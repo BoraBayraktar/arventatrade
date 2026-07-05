@@ -1,0 +1,223 @@
+import bcrypt from "bcryptjs";
+import { PrismaClient } from "@prisma/client";
+
+const baseUrl = process.env.APP_URL || "http://localhost:3001";
+const prisma = new PrismaClient();
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function extractCookie(setCookieHeader) {
+  if (!setCookieHeader) {
+    return null;
+  }
+
+  return setCookieHeader.split(";")[0] || null;
+}
+
+async function login(email, password) {
+  const response = await fetch(`${baseUrl}/api/identity/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  assert(response.ok, `Login failed for ${email} with status ${response.status}`);
+
+  const cookie = extractCookie(response.headers.get("set-cookie"));
+  assert(cookie, `No auth cookie for ${email}`);
+
+  return cookie;
+}
+
+async function authFetch(path, cookie, options = {}) {
+  return fetch(`${baseUrl}${path}`, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Cookie: cookie,
+    },
+  });
+}
+
+async function main() {
+  const adminPasswordHash = await bcrypt.hash("Admin123!", 10);
+  const editorPasswordHash = await bcrypt.hash("Editor123!", 10);
+
+  const adminUser = await prisma.user.upsert({
+    where: { email: "admin@arventatrade.local" },
+    update: {
+      name: "Admin User",
+      role: "ADMIN",
+      passwordHash: adminPasswordHash,
+      deleted: false,
+      deletedDate: null,
+      deletedUserId: null,
+    },
+    create: {
+      email: "admin@arventatrade.local",
+      name: "Admin User",
+      role: "ADMIN",
+      passwordHash: adminPasswordHash,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "editor@arventatrade.local" },
+    update: {
+      name: "Editor User",
+      role: "EDITOR",
+      passwordHash: editorPasswordHash,
+      deleted: false,
+      deletedDate: null,
+      deletedUserId: null,
+    },
+    create: {
+      email: "editor@arventatrade.local",
+      name: "Editor User",
+      role: "EDITOR",
+      passwordHash: editorPasswordHash,
+    },
+  });
+
+  const adminCookie = await login("admin@arventatrade.local", "Admin123!");
+  const editorCookie = await login("editor@arventatrade.local", "Editor123!");
+
+  const unique = Date.now();
+  const createProductResponse = await authFetch("/api/admin/products", adminCookie, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      slug: `orders-verify-${unique}`,
+      sku: `orders-verify-sku-${unique}`,
+      name: "Orders Verify Product",
+      description: "Temporary product for orders verify",
+      price: 120,
+      compareAtPrice: 150,
+      stock: 3,
+      imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80",
+    }),
+  });
+
+  assert(createProductResponse.status === 201, `Create product expected 201, got ${createProductResponse.status}`);
+  const createProductPayload = await createProductResponse.json();
+  const productId = createProductPayload?.item?.id;
+  assert(productId, "Create product response should include id");
+
+  let createdOrderId = null;
+
+  try {
+    const checkoutResponse = await fetch(`${baseUrl}/api/commerce/checkout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        lines: [{ productId, quantity: 1 }],
+      }),
+    });
+
+    assert(checkoutResponse.status === 201, `Checkout expected 201, got ${checkoutResponse.status}`);
+    const checkoutPayload = await checkoutResponse.json();
+    const orderNumber = checkoutPayload?.orderNumber;
+    assert(orderNumber, "Checkout should return order number");
+
+    const adminListResponse = await authFetch(`/api/admin/orders?search=${encodeURIComponent(orderNumber)}&page=1&pageSize=5`, adminCookie);
+    assert(adminListResponse.status === 200, `Admin orders list expected 200, got ${adminListResponse.status}`);
+
+    const adminPayload = await adminListResponse.json();
+    assert(Array.isArray(adminPayload.items), "Orders list should include items array");
+    const createdOrder = adminPayload.items.find((item) => item.orderNumber === orderNumber);
+    assert(createdOrder, "Created order should be listed");
+    createdOrderId = createdOrder.id;
+
+    const editorListResponse = await authFetch("/api/admin/orders?page=1&pageSize=5", editorCookie);
+    assert(editorListResponse.status === 200, `Editor orders list expected 200, got ${editorListResponse.status}`);
+
+    const unauthorizedResponse = await fetch(`${baseUrl}/api/admin/orders?page=1&pageSize=5`);
+    assert(unauthorizedResponse.status === 401, `Unauthorized orders list expected 401, got ${unauthorizedResponse.status}`);
+
+    const adminDetailResponse = await authFetch(`/api/admin/orders/${createdOrderId}`, adminCookie);
+    assert(adminDetailResponse.status === 200, `Admin order detail expected 200, got ${adminDetailResponse.status}`);
+    const adminDetailPayload = await adminDetailResponse.json();
+    assert(Array.isArray(adminDetailPayload?.statusHistory), "Order detail should include status history");
+    assert(adminDetailPayload.statusHistory.length >= 1, "Order should have initial status history");
+    assert(adminDetailPayload.statusHistory[0].toStatus === "CONFIRMED", "Initial history should be CONFIRMED");
+    assert(adminDetailPayload.paymentStatus === "PENDING", "Initial payment status should be PENDING");
+    assert(Array.isArray(adminDetailPayload?.paymentStatusHistory), "Order detail should include payment status history");
+    assert(adminDetailPayload.paymentStatusHistory.length >= 1, "Order should have initial payment history");
+    assert(adminDetailPayload.paymentStatusHistory[0].toStatus === "PENDING", "Initial payment history should be PENDING");
+
+    const editorDetailResponse = await authFetch(`/api/admin/orders/${createdOrderId}`, editorCookie);
+    assert(editorDetailResponse.status === 200, `Editor order detail expected 200, got ${editorDetailResponse.status}`);
+
+    const editorPatchResponse = await authFetch(`/api/admin/orders/${createdOrderId}`, editorCookie, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status: "CANCELLED" }),
+    });
+    assert(editorPatchResponse.status === 403, `Editor order patch expected 403, got ${editorPatchResponse.status}`);
+
+    const adminPatchResponse = await authFetch(`/api/admin/orders/${createdOrderId}`, adminCookie, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status: "CANCELLED", paymentStatus: "PAID" }),
+    });
+    assert(adminPatchResponse.status === 200, `Admin order patch expected 200, got ${adminPatchResponse.status}`);
+
+    const patchedPayload = await adminPatchResponse.json();
+    assert(patchedPayload?.item?.status === "CANCELLED", "Admin order patch should update status");
+    assert(patchedPayload?.item?.statusHistory?.length >= 2, "Status update should append history record");
+    assert(patchedPayload.item.statusHistory[0].toStatus === "CANCELLED", "Latest history should be CANCELLED");
+    assert(patchedPayload.item.statusHistory[0].source === "ADMIN", "Latest history source should be ADMIN");
+    assert(patchedPayload.item.statusHistory[0].changedByUserId === adminUser.id, "History actor should match admin user");
+    assert(patchedPayload.item.paymentStatus === "PAID", "Admin order patch should update payment status");
+    assert(patchedPayload.item.paymentStatusHistory.length >= 2, "Payment status update should append history record");
+    assert(patchedPayload.item.paymentStatusHistory[0].toStatus === "PAID", "Latest payment history should be PAID");
+    assert(patchedPayload.item.paymentStatusHistory[0].source === "ADMIN", "Latest payment history source should be ADMIN");
+    assert(patchedPayload.item.paymentStatusHistory[0].changedByUserId === adminUser.id, "Payment history actor should match admin user");
+
+    const editorDeleteResponse = await authFetch(`/api/admin/orders/${createdOrderId}`, editorCookie, {
+      method: "DELETE",
+    });
+    assert(editorDeleteResponse.status === 403, `Editor order delete expected 403, got ${editorDeleteResponse.status}`);
+
+    const adminDeleteResponse = await authFetch(`/api/admin/orders/${createdOrderId}`, adminCookie, {
+      method: "DELETE",
+    });
+    assert(adminDeleteResponse.status === 200, `Admin order delete expected 200, got ${adminDeleteResponse.status}`);
+
+    const adminDetailAfterDeleteResponse = await authFetch(`/api/admin/orders/${createdOrderId}`, adminCookie);
+    assert(adminDetailAfterDeleteResponse.status === 404, `Deleted order detail expected 404, got ${adminDetailAfterDeleteResponse.status}`);
+
+    console.log("Orders admin integration verification passed");
+  } finally {
+    if (createdOrderId) {
+      await authFetch(`/api/admin/orders/${createdOrderId}`, adminCookie, {
+        method: "DELETE",
+      });
+    }
+
+    await authFetch(`/api/admin/products/${productId}`, adminCookie, {
+      method: "DELETE",
+    });
+  }
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+}).finally(async () => {
+  await prisma.$disconnect();
+});

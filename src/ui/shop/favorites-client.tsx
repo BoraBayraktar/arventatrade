@@ -1,0 +1,85 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+
+import Grid from "@/components/grid";
+import { ProductGridItems } from "@/components/layout/product-grid-items";
+import { Button } from "@/components/ui/button";
+import type { Locale } from "@/lib/i18n";
+import type { ProductCard } from "@/modules/catalog/contracts/catalog.contract";
+
+const FAVORITES_KEY = "arventa:favorites";
+
+function readFavorites(): string[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(FAVORITES_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as string[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((item) => typeof item === "string");
+  } catch {
+    return [];
+  }
+}
+
+type FavoritesClientProps = {
+  locale: Locale;
+  products: ProductCard[];
+  labels: {
+    title: string;
+    empty: string;
+    continueShopping: string;
+  };
+};
+
+export function FavoritesClient({ locale, products, labels }: FavoritesClientProps) {
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const sync = () => setFavoriteIds(readFavorites());
+    sync();
+
+    window.addEventListener("storage", sync);
+    window.addEventListener("arventa:favorites-updated", sync);
+
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("arventa:favorites-updated", sync);
+    };
+  }, []);
+
+  const favorites = useMemo(() => {
+    const ids = new Set(favoriteIds);
+    return products.filter((product) => ids.has(product.id));
+  }, [favoriteIds, products]);
+
+  return (
+    <section className="mx-auto w-[min(1200px,95vw)] py-8">
+      <h1 className="mb-6 text-3xl font-semibold tracking-tight">{labels.title}</h1>
+
+      {favorites.length === 0 ? (
+        <div className="rounded-xl border border-neutral-200 bg-white p-6">
+          <p className="mb-4 text-sm text-neutral-600">{labels.empty}</p>
+          <Button asChild variant="secondary">
+            <Link href={`/${locale}/search`}>{labels.continueShopping}</Link>
+          </Button>
+        </div>
+      ) : (
+        <Grid className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <ProductGridItems locale={locale} products={favorites} />
+        </Grid>
+      )}
+    </section>
+  );
+}

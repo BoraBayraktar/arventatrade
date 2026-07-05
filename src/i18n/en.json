@@ -1,0 +1,183 @@
+{
+	"common": {
+		"brand": "ArventaTrade",
+		"language": "Language",
+		"favorites": "My Favorites",
+		"adminPanel": "Admin",
+		"product": "product",
+		"noResult": "No results found",
+		"loading": "Loading...",
+		"notSpecified": "Not specified"
+	},
+	"auth": {
+		"loginTitle": "Sign In To Your Account",
+		"loginSubtitle": "Sign in to manage shopping, favorites, and your orders.",
+		"registerTitle": "Create New Account",
+		"registerSubtitle": "Register in minutes and start shopping.",
+		"email": "E-mail",
+		"name": "Full Name",
+		"password": "Password",
+		"loginButton": "Sign In",
+		"registerButton": "Sign Up",
+		"invalidCredentials": "E-mail or password is incorrect.",
+		"registerFailed": "Registration failed.",
+		"emailExists": "This e-mail is already registered.",
+		"noAccount": "Don't have an account?",
+		"haveAccount": "Already have an account?"
+	},
+	"home": {
+		"title": "ArventaTrade Product Showcase",
+		"subtitle": "Phase one focuses on a fast, mobile-friendly and service-driven product discovery experience.",
+		"cta": "Explore Products",
+		"eyebrow": "Next-generation ecommerce storefront experience",
+		"spotlightTitle": "Manage daily discovery, campaigns and category flow at a glance.",
+		"spotlightBody": "We bring a modern marketplace quality storefront with category entry points, focus areas, and quick decision support modules.",
+		"campaignTitle": "Featured Areas",
+		"campaignCards": {
+			"new": {
+				"title": "New Arrivals",
+				"text": "A quick discovery space that highlights incoming products."
+			},
+			"popular": {
+				"title": "Popular Picks",
+				"text": "Presents high-demand products in blocks that make decisions easier."
+			},
+			"fast": {
+				"title": "Quick Campaigns",
+				"text": "An ideal storefront structure for short-term price and focus-product highlights."
+			}
+		},
+		"featureTitle": "Commercial advantages",
+		"featureCards": {
+			"curation": {
+				"title": "Editorial curation",
+				"text": "Reduces list clutter and surfaces the most critical products."
+			},
+			"responsive": {
+				"title": "Mobile-first flow",
+				"text": "Provides fast navigation and clear action-oriented experience on phone screens."
+			},
+			"conversion": {
+				"title": "Conversion-focused blocks",
+				"text": "Combines campaigns, categories and trust signals in a single flow."
+			}
+		}
+	},
+	"catalog": {
+		"title": "Product Catalog",
+		"searchPlaceholder": "Search products",
+		"allCategories": "All categories",
+		"filter": "Filter",
+		"detail": "Detail",
+		"price": "Price",
+		"category": "Category",
+		"back": "Back to catalog",
+		"empty": "No products found for the selected criteria.",
+		"page": "Page",
+		"summaryTitle": "Discovery Board",
+		"summaryCards": {
+			"total": "Total products",
+			"focused": "Active filter",
+			"pace": "Discovery speed"
+		},
+		"focusAll": "All products",
+		"focusSearch": "Search focus",
+		"paceText": "Fast scan"
+	},
+	"commerce": {
+		"addToCart": "Add to Cart",
+		"addedToCart": "Product added to cart.",
+		"viewCart": "View cart",
+		"cartTitle": "Cart",
+		"cartEmpty": "Your cart is empty.",
+		"quantity": "Quantity",
+		"subtotal": "Subtotal",
+		"discountTotal": "Discount Total",
+		"total": "Grand Total",
+		"promotionCode": "Promotion Code",
+		"checkout": "Complete Checkout",
+		"continueShopping": "Continue Shopping",
+		"remove": "Remove",
+		"stockWarning": "Insufficient stock",
+		"checkoutSuccess": "Order created:",
+		"checkoutFailed": "Checkout failed.",
+		"relatedProducts": "Related Products",
+		"compareAtPrice": "Compare-at Price",
+		"discount": "discount",
+		"stockStatus": "Stock",
+		"inStock": "In stock",
+		"outOfStock": "Out of stock",
+		"sortBy": "Sort by",
+		"relevance": "Relevance",
+		"latest": "Latest",
+		"showing": "Showing",
+		"for": "for",
+		"noProductsMatch": "No products match: ",
+		"favoritesTitle": "My Favorites",
+		"favoritesEmpty": "No products added to favorites yet."
+	},
+	"admin": {
+		"title": "Backoffice Dashboard",
+		"loginTitle": "Admin Login",
+		"loginSubtitle": "Authentication and role foundation are ready for Phase 2.",
+		"email": "E-mail",
+		"password": "Password",
+		"loginButton": "Sign In",
+		"invalidCredentials": "E-mail or password is incorrect.",
+		"logout": "Log Out",
+		"userInfo": "User Information",
+		"quickActions": "Quick Actions",
+		"phase2Note": "Next step is product management screens and role-based authorization expansion.",
+		"name": "Full Name",
+		"role": "Role",
+		"productManager": "Product Management",
+		"createProduct": "Add New Product",
+		"productList": "Product List",
+		"slug": "Slug",
+		"description": "Description",
+		"imageUrl": "Image URL",
+		"search": "Search product",
+		"allCategories": "All categories",
+		"prev": "Previous",
+		"next": "Next",
+		"page": "Page",
+		"save": "Save",
+		"create": "Create",
+		"edit": "Edit",
+		"delete": "Delete",
+		"cancel": "Cancel",
+		"emptyProducts": "No products to display.",
+		"operationFailed": "Operation failed. Please try again.",
+		"validationRequired": "Please fill all required fields.",
+		"validationPrice": "Price must be greater than 0.",
+		"validationImageUrl": "Please enter a valid image URL."
+		,"categoryManager": "Category Management"
+		,"createCategory": "New Category"
+		,"categoryList": "Category List"
+		,"searchCategory": "Search category"
+		,"productCount": "Product Count"
+		,"emptyCategories": "No categories to display."
+		,"validationDeleteCategoryBlocked": "Cannot delete a category that still has products."
+		,"parentCategory": "Parent Category"
+		,"noParentCategory": "No parent category"
+		,"startAt": "Start"
+		,"endAt": "End"
+		,"noDateWindow": "Unbounded"
+		,"validationDateRange": "End date cannot be earlier than start date."
+		,"roleCustomer": "Customer"
+		,"customerManager": "Customer Management"
+		,"createCustomer": "New Customer"
+		,"customerList": "Customer List"
+		,"searchCustomer": "Search customer"
+		,"emptyCustomers": "No customers to display."
+		,"auditLogMenu": "Audit Log"
+		,"auditLogTitle": "Activity Logs"
+		,"auditLogCount": "records listed"
+		,"auditEntity": "Entity"
+		,"auditAction": "Action"
+		,"auditActor": "Actor"
+		,"auditSummary": "Summary"
+		,"auditDate": "Date"
+		,"auditEmpty": "No audit records to display."
+	}
+}

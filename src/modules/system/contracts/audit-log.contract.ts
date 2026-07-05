@@ -1,0 +1,45 @@
+export type AuditLogEntityType =
+  | "USER"
+  | "PRODUCT"
+  | "CATEGORY"
+  | "ORDER"
+  | "STOREFRONT_ITEM"
+  | "AUTH";
+
+export type AuditLogAction = "CREATE" | "UPDATE" | "DELETE" | "STATUS_UPDATE" | "LOGIN" | "LOGOUT";
+
+export type AuditLogItem = {
+  id: string;
+  entityType: AuditLogEntityType;
+  entityId: string | null;
+  action: AuditLogAction;
+  actorUserId: string | null;
+  summary: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type AuditLogListQuery = {
+  search?: string;
+  entityType?: AuditLogEntityType;
+  actorUserId?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type AuditLogListResult = {
+  items: AuditLogItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export type CreateAuditLogInput = {
+  entityType: AuditLogEntityType;
+  entityId?: string | null;
+  action: AuditLogAction;
+  actorUserId?: string | null;
+  summary?: string | null;
+  metadata?: Record<string, unknown> | null;
+};

@@ -1,0 +1,41 @@
+:root {
+  /* Colors */
+  --color-bg-main: #ffffff;
+  --color-bg-soft: #f7f7f7;
+  --color-surface: #ffffff;
+  --color-surface-glass: #ffffff;
+  --color-text: #171717;
+  --color-text-muted: #737373;
+  --color-border: #e5e5e5;
+  --color-brand: #000000;
+  --color-brand-strong: #171717;
+  --color-accent: #171717;
+  --color-danger: #dc2626;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-pill: 999px;
+
+  /* Shadow */
+  --shadow-soft: none;
+  --shadow-card: none;
+  --shadow-float: 0 10px 30px rgba(0, 0, 0, 0.08);
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+
+  /* Motion */
+  --motion-fast: 160ms;
+  --motion-base: 240ms;
+  --motion-slow: 420ms;
+}

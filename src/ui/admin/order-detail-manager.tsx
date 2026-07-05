@@ -1,0 +1,296 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { Button } from "@/components/ui/button";
+
+type OrderStatus = "CONFIRMED" | "CANCELLED";
+type PaymentStatus = "PENDING" | "AUTHORIZED" | "PAID" | "FAILED" | "REFUNDED";
+
+type Item = {
+  id: string;
+  productSlug: string;
+  productSku: string;
+  productName: string;
+  productImageUrl: string;
+  quantity: number;
+  unitPrice: number;
+  compareAtPrice: number | null;
+  lineTotal: number;
+  currency: string;
+};
+
+type OrderDetail = {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  subtotal: number;
+  discountTotal: number;
+  total: number;
+  promotionCode: string | null;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+  items: Item[];
+  statusHistory: {
+    id: string;
+    fromStatus: OrderStatus | null;
+    toStatus: OrderStatus;
+    source: "SYSTEM" | "ADMIN";
+    changedByUserId: string | null;
+    note: string | null;
+    createdAt: string;
+  }[];
+  paymentStatusHistory: {
+    id: string;
+    fromStatus: PaymentStatus | null;
+    toStatus: PaymentStatus;
+    source: "SYSTEM" | "ADMIN";
+    changedByUserId: string | null;
+    note: string | null;
+    createdAt: string;
+  }[];
+};
+
+type Labels = {
+  back: string;
+  orderNumber: string;
+  orderStatus: string;
+  orderStatusConfirmed: string;
+  orderStatusCancelled: string;
+  paymentStatus: string;
+  orderItems: string;
+  orderSubtotal: string;
+  orderTotal: string;
+  orderDiscount: string;
+  promotionCode: string;
+  orderDate: string;
+  updateStatus: string;
+  deleteOrder: string;
+  operationFailed: string;
+  loading: string;
+  statusHistoryTitle: string;
+  historyFrom: string;
+  historyTo: string;
+  historySource: string;
+  historyBy: string;
+  historyNote: string;
+  historyAt: string;
+  historySourceSystem: string;
+  historySourceAdmin: string;
+  paymentHistoryTitle: string;
+  paymentHistoryFrom: string;
+  paymentHistoryTo: string;
+  notSpecified: string;
+};
+
+function formatMoney(value: number, currency: string, locale: string) {
+  return new Intl.NumberFormat(locale === "tr" ? "tr-TR" : "en-US", {
+    style: "currency",
+    currency,
+  }).format(value);
+}
+
+function formatDate(value: string, locale: string) {
+  const date = new Date(value);
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+export function OrderDetailManager({ locale, order, labels, canManage }: { locale: string; order: OrderDetail; labels: Labels; canManage: boolean }) {
+  const router = useRouter();
+  const [status, setStatus] = useState<OrderStatus>(order.status);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(order.paymentStatus);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function updateStatus() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/orders/${order.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status, paymentStatus }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(payload?.message ?? labels.operationFailed);
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      setError(labels.operationFailed);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteOrder() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/orders/${order.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(payload?.message ?? labels.operationFailed);
+        return;
+      }
+
+      router.push(`/${locale}/admin/orders`);
+      router.refresh();
+    } catch {
+      setError(labels.operationFailed);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-neutral-200 bg-white">
+      <div className="flex flex-col gap-3 border-b border-neutral-200 p-5">
+        <Link href={`/${locale}/admin/orders`} className="text-sm text-neutral-600 underline-offset-4 hover:text-neutral-900 hover:underline">{labels.back}</Link>
+        <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">{order.orderNumber}</h2>
+        <p className="text-sm text-neutral-500">{labels.orderDate}: {formatDate(order.createdAt, locale)}</p>
+      </div>
+
+      <div className="grid gap-4 border-b border-neutral-200 p-5 md:grid-cols-4">
+        <article className="rounded-xl border border-neutral-200 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.orderStatus}</p>
+          <p className="mt-2 text-sm font-semibold text-neutral-950">{order.status === "CONFIRMED" ? labels.orderStatusConfirmed : labels.orderStatusCancelled}</p>
+        </article>
+        <article className="rounded-xl border border-neutral-200 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.paymentStatus}</p>
+          <p className="mt-2 text-sm font-semibold text-neutral-950">{paymentStatus}</p>
+        </article>
+        <article className="rounded-xl border border-neutral-200 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.orderSubtotal}</p>
+          <p className="mt-2 text-sm font-semibold text-neutral-950">{formatMoney(order.subtotal, order.currency, locale)}</p>
+        </article>
+        <article className="rounded-xl border border-neutral-200 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.orderDiscount}</p>
+          <p className="mt-2 text-sm font-semibold text-neutral-950">{formatMoney(order.discountTotal, order.currency, locale)}</p>
+        </article>
+        <article className="rounded-xl border border-neutral-200 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.orderItems}</p>
+          <p className="mt-2 text-sm font-semibold text-neutral-950">{order.items.reduce((sum, item) => sum + item.quantity, 0)}</p>
+        </article>
+        <article className="rounded-xl border border-neutral-200 p-4 md:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.orderTotal}</p>
+          <p className="mt-2 text-xl font-semibold text-neutral-950">{formatMoney(order.total, order.currency, locale)}</p>
+          <p className="mt-1 text-xs text-neutral-500">{labels.promotionCode}: {order.promotionCode ?? labels.notSpecified}</p>
+        </article>
+      </div>
+
+      {error ? <p className="mx-5 mt-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+
+      <div className="p-5">
+        <div className="overflow-hidden rounded-xl border border-neutral-200">
+          <div className="hidden grid-cols-[80px_1.2fr_120px_130px_140px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+            <span>Image</span>
+            <span>{labels.orderItems}</span>
+            <span>Qty</span>
+            <span>Unit</span>
+            <span>Total</span>
+          </div>
+
+          <div className="divide-y divide-neutral-200">
+            {order.items.map((item) => (
+              <article key={item.id} className="grid gap-3 p-4 lg:grid-cols-[80px_1.2fr_120px_130px_140px] lg:items-center">
+                <div className="h-20 w-20 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.productImageUrl} alt={item.productName} className="h-full w-full object-cover" />
+                </div>
+                <div>
+                  <p className="font-medium text-neutral-950">{item.productName}</p>
+                  <p className="mt-1 text-xs text-neutral-500">/{item.productSlug} · {item.productSku}</p>
+                </div>
+                <p className="text-sm text-neutral-700">{item.quantity}</p>
+                <p className="text-sm text-neutral-700">{formatMoney(item.unitPrice, item.currency, locale)}</p>
+                <p className="text-sm font-semibold text-neutral-950">{formatMoney(item.lineTotal, item.currency, locale)}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-neutral-200 p-5">
+        <h3 className="mb-3 text-lg font-semibold tracking-tight text-neutral-950">{labels.statusHistoryTitle}</h3>
+        <div className="space-y-3">
+          {order.statusHistory.map((entry) => (
+            <article key={entry.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <div className="grid gap-2 text-sm text-neutral-700 md:grid-cols-2">
+                <p><span className="font-medium text-neutral-900">{labels.historyFrom}:</span> {entry.fromStatus ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyTo}:</span> {entry.toStatus}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historySource}:</span> {entry.source === "ADMIN" ? labels.historySourceAdmin : labels.historySourceSystem}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyBy}:</span> {entry.changedByUserId ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyAt}:</span> {formatDate(entry.createdAt, locale)}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyNote}:</span> {entry.note ?? labels.notSpecified}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t border-neutral-200 p-5">
+        <h3 className="mb-3 text-lg font-semibold tracking-tight text-neutral-950">{labels.paymentHistoryTitle}</h3>
+        <div className="space-y-3">
+          {order.paymentStatusHistory.map((entry) => (
+            <article key={entry.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <div className="grid gap-2 text-sm text-neutral-700 md:grid-cols-2">
+                <p><span className="font-medium text-neutral-900">{labels.paymentHistoryFrom}:</span> {entry.fromStatus ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.paymentHistoryTo}:</span> {entry.toStatus}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historySource}:</span> {entry.source === "ADMIN" ? labels.historySourceAdmin : labels.historySourceSystem}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyBy}:</span> {entry.changedByUserId ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyAt}:</span> {formatDate(entry.createdAt, locale)}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyNote}:</span> {entry.note ?? labels.notSpecified}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      {canManage ? (
+        <div className="flex flex-wrap items-center gap-3 border-t border-neutral-200 p-5">
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value as OrderStatus)}
+            className="h-10 rounded-md border border-neutral-300 px-3 text-sm"
+            disabled={loading}
+          >
+            <option value="CONFIRMED">{labels.orderStatusConfirmed}</option>
+            <option value="CANCELLED">{labels.orderStatusCancelled}</option>
+          </select>
+          <select
+            value={paymentStatus}
+            onChange={(event) => setPaymentStatus(event.target.value as PaymentStatus)}
+            className="h-10 rounded-md border border-neutral-300 px-3 text-sm"
+            disabled={loading}
+          >
+            <option value="PENDING">PENDING</option>
+            <option value="AUTHORIZED">AUTHORIZED</option>
+            <option value="PAID">PAID</option>
+            <option value="FAILED">FAILED</option>
+            <option value="REFUNDED">REFUNDED</option>
+          </select>
+          <Button type="button" variant="secondary" onClick={updateStatus} disabled={loading}>{loading ? labels.loading : labels.updateStatus}</Button>
+          <Button type="button" variant="destructive" onClick={deleteOrder} disabled={loading}>{labels.deleteOrder}</Button>
+        </div>
+      ) : null}
+    </section>
+  );
+}

@@ -1,0 +1,86 @@
+export type IntegrationChannel = "TRENDYOL" | "N11";
+export type IntegrationJobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC";
+export type IntegrationEntityType = "PRODUCT";
+export type IntegrationJobStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
+
+export type AdminIntegrationListQuery = {
+  channel?: IntegrationChannel;
+  jobType?: IntegrationJobType;
+  status?: IntegrationJobStatus;
+  page?: number;
+  pageSize?: number;
+};
+
+export type AdminIntegrationJobItem = {
+  id: string;
+  idempotencyKey: string;
+  channel: IntegrationChannel;
+  jobType: IntegrationJobType;
+  entityType: IntegrationEntityType;
+  entityId: string;
+  status: IntegrationJobStatus;
+  attemptCount: number;
+  maxAttempts: number;
+  nextAttemptAt: string;
+  lastAttemptAt: string | null;
+  processedAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+};
+
+export type AdminIntegrationJobListResult = {
+  items: AdminIntegrationJobItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export type DispatchIntegrationJobsInput = {
+  channel: IntegrationChannel;
+  jobType: IntegrationJobType;
+  entityType: IntegrationEntityType;
+  entityIds: string[];
+  maxAttempts?: number;
+  payload?: Record<string, string | number | boolean | null>;
+};
+
+export type DispatchIntegrationJobsResult = {
+  accepted: number;
+  deduplicated: number;
+  jobs: AdminIntegrationJobItem[];
+};
+
+export type ProcessIntegrationQueueInput = {
+  limit?: number;
+};
+
+export type ProcessIntegrationQueueResult = {
+  processed: number;
+  success: number;
+  failed: number;
+  deadLetter: number;
+};
+
+export type IntegrationDeadLetterItem = {
+  id: string;
+  jobId: string;
+  channel: IntegrationChannel;
+  jobType: IntegrationJobType;
+  entityType: IntegrationEntityType;
+  entityId: string;
+  lastError: string;
+  attemptCount: number;
+  maxAttempts: number;
+  createdAt: string;
+  resolved: boolean;
+};
+
+export type IntegrationDeadLetterListResult = {
+  items: IntegrationDeadLetterItem[];
+};
+
+export type RetryDeadLetterInput = {
+  jobId: string;
+  resolvedByUserId: string;
+};

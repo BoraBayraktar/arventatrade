@@ -1,0 +1,80 @@
+import { notFound } from "next/navigation";
+
+import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
+import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { CategoryManager } from "@/ui/admin/category-manager";
+
+export default async function AdminCategoriesPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  const dictionary = getDictionary(locale as Locale);
+  const user = await getCurrentUserFromContext();
+
+  if (!user) {
+    notFound();
+  }
+
+  const categoryResult = await catalogAdminService.listCategories({
+    page: 1,
+    pageSize: 10,
+  });
+
+  const firstCandidatePage = await catalogAdminService.listCategories({
+    page: 1,
+    pageSize: 50,
+  });
+
+  const candidateItems = [...firstCandidatePage.items];
+  for (let page = 2; page <= firstCandidatePage.totalPages; page += 1) {
+    const nextPage = await catalogAdminService.listCategories({
+      page,
+      pageSize: 50,
+    });
+    candidateItems.push(...nextPage.items);
+  }
+
+  return (
+    <CategoryManager
+      initialResult={categoryResult}
+      parentCandidates={candidateItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        parentId: item.parentId,
+      }))}
+      canDelete={user.role === "ADMIN"}
+      labels={{
+        title: dictionary.admin.categoryManager,
+        createTitle: dictionary.admin.createCategory,
+        listTitle: dictionary.admin.categoryList,
+        search: dictionary.admin.searchCategory,
+        slug: dictionary.admin.slug,
+        name: dictionary.admin.name,
+        productCount: dictionary.admin.productCount,
+        parentCategory: dictionary.admin.parentCategory,
+        noParent: dictionary.admin.noParentCategory,
+        page: dictionary.admin.page,
+        prev: dictionary.admin.prev,
+        next: dictionary.admin.next,
+        save: dictionary.admin.save,
+        create: dictionary.admin.create,
+        edit: dictionary.admin.edit,
+        delete: dictionary.admin.delete,
+        cancel: dictionary.admin.cancel,
+        empty: dictionary.admin.emptyCategories,
+        opFailed: dictionary.admin.operationFailed,
+        validationRequired: dictionary.admin.validationRequired,
+        validationDeleteBlocked: dictionary.admin.validationDeleteCategoryBlocked,
+        loading: dictionary.common.loading,
+      }}
+    />
+  );
+}

@@ -1,0 +1,18 @@
+import { NextResponse } from "next/server";
+import { ZodError } from "zod";
+
+import { commerceService } from "@/modules/commerce/services/commerce.service";
+
+export async function POST(request: Request) {
+  try {
+    const payload = await request.json();
+    const quote = await commerceService.quote(payload);
+    return NextResponse.json(quote);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ message: error.issues[0]?.message ?? "Validation failed" }, { status: 400 });
+    }
+
+    return NextResponse.json({ message: "Unexpected error" }, { status: 500 });
+  }
+}

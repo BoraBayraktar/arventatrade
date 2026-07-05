@@ -1,0 +1,12 @@
+# Domain ownership model (Phase 5)
+
+/src/modules/catalog/ @BoraBayraktar
+/src/modules/commerce/ @BoraBayraktar
+/src/modules/pricing/ @BoraBayraktar
+/src/modules/integration/ @BoraBayraktar
+/src/modules/identity/ @BoraBayraktar
+/src/modules/storefront/ @BoraBayraktar
+/src/lib/ @BoraBayraktar
+/middleware.ts @BoraBayraktar
+/next.config.ts @BoraBayraktar
+/docs/ @BoraBayraktar

@@ -1,0 +1,183 @@
+{
+  "common": {
+    "brand": "ArventaTrade",
+    "language": "Dil",
+    "favorites": "Favorilerim",
+    "adminPanel": "Admin",
+    "product": "urun",
+    "noResult": "Sonuc bulunamadi",
+    "loading": "Yukleniyor...",
+    "notSpecified": "Belirtilmedi"
+  },
+  "auth": {
+    "loginTitle": "Hesabina Giris Yap",
+    "loginSubtitle": "Alisveris, favoriler ve siparislerini yonetmek icin giris yap.",
+    "registerTitle": "Yeni Hesap Olustur",
+    "registerSubtitle": "Dakikalar icinde kayit ol ve alisverise basla.",
+    "email": "E-posta",
+    "name": "Ad Soyad",
+    "password": "Sifre",
+    "loginButton": "Giris Yap",
+    "registerButton": "Kayit Ol",
+    "invalidCredentials": "E-posta veya sifre hatali.",
+    "registerFailed": "Kayit islemi basarisiz oldu.",
+    "emailExists": "Bu e-posta zaten kayitli.",
+    "noAccount": "Hesabin yok mu?",
+    "haveAccount": "Zaten hesabin var mi?"
+  },
+  "home": {
+    "title": "ArventaTrade Urun Vitrini",
+    "subtitle": "Ilk fazda hizli, mobil uyumlu ve servis odakli urun kesfi deneyimi.",
+    "cta": "Urunleri Kesfet",
+    "eyebrow": "Yeni nesil e-ticaret vitrin deneyimi",
+    "spotlightTitle": "Gunluk kesif, kampanya ve kategori akisini tek bakista yonetin.",
+    "spotlightBody": "Kategori girisleri, dikkat odaklari ve hizli karar destek modulleri ile vitrin deneyimini modern pazaryeri kalitesine tasiyoruz.",
+    "campaignTitle": "One Cikan Alanlar",
+    "campaignCards": {
+      "new": {
+        "title": "Yeni Gelenler",
+        "text": "Yeni urun akisini one cikaran hizli kesif alani."
+      },
+      "popular": {
+        "title": "Populer Secimler",
+        "text": "Talep goren urunleri karar vermeyi kolaylastiran bloklarda sunar."
+      },
+      "fast": {
+        "title": "Hizli Kampanyalar",
+        "text": "Kisa sureli fiyat ve odak urun vurgulari icin ideal vitrin yapisi."
+      }
+    },
+    "featureTitle": "Ticari avantajlar",
+    "featureCards": {
+      "curation": {
+        "title": "Editoryal kurasyon",
+        "text": "Liste karmasasini azaltip en kritik urunleri one cikarir."
+      },
+      "responsive": {
+        "title": "Mobil once gelen akış",
+        "text": "Telefon ekraninda hizli gezinme ve net aksiyon odakli deneyim sunar."
+      },
+      "conversion": {
+        "title": "Donusum odakli bloklar",
+        "text": "Kampanya, kategori ve guven sinyallerini ayni akista toplar."
+      }
+    }
+  },
+  "catalog": {
+    "title": "Urun Katalogu",
+    "searchPlaceholder": "Urun ara",
+    "allCategories": "Tum kategoriler",
+    "filter": "Filtrele",
+    "detail": "Detay",
+    "price": "Fiyat",
+    "category": "Kategori",
+    "back": "Kataloga don",
+    "empty": "Kriterlere uygun urun bulunamadi.",
+    "page": "Sayfa",
+    "summaryTitle": "Kesif Panosu",
+    "summaryCards": {
+      "total": "Toplam urun",
+      "focused": "Aktif filtre",
+      "pace": "Kesif hizi"
+    },
+    "focusAll": "Tum urunler",
+    "focusSearch": "Arama odagi",
+    "paceText": "Hizli tarama"
+  },
+  "commerce": {
+    "addToCart": "Sepete Ekle",
+    "addedToCart": "Urun sepete eklendi.",
+    "viewCart": "Sepete git",
+    "cartTitle": "Sepet",
+    "cartEmpty": "Sepetinizde urun bulunmuyor.",
+    "quantity": "Adet",
+    "subtotal": "Ara Toplam",
+    "discountTotal": "Indirim Toplami",
+    "total": "Genel Toplam",
+    "promotionCode": "Promosyon Kodu",
+    "checkout": "Siparisi Tamamla",
+    "continueShopping": "Alisverise Devam Et",
+    "remove": "Kaldir",
+    "stockWarning": "Yetersiz stok",
+    "checkoutSuccess": "Siparis olusturuldu:",
+    "checkoutFailed": "Checkout islemi basarisiz oldu.",
+    "relatedProducts": "Benzer Urunler",
+    "compareAtPrice": "Indirimsiz Fiyat",
+    "discount": "indirim",
+    "stockStatus": "Stok",
+    "inStock": "Stokta",
+    "outOfStock": "Tukendi",
+    "sortBy": "Siralama",
+    "relevance": "Ilgi duzeyi",
+    "latest": "En yeni",
+    "showing": "Gosterilen",
+    "for": "sonuc:",
+    "noProductsMatch": "Eslesen urun bulunamadi: ",
+    "favoritesTitle": "Favorilerim",
+    "favoritesEmpty": "Henuz favorilere eklenmis urun yok."
+  },
+  "admin": {
+    "title": "Backoffice Dashboard",
+    "loginTitle": "Admin Girisi",
+    "loginSubtitle": "Faz 2 icin kimlik dogrulama ve rol temeli hazirdir.",
+    "email": "E-mail",
+    "password": "Sifre",
+    "loginButton": "Giris Yap",
+    "invalidCredentials": "E-mail veya sifre hatali.",
+    "logout": "Cikis Yap",
+    "userInfo": "Kullanici Bilgisi",
+    "quickActions": "Hizli Islem",
+    "phase2Note": "Bir sonraki adim urun yonetimi ekranlari ve role dayali yetkilendirme genisletmesidir.",
+    "name": "Ad Soyad",
+    "role": "Rol",
+    "productManager": "Urun Yonetimi",
+    "createProduct": "Yeni Urun Ekle",
+    "productList": "Urun Listesi",
+    "slug": "Slug",
+    "description": "Aciklama",
+    "imageUrl": "Gorsel URL",
+    "search": "Urun ara",
+    "allCategories": "Tum kategoriler",
+    "prev": "Geri",
+    "next": "Ileri",
+    "page": "Sayfa",
+    "save": "Kaydet",
+    "create": "Olustur",
+    "edit": "Duzenle",
+    "delete": "Sil",
+    "cancel": "Iptal",
+    "emptyProducts": "Gosterilecek urun yok.",
+    "operationFailed": "Islem basarisiz oldu. Lutfen tekrar deneyin.",
+    "validationRequired": "Tum zorunlu alanlari doldurun.",
+    "validationPrice": "Fiyat 0'dan buyuk olmalidir.",
+    "validationImageUrl": "Gecerli bir gorsel URL girin."
+    ,"categoryManager": "Kategori Yonetimi"
+    ,"createCategory": "Yeni Kategori"
+    ,"categoryList": "Kategori Listesi"
+    ,"searchCategory": "Kategori ara"
+    ,"productCount": "Urun Sayisi"
+    ,"emptyCategories": "Gosterilecek kategori yok."
+    ,"validationDeleteCategoryBlocked": "Bu kategoride urun oldugu icin silinemez."
+    ,"parentCategory": "Ust Kategori"
+    ,"noParentCategory": "Ust kategori yok"
+    ,"startAt": "Baslangic"
+    ,"endAt": "Bitis"
+    ,"noDateWindow": "Sinirsiz"
+    ,"validationDateRange": "Bitis tarihi baslangic tarihinden once olamaz."
+    ,"roleCustomer": "Musteri"
+    ,"customerManager": "Musteri Yonetimi"
+    ,"createCustomer": "Yeni Musteri"
+    ,"customerList": "Musteri Listesi"
+    ,"searchCustomer": "Musteri ara"
+    ,"emptyCustomers": "Gosterilecek musteri yok."
+    ,"auditLogMenu": "Audit Log"
+    ,"auditLogTitle": "Islem Kayitlari"
+    ,"auditLogCount": "kayit listeleniyor"
+    ,"auditEntity": "Varlik"
+    ,"auditAction": "Aksiyon"
+    ,"auditActor": "Kullanici"
+    ,"auditSummary": "Ozet"
+    ,"auditDate": "Tarih"
+    ,"auditEmpty": "Gosterilecek audit kaydi yok."
+  }
+}

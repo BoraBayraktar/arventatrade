@@ -1,0 +1,284 @@
+import { Prisma } from "@prisma/client";
+
+import { prisma } from "@/lib/prisma";
+import type {
+  AdminIntegrationListQuery,
+  DispatchIntegrationJobsInput,
+  RetryDeadLetterInput,
+} from "@/modules/integration/contracts/integration.contract";
+
+function buildIdempotencyKey(args: {
+  channel: string;
+  jobType: string;
+  entityType: string;
+  entityId: string;
+}) {
+  return `${args.channel}:${args.jobType}:${args.entityType}:${args.entityId}`;
+}
+
+function toJsonInput(value: Prisma.JsonValue | null | undefined) {
+  if (value === null || value === undefined) {
+    return Prisma.JsonNull;
+  }
+
+  return value as Prisma.InputJsonValue;
+}
+
+export class IntegrationRepository {
+  async listJobs(args: Required<Pick<AdminIntegrationListQuery, "page" | "pageSize">> & Pick<AdminIntegrationListQuery, "channel" | "jobType" | "status">) {
+    return prisma.integrationSyncJob.findMany({
+      where: {
+        deleted: false,
+        ...(args.channel ? { channel: args.channel } : {}),
+        ...(args.jobType ? { jobType: args.jobType } : {}),
+        ...(args.status ? { status: args.status } : {}),
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      skip: (args.page - 1) * args.pageSize,
+      take: args.pageSize,
+    });
+  }
+
+  async countJobs(args: Pick<AdminIntegrationListQuery, "channel" | "jobType" | "status">) {
+    return prisma.integrationSyncJob.count({
+      where: {
+        deleted: false,
+        ...(args.channel ? { channel: args.channel } : {}),
+        ...(args.jobType ? { jobType: args.jobType } : {}),
+        ...(args.status ? { status: args.status } : {}),
+      },
+    });
+  }
+
+  async dispatchJobs(input: DispatchIntegrationJobsInput) {
+    const jobs: Array<{ job: Awaited<ReturnType<typeof prisma.integrationSyncJob.findUnique>>; deduplicated: boolean }> = [];
+
+    for (const entityId of input.entityIds) {
+      const idempotencyKey = buildIdempotencyKey({
+        channel: input.channel,
+        jobType: input.jobType,
+        entityType: input.entityType,
+        entityId,
+      });
+
+      const existing = await prisma.integrationSyncJob.findUnique({
+        where: {
+          idempotencyKey,
+        },
+      });
+
+      if (existing && !existing.deleted) {
+        jobs.push({ job: existing, deduplicated: true });
+        continue;
+      }
+
+      const job = await prisma.integrationSyncJob.upsert({
+        where: {
+          idempotencyKey,
+        },
+        update: {
+          deleted: false,
+          deletedDate: null,
+          deletedUserId: null,
+          status: "PENDING",
+          attemptCount: 0,
+          nextAttemptAt: new Date(),
+          maxAttempts: input.maxAttempts ?? 3,
+          payload: input.payload ? (input.payload as Prisma.InputJsonValue) : Prisma.JsonNull,
+          lastError: null,
+          processedAt: null,
+        },
+        create: {
+          idempotencyKey,
+          channel: input.channel,
+          jobType: input.jobType,
+          entityType: input.entityType,
+          entityId,
+          payload: input.payload ? (input.payload as Prisma.InputJsonValue) : Prisma.JsonNull,
+          maxAttempts: input.maxAttempts ?? 3,
+          nextAttemptAt: new Date(),
+          status: "PENDING",
+        },
+      });
+
+      jobs.push({ job, deduplicated: false });
+    }
+
+    return jobs;
+  }
+
+  async reserveJobs(limit: number) {
+    const now = new Date();
+    const candidates = await prisma.integrationSyncJob.findMany({
+      where: {
+        deleted: false,
+        status: {
+          in: ["PENDING", "FAILED"],
+        },
+        nextAttemptAt: {
+          lte: now,
+        },
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+      take: limit,
+    });
+
+    const reserved = [];
+
+    for (const item of candidates) {
+      const updatedCount = await prisma.integrationSyncJob.updateMany({
+        where: {
+          id: item.id,
+          status: item.status,
+        },
+        data: {
+          status: "PROCESSING",
+          attemptCount: {
+            increment: 1,
+          },
+          lastAttemptAt: now,
+        },
+      });
+
+      if (updatedCount.count === 1) {
+        const refreshed = await prisma.integrationSyncJob.findUnique({ where: { id: item.id } });
+        if (refreshed) {
+          reserved.push(refreshed);
+        }
+      }
+    }
+
+    return reserved;
+  }
+
+  async markJobSuccess(id: string) {
+    return prisma.integrationSyncJob.update({
+      where: { id },
+      data: {
+        status: "SUCCESS",
+        processedAt: new Date(),
+        lastError: null,
+      },
+    });
+  }
+
+  async markJobFailure(args: {
+    id: string;
+    lastError: string;
+    attemptCount: number;
+    maxAttempts: number;
+    retryDelayMinutes: number;
+  }) {
+    const isDeadLetter = args.attemptCount >= args.maxAttempts;
+
+    const job = await prisma.integrationSyncJob.update({
+      where: { id: args.id },
+      data: {
+        status: isDeadLetter ? "DEAD_LETTER" : "FAILED",
+        lastError: args.lastError,
+        nextAttemptAt: isDeadLetter
+          ? new Date(Date.now() + args.retryDelayMinutes * 60000)
+          : new Date(Date.now() + args.retryDelayMinutes * 60000),
+      },
+    });
+
+    if (isDeadLetter) {
+      await prisma.integrationDeadLetter.upsert({
+        where: {
+          jobId: job.id,
+        },
+        update: {
+          channel: job.channel,
+          jobType: job.jobType,
+          entityType: job.entityType,
+          entityId: job.entityId,
+          payload: toJsonInput(job.payload),
+          lastError: args.lastError,
+          attemptCount: job.attemptCount,
+          maxAttempts: job.maxAttempts,
+          resolved: false,
+          resolvedAt: null,
+          resolvedByUserId: null,
+          deleted: false,
+          deletedDate: null,
+          deletedUserId: null,
+        },
+        create: {
+          jobId: job.id,
+          channel: job.channel,
+          jobType: job.jobType,
+          entityType: job.entityType,
+          entityId: job.entityId,
+          payload: toJsonInput(job.payload),
+          lastError: args.lastError,
+          attemptCount: job.attemptCount,
+          maxAttempts: job.maxAttempts,
+        },
+      });
+    }
+
+    return job;
+  }
+
+  async listDeadLetters() {
+    return prisma.integrationDeadLetter.findMany({
+      where: {
+        deleted: false,
+        resolved: false,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
+
+  async retryDeadLetter(input: RetryDeadLetterInput) {
+    const deadLetter = await prisma.integrationDeadLetter.findFirst({
+      where: {
+        jobId: input.jobId,
+        deleted: false,
+      },
+      include: {
+        job: true,
+      },
+    });
+
+    if (!deadLetter) {
+      return null;
+    }
+
+    await prisma.integrationDeadLetter.update({
+      where: {
+        id: deadLetter.id,
+      },
+      data: {
+        resolved: true,
+        resolvedAt: new Date(),
+        resolvedByUserId: input.resolvedByUserId,
+      },
+    });
+
+    const payloadRecord = (deadLetter.job.payload as Record<string, unknown> | null) ?? {};
+    const cleanedPayload = {
+      ...payloadRecord,
+      forceFail: false,
+    } as Prisma.InputJsonValue;
+
+    return prisma.integrationSyncJob.update({
+      where: {
+        id: deadLetter.jobId,
+      },
+      data: {
+        status: "PENDING",
+        attemptCount: 0,
+        nextAttemptAt: new Date(),
+        lastError: null,
+        payload: cleanedPayload,
+      },
+    });
+  }
+}
