@@ -21,14 +21,14 @@ type AuthUser = {
 export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
 	const labels = locale === "tr"
 		? {
-			login: "Giris Yap",
-			account: "Hesabim",
-			orders: "Siparislerim",
-			coupons: "Indirim Kuponlarim",
-			messages: "Mesajlarim",
-			logout: "Cikis Yap",
-				loginMenu: "Giris Yap",
-				registerMenu: "Kayit Ol",
+			login: "Giriş Yap",
+			account: "Hesabım",
+			orders: "Siparişlerim",
+			coupons: "İndirim Kuponlarım",
+			messages: "Mesajlarım",
+			logout: "Çıkış Yap",
+			loginMenu: "Giriş Yap",
+			registerMenu: "Kayıt Ol",
 		}
 		: {
 			login: "Sign In",

@@ -340,7 +340,7 @@ export function StorefrontManager({ items, productOptions, categoryOptions, labe
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Storefront</p>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-950">{labels.title}</h2>
-          <p className="mt-1 text-sm text-neutral-500">{items.length} vitrin öğesi yönetiliyor</p>
+          <p className="mt-1 text-sm text-neutral-500">{items.length} Vitrin öğesi yönetiliyor</p>
         </div>
         <Button type="button" onClick={openCreateDrawer}>{labels.createTitle}</Button>
       </div>

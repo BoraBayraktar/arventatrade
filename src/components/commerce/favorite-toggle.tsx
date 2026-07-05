@@ -63,7 +63,7 @@ export function FavoriteToggle({ productId, productName }: { productId: string; 
     <button
       type="button"
       onClick={toggleFavorite}
-      aria-label={isFavorite ? `${productName} favorilerden cikar` : `${productName} favorilere ekle`}
+      aria-label={isFavorite ? `${productName} favorilerden çıkar` : `${productName} favorilere ekle`}
       className="absolute right-2 top-2 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white/95 text-neutral-600 shadow-sm backdrop-blur transition hover:border-rose-200 hover:text-rose-600"
     >
       <Heart className={`h-4 w-4 ${isFavorite ? "fill-rose-500 text-rose-500" : ""}`} />

@@ -55,7 +55,7 @@ export function CartDropdown({ locale, labels }: { locale: string; labels: CartD
 	const rootRef = useRef<HTMLDivElement | null>(null);
 
 	const hasItems = useMemo(() => count > 0, [count]);
-	const itemLabel = locale === "tr" ? "urun" : "items";
+	const itemLabel = locale === "tr" ? "ürün" : "items";
 
 	useEffect(() => {
 		const syncCount = () => setCount(readCartCount());

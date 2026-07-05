@@ -3,181 +3,203 @@
     "brand": "ArventaTrade",
     "language": "Dil",
     "favorites": "Favorilerim",
-    "adminPanel": "Admin",
-    "product": "urun",
-    "noResult": "Sonuc bulunamadi",
-    "loading": "Yukleniyor...",
+    "adminPanel": "Yönetim",
+    "product": "ürün",
+    "noResult": "Sonuç bulunamadı",
+    "loading": "Yükleniyor...",
     "notSpecified": "Belirtilmedi"
   },
   "auth": {
-    "loginTitle": "Hesabina Giris Yap",
-    "loginSubtitle": "Alisveris, favoriler ve siparislerini yonetmek icin giris yap.",
-    "registerTitle": "Yeni Hesap Olustur",
-    "registerSubtitle": "Dakikalar icinde kayit ol ve alisverise basla.",
+    "loginTitle": "Hesabına Giriş Yap",
+    "loginSubtitle": "Alışveriş, favoriler ve siparişlerini yönetmek için giriş yap.",
+    "registerTitle": "Yeni Hesap Oluştur",
+    "registerSubtitle": "Dakikalar içinde kaydol ve alışverişe başla.",
     "email": "E-posta",
     "name": "Ad Soyad",
-    "password": "Sifre",
-    "loginButton": "Giris Yap",
-    "registerButton": "Kayit Ol",
-    "invalidCredentials": "E-posta veya sifre hatali.",
-    "registerFailed": "Kayit islemi basarisiz oldu.",
-    "emailExists": "Bu e-posta zaten kayitli.",
-    "noAccount": "Hesabin yok mu?",
-    "haveAccount": "Zaten hesabin var mi?"
+    "password": "Şifre",
+    "loginButton": "Giriş Yap",
+    "registerButton": "Kayıt Ol",
+    "invalidCredentials": "E-posta veya şifre hatalı.",
+    "registerFailed": "Kayıt işlemi başarısız oldu.",
+    "emailExists": "Bu e-posta zaten kayıtlı.",
+    "noAccount": "Hesabın yok mu?",
+    "haveAccount": "Zaten hesabın var mı?"
   },
   "home": {
-    "title": "ArventaTrade Urun Vitrini",
-    "subtitle": "Ilk fazda hizli, mobil uyumlu ve servis odakli urun kesfi deneyimi.",
-    "cta": "Urunleri Kesfet",
+    "title": "ArventaTrade Ürün Vitrini",
+    "subtitle": "İlk fazda hızlı, mobil uyumlu ve servis odaklı ürün keşfi deneyimi.",
+    "cta": "Ürünleri Keşfet",
     "eyebrow": "Yeni nesil e-ticaret vitrin deneyimi",
-    "spotlightTitle": "Gunluk kesif, kampanya ve kategori akisini tek bakista yonetin.",
-    "spotlightBody": "Kategori girisleri, dikkat odaklari ve hizli karar destek modulleri ile vitrin deneyimini modern pazaryeri kalitesine tasiyoruz.",
-    "campaignTitle": "One Cikan Alanlar",
+    "spotlightTitle": "Günlük keşif, kampanya ve kategori akışını tek bakışta yönetin.",
+    "spotlightBody": "Kategori girişleri, dikkat odakları ve hızlı karar destek modülleri ile vitrin deneyimini modern pazaryeri kalitesine taşıyoruz.",
+    "campaignTitle": "Öne Çıkan Alanlar",
     "campaignCards": {
       "new": {
         "title": "Yeni Gelenler",
-        "text": "Yeni urun akisini one cikaran hizli kesif alani."
+        "text": "Yeni ürün akışını öne çıkaran hızlı keşif alanı."
       },
       "popular": {
-        "title": "Populer Secimler",
-        "text": "Talep goren urunleri karar vermeyi kolaylastiran bloklarda sunar."
+        "title": "Popüler Seçimler",
+        "text": "Talep gören ürünleri karar vermeyi kolaylaştıran bloklarda sunar."
       },
       "fast": {
-        "title": "Hizli Kampanyalar",
-        "text": "Kisa sureli fiyat ve odak urun vurgulari icin ideal vitrin yapisi."
+        "title": "Hızlı Kampanyalar",
+        "text": "Kısa süreli fiyat ve odak ürün vurguları için ideal vitrin yapısı."
       }
     },
     "featureTitle": "Ticari avantajlar",
     "featureCards": {
       "curation": {
         "title": "Editoryal kurasyon",
-        "text": "Liste karmasasini azaltip en kritik urunleri one cikarir."
+        "text": "Liste karmaşasını azaltıp en kritik ürünleri öne çıkarır."
       },
       "responsive": {
-        "title": "Mobil once gelen akış",
-        "text": "Telefon ekraninda hizli gezinme ve net aksiyon odakli deneyim sunar."
+        "title": "Mobil öncelikli akış",
+        "text": "Telefon ekranında hızlı gezinme ve net aksiyon odaklı deneyim sunar."
       },
       "conversion": {
-        "title": "Donusum odakli bloklar",
-        "text": "Kampanya, kategori ve guven sinyallerini ayni akista toplar."
+        "title": "Dönüşüm odaklı bloklar",
+        "text": "Kampanya, kategori ve güven sinyallerini aynı akışta toplar."
       }
     }
   },
   "catalog": {
-    "title": "Urun Katalogu",
-    "searchPlaceholder": "Urun ara",
-    "allCategories": "Tum kategoriler",
+    "title": "Ürün Kataloğu",
+    "searchPlaceholder": "Ürün ara",
+    "allCategories": "Tüm kategoriler",
     "filter": "Filtrele",
     "detail": "Detay",
     "price": "Fiyat",
     "category": "Kategori",
-    "back": "Kataloga don",
-    "empty": "Kriterlere uygun urun bulunamadi.",
+    "back": "Kataloğa dön",
+    "empty": "Kriterlere uygun ürün bulunamadı.",
     "page": "Sayfa",
-    "summaryTitle": "Kesif Panosu",
+    "summaryTitle": "Keşif Panosu",
     "summaryCards": {
-      "total": "Toplam urun",
+      "total": "Toplam ürün",
       "focused": "Aktif filtre",
-      "pace": "Kesif hizi"
+      "pace": "Keşif hızı"
     },
-    "focusAll": "Tum urunler",
-    "focusSearch": "Arama odagi",
-    "paceText": "Hizli tarama"
+    "focusAll": "Tüm ürünler",
+    "focusSearch": "Arama odağı",
+    "paceText": "Hızlı tarama"
   },
   "commerce": {
     "addToCart": "Sepete Ekle",
-    "addedToCart": "Urun sepete eklendi.",
+    "addedToCart": "Ürün sepete eklendi.",
     "viewCart": "Sepete git",
     "cartTitle": "Sepet",
-    "cartEmpty": "Sepetinizde urun bulunmuyor.",
+    "cartEmpty": "Sepetinizde ürün bulunmuyor.",
     "quantity": "Adet",
     "subtotal": "Ara Toplam",
-    "discountTotal": "Indirim Toplami",
+    "discountTotal": "İndirim Toplamı",
     "total": "Genel Toplam",
     "promotionCode": "Promosyon Kodu",
-    "checkout": "Siparisi Tamamla",
-    "continueShopping": "Alisverise Devam Et",
-    "remove": "Kaldir",
+    "checkout": "Siparişi Tamamla",
+    "continueShopping": "Alışverişe Devam Et",
+    "remove": "Kaldır",
     "stockWarning": "Yetersiz stok",
-    "checkoutSuccess": "Siparis olusturuldu:",
-    "checkoutFailed": "Checkout islemi basarisiz oldu.",
-    "relatedProducts": "Benzer Urunler",
-    "compareAtPrice": "Indirimsiz Fiyat",
+    "checkoutSuccess": "Sipariş oluşturuldu:",
+    "checkoutFailed": "Checkout işlemi başarısız oldu.",
+    "relatedProducts": "Benzer Ürünler",
+    "compareAtPrice": "İndirimsiz Fiyat",
     "discount": "indirim",
     "stockStatus": "Stok",
     "inStock": "Stokta",
-    "outOfStock": "Tukendi",
-    "sortBy": "Siralama",
-    "relevance": "Ilgi duzeyi",
+    "outOfStock": "Tükendi",
+    "sortBy": "Sıralama",
+    "relevance": "İlgi düzeyi",
     "latest": "En yeni",
-    "showing": "Gosterilen",
-    "for": "sonuc:",
-    "noProductsMatch": "Eslesen urun bulunamadi: ",
+    "showing": "Gösterilen",
+    "for": "sonuç:",
+    "noProductsMatch": "Eşleşen ürün bulunamadı: ",
     "favoritesTitle": "Favorilerim",
-    "favoritesEmpty": "Henuz favorilere eklenmis urun yok."
+    "favoritesEmpty": "Henüz favorilere eklenmiş ürün yok."
   },
   "admin": {
-    "title": "Backoffice Dashboard",
-    "loginTitle": "Admin Girisi",
-    "loginSubtitle": "Faz 2 icin kimlik dogrulama ve rol temeli hazirdir.",
-    "email": "E-mail",
-    "password": "Sifre",
-    "loginButton": "Giris Yap",
-    "invalidCredentials": "E-mail veya sifre hatali.",
-    "logout": "Cikis Yap",
-    "userInfo": "Kullanici Bilgisi",
-    "quickActions": "Hizli Islem",
-    "phase2Note": "Bir sonraki adim urun yonetimi ekranlari ve role dayali yetkilendirme genisletmesidir.",
+    "title": "Yönetim Paneli",
+    "loginTitle": "Admin Girişi",
+    "loginSubtitle": "Faz 2 için kimlik doğrulama ve rol temeli hazırdır.",
+    "email": "E-posta",
+    "password": "Şifre",
+    "loginButton": "Giriş Yap",
+    "invalidCredentials": "E-posta veya şifre hatalı.",
+    "logout": "Çıkış Yap",
+    "dashboardMenu": "Pano",
+    "userInfo": "Kullanıcı Bilgisi",
+    "quickActions": "Hızlı İşlem",
+    "phase2Note": "Bir sonraki adım ürün yönetimi ekranları ve role dayalı yetkilendirme genişletmesidir.",
     "name": "Ad Soyad",
     "role": "Rol",
-    "productManager": "Urun Yonetimi",
-    "createProduct": "Yeni Urun Ekle",
-    "productList": "Urun Listesi",
+    "productManager": "Ürün Yönetimi",
+    "orderManager": "Sipariş Yönetimi",
+    "integrationManager": "Entegrasyon Yönetimi",
+    "userManager": "Kullanıcı Yönetimi",
+    "createProduct": "Yeni Ürün Ekle",
+    "productList": "Ürün Listesi",
     "slug": "Slug",
-    "description": "Aciklama",
-    "imageUrl": "Gorsel URL",
-    "search": "Urun ara",
-    "allCategories": "Tum kategoriler",
+    "description": "Açıklama",
+    "imageUrl": "Görsel URL",
+    "search": "Ürün ara",
+    "allCategories": "Tüm kategoriler",
     "prev": "Geri",
-    "next": "Ileri",
+    "next": "İleri",
     "page": "Sayfa",
     "save": "Kaydet",
-    "create": "Olustur",
-    "edit": "Duzenle",
+    "create": "Oluştur",
+    "edit": "Düzenle",
     "delete": "Sil",
-    "cancel": "Iptal",
-    "emptyProducts": "Gosterilecek urun yok.",
-    "operationFailed": "Islem basarisiz oldu. Lutfen tekrar deneyin.",
-    "validationRequired": "Tum zorunlu alanlari doldurun.",
-    "validationPrice": "Fiyat 0'dan buyuk olmalidir.",
-    "validationImageUrl": "Gecerli bir gorsel URL girin."
-    ,"categoryManager": "Kategori Yonetimi"
-    ,"createCategory": "Yeni Kategori"
-    ,"categoryList": "Kategori Listesi"
-    ,"searchCategory": "Kategori ara"
-    ,"productCount": "Urun Sayisi"
-    ,"emptyCategories": "Gosterilecek kategori yok."
-    ,"validationDeleteCategoryBlocked": "Bu kategoride urun oldugu icin silinemez."
-    ,"parentCategory": "Ust Kategori"
-    ,"noParentCategory": "Ust kategori yok"
-    ,"startAt": "Baslangic"
-    ,"endAt": "Bitis"
-    ,"noDateWindow": "Sinirsiz"
-    ,"validationDateRange": "Bitis tarihi baslangic tarihinden once olamaz."
-    ,"roleCustomer": "Musteri"
-    ,"customerManager": "Musteri Yonetimi"
-    ,"createCustomer": "Yeni Musteri"
-    ,"customerList": "Musteri Listesi"
-    ,"searchCustomer": "Musteri ara"
-    ,"emptyCustomers": "Gosterilecek musteri yok."
-    ,"auditLogMenu": "Audit Log"
-    ,"auditLogTitle": "Islem Kayitlari"
-    ,"auditLogCount": "kayit listeleniyor"
-    ,"auditEntity": "Varlik"
-    ,"auditAction": "Aksiyon"
-    ,"auditActor": "Kullanici"
-    ,"auditSummary": "Ozet"
-    ,"auditDate": "Tarih"
-    ,"auditEmpty": "Gosterilecek audit kaydi yok."
+    "cancel": "İptal",
+    "emptyProducts": "Gösterilecek ürün yok.",
+    "operationFailed": "İşlem başarısız oldu. Lütfen tekrar deneyin.",
+    "validationRequired": "Tüm zorunlu alanları doldurun.",
+    "validationPrice": "Fiyat 0'dan büyük olmalıdır.",
+    "validationImageUrl": "Geçerli bir görsel URL girin.",
+    "categoryManager": "Kategori Yönetimi",
+    "createCategory": "Yeni Kategori",
+    "categoryList": "Kategori Listesi",
+    "searchCategory": "Kategori ara",
+    "productCount": "Ürün Sayısı",
+    "emptyCategories": "Gösterilecek kategori yok.",
+    "validationDeleteCategoryBlocked": "Bu kategoride ürün olduğu için silinemez.",
+    "parentCategory": "Üst Kategori",
+    "noParentCategory": "Üst kategori yok",
+    "startAt": "Başlangıç",
+    "endAt": "Bitiş",
+    "noDateWindow": "Sınırsız",
+    "validationDateRange": "Bitiş tarihi başlangıç tarihinden önce olamaz.",
+    "roleCustomer": "Müşteri",
+    "customerManager": "Müşteri Yönetimi",
+    "createCustomer": "Yeni Müşteri",
+    "customerList": "Müşteri Listesi",
+    "searchCustomer": "Müşteri ara",
+    "emptyCustomers": "Gösterilecek müşteri yok.",
+    "auditLogMenu": "İşlem Kayıtları",
+    "auditLogTitle": "İşlem Kayıtları",
+    "auditLogCount": "kayıt listeleniyor",
+    "auditEntity": "Varlık",
+    "auditAction": "Aksiyon",
+    "auditActor": "Kullanıcı",
+    "auditSummary": "Özet",
+    "auditDate": "Tarih",
+    "auditEmpty": "Gösterilecek işlem kaydı yok.",
+    "storefrontManager": "Vitrin Yönetimi",
+    "createStorefrontItem": "Yeni Vitrin Öğesi",
+    "section": "Bölüm",
+    "variant": "Varyant",
+    "targetType": "Hedef Türü",
+    "targetProduct": "Ürün Hedefi",
+    "targetCategory": "Kategori Hedefi",
+    "selectProduct": "Ürün seç",
+    "selectCategory": "Kategori seç",
+    "order": "Sıra",
+    "campaigns": "Kampanyalar",
+    "features": "Özellikler",
+    "accent": "Vurgu",
+    "soft": "Yumuşak",
+    "dark": "Koyu",
+    "defaultVariant": "Varsayılan",
+    "validationTarget": "Hedef seçimi zorunludur.",
+    "validationOrder": "Sıra 1 ile 99 arasında olmalı."
   }
 }

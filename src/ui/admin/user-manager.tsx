@@ -303,7 +303,7 @@ export function UserManager({ initialResult, labels, fixedRole }: Props) {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.title}</p>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-950">{labels.listTitle}</h2>
-          <p className="mt-1 text-sm text-neutral-500">{result.total} kullanici listeleniyor</p>
+          <p className="mt-1 text-sm text-neutral-500">{result.total} kullanıcı listeleniyor</p>
         </div>
         <Button type="button" onClick={openCreateDrawer}>{labels.createTitle}</Button>
       </div>

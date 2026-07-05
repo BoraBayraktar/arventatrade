@@ -9,7 +9,7 @@ const spaceGrotesk = Space_Grotesk({
 
 export const metadata: Metadata = {
   title: "ArventaTrade",
-  description: "ArventaTrade e-ticaret vitrin ve backoffice uygulamasi",
+  description: "ArventaTrade e-ticaret vitrin ve backoffice uygulaması",
 };
 
 export default function RootLayout({

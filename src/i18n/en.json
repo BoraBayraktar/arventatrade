@@ -125,12 +125,16 @@
 		"loginButton": "Sign In",
 		"invalidCredentials": "E-mail or password is incorrect.",
 		"logout": "Log Out",
+		"dashboardMenu": "Dashboard",
 		"userInfo": "User Information",
 		"quickActions": "Quick Actions",
 		"phase2Note": "Next step is product management screens and role-based authorization expansion.",
 		"name": "Full Name",
 		"role": "Role",
 		"productManager": "Product Management",
+		"orderManager": "Order Management",
+		"integrationManager": "Integration Management",
+		"userManager": "User Management",
 		"createProduct": "Add New Product",
 		"productList": "Product List",
 		"slug": "Slug",
@@ -179,5 +183,23 @@
 		,"auditSummary": "Summary"
 		,"auditDate": "Date"
 		,"auditEmpty": "No audit records to display."
+		,"storefrontManager": "Storefront Management"
+		,"createStorefrontItem": "New Storefront Item"
+		,"section": "Section"
+		,"variant": "Variant"
+		,"targetType": "Target Type"
+		,"targetProduct": "Product Target"
+		,"targetCategory": "Category Target"
+		,"selectProduct": "Select product"
+		,"selectCategory": "Select category"
+		,"order": "Order"
+		,"campaigns": "Campaigns"
+		,"features": "Features"
+		,"accent": "Accent"
+		,"soft": "Soft"
+		,"dark": "Dark"
+		,"defaultVariant": "Default"
+		,"validationTarget": "Target selection is required."
+		,"validationOrder": "Order must be between 1 and 99."
 	}
 }
