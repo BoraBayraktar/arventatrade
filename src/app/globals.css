@@ -7,6 +7,7 @@
 @theme {
   --animate-carousel: carousel 60s linear infinite;
   --animate-fadeIn: fadeIn 500ms ease-in-out;
+  --animate-auth-carousel: auth-carousel-image 12s infinite ease-in-out;
 
   @keyframes carousel {
     0% {
@@ -23,6 +24,34 @@
     }
     to {
       opacity: 1;
+    }
+  }
+
+  @keyframes auth-carousel-image {
+    0%,
+    30% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    33%,
+    97% {
+      opacity: 0;
+      transform: scale(1.02);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes auth-carousel-dot {
+    0%,
+    30% {
+      opacity: 1;
+    }
+    33%,
+    100% {
+      opacity: 0.35;
     }
   }
 }

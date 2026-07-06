@@ -63,10 +63,10 @@ export function LoginForm({ locale, redirectTo, labels }: LoginFormProps) {
   }
 
   return (
-    <Card className="w-full max-w-xl border-white/70 bg-white/90">
+    <Card className={styles.loginCard}>
       <CardHeader>
-        <CardTitle className="text-3xl">{labels.title}</CardTitle>
-        <CardDescription>{labels.subtitle}</CardDescription>
+        <CardTitle className={styles.loginTitle}>{labels.title}</CardTitle>
+        <CardDescription className={styles.loginSubtitle}>{labels.subtitle}</CardDescription>
       </CardHeader>
       <CardContent>
         <form className={styles.form} onSubmit={handleSubmit}>

@@ -1,54 +1,69 @@
-.card {
-  background: linear-gradient(155deg, #ffffffed 0%, #f8fbffeb 100%);
-  border: 1px solid #d6e1f3;
-  border-radius: var(--radius-xl);
-  padding: 1.1rem;
-  box-shadow: var(--shadow-card);
-}
-
-.loginShell {
+.authShell {
   min-height: 100vh;
-  padding: 1rem;
   display: grid;
   grid-template-columns: 1fr;
   gap: 1rem;
+  padding: 1rem;
   align-items: stretch;
   background:
-    radial-gradient(1200px 420px at 85% -10%, rgba(90, 90, 255, 0.14), transparent 55%),
-    radial-gradient(900px 340px at -10% 100%, rgba(0, 0, 0, 0.05), transparent 60%),
+    radial-gradient(1100px 420px at 90% -8%, rgba(90, 90, 255, 0.14), transparent 56%),
+    radial-gradient(860px 320px at -8% 96%, rgba(0, 0, 0, 0.05), transparent 60%),
     var(--background);
 }
 
-.loginFormPane {
+.formPane {
   display: grid;
   align-items: center;
   justify-items: center;
   min-height: 58vh;
 }
 
-.loginCard {
+.authCard {
   width: min(100%, 560px);
   border: 1px solid var(--border);
+  border-radius: 1.25rem;
   background: color-mix(in oklab, var(--background) 95%, white);
   box-shadow: 0 22px 54px rgba(18, 18, 22, 0.08);
-  border-radius: 1.25rem;
 }
 
-.loginTitle {
-  font-size: clamp(1.8rem, 3.6vw, 2.25rem);
+.authTitle {
+  font-size: clamp(1.8rem, 3.8vw, 2.28rem);
   line-height: 1.18;
   letter-spacing: -0.025em;
 }
 
-.loginSubtitle {
-  max-width: 52ch;
+.authSubtitle {
+  max-width: 54ch;
 }
 
-.loginVisualPane {
+.authForm {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.authError {
+  color: var(--destructive);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.authSwitch {
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
+}
+
+.authSwitch a {
+  color: #1f2c8f;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.visualPane {
   min-height: 300px;
 }
 
-.loginVisualFrame {
+.visualFrame {
   position: relative;
   height: 100%;
   min-height: 280px;
@@ -58,15 +73,15 @@
   background: linear-gradient(145deg, #ffffff 0%, #f4f6ff 48%, #eef1ff 100%);
 }
 
-.loginVisualOverlay {
+.visualOverlay {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(80% 56% at 18% 20%, rgba(111, 108, 255, 0.18), transparent 65%),
-    radial-gradient(55% 50% at 80% 82%, rgba(82, 76, 225, 0.22), transparent 70%);
+    radial-gradient(82% 56% at 16% 18%, rgba(111, 108, 255, 0.18), transparent 65%),
+    radial-gradient(55% 50% at 82% 84%, rgba(82, 76, 225, 0.22), transparent 70%);
 }
 
-.loginVisualTitle {
+.visualTitle {
   position: absolute;
   top: 1.25rem;
   left: 1.25rem;
@@ -74,19 +89,19 @@
   z-index: 2;
 }
 
-.loginVisualTitle h2 {
+.visualTitle h2 {
   margin: 0;
   font-size: clamp(1.1rem, 2.8vw, 1.35rem);
   letter-spacing: -0.02em;
   color: #1f2250;
 }
 
-.loginVisualTitle p {
+.visualTitle p {
   margin: 0.42rem 0 0;
   font-size: 0.92rem;
   line-height: 1.5;
   color: #4a4f86;
-  max-width: 54ch;
+  max-width: 52ch;
 }
 
 .authSlide {
@@ -169,7 +184,7 @@
   background: rgba(38, 42, 102, 0.12);
 }
 
-.loginDots {
+.dots {
   position: absolute;
   bottom: 0.95rem;
   left: 1rem;
@@ -178,7 +193,7 @@
   z-index: 3;
 }
 
-.loginDot {
+.dot {
   width: 2rem;
   height: 0.36rem;
   border-radius: 999px;
@@ -199,162 +214,28 @@
   animation-delay: 8s;
 }
 
-.form {
-  display: grid;
-  gap: 0.8rem;
-  width: min(500px, 100%);
-}
-
-.label {
-  display: grid;
-  gap: 0.35rem;
-  color: #314d6b;
-  font-size: 0.92rem;
-  font-weight: 600;
-}
-
-.input {
-  border: 1px solid #c7d4ea;
-  border-radius: var(--radius-md);
-  padding: 0.72rem 0.8rem;
-  font-size: 0.95rem;
-  background: #ffffffde;
-}
-
-.primaryBtn {
-  border: none;
-  border-radius: var(--radius-md);
-  background: linear-gradient(118deg, #0f7c72 0%, #11988a 100%);
-  color: #fff;
-  padding: 0.72rem 0.88rem;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 10px 24px rgba(14, 122, 111, 0.28);
-}
-
-.secondaryBtn {
-  border: 1px solid #c9d5e7;
-  border-radius: var(--radius-md);
-  background: #fff;
-  color: #2c4a68;
-  padding: 0.72rem 0.88rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.error {
-  color: var(--color-danger);
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-.muted {
-  color: #526a85;
-  margin-top: 0.25rem;
-}
-
-.textarea {
-  border: 1px solid #c7d4ea;
-  border-radius: var(--radius-md);
-  padding: 0.72rem 0.8rem;
-  font-size: 0.95rem;
-  min-height: 84px;
-  resize: vertical;
-  background: #ffffffde;
-}
-
-.grid {
-  display: grid;
-  gap: 0.9rem;
-}
-
-.managerGrid {
-  margin-top: 1rem;
-  display: grid;
-  gap: 1rem;
-}
-
-.productList {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.filterBar {
-  display: grid;
-  gap: 0.6rem;
-  align-items: center;
-}
-
-.productCard {
-  border: 1px solid #d2ddf0;
-  border-radius: var(--radius-md);
-  padding: 0.8rem;
-  background: #ffffffdd;
-}
-
-.rowButtons {
-  margin-top: 0.7rem;
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.paginationRow {
-  margin-top: 0.5rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.deleteBtn {
-  border: 1px solid #dfb2af;
-  border-radius: var(--radius-md);
-  background: #fff5f4;
-  color: #a2372f;
-  padding: 0.72rem 0.88rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
 @media (min-width: 768px) {
-  .loginShell {
+  .authShell {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 1.4rem;
     padding: 1.5rem;
   }
 
-  .loginVisualPane {
+  .visualPane {
     min-height: 100%;
   }
 
-  .loginVisualFrame {
+  .visualFrame {
     min-height: calc(100vh - 3rem);
-  }
-
-  .card {
-    padding: 1.55rem;
-  }
-
-  .grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .managerGrid {
-    grid-template-columns: 1fr 1.2fr;
-  }
-
-  .filterBar {
-    grid-template-columns: 1.3fr 1fr auto;
   }
 }
 
 @media (min-width: 1200px) {
-  .loginShell {
+  .authShell {
     padding: 1.75rem;
   }
 
-  .loginVisualFrame {
+  .visualFrame {
     min-height: calc(100vh - 3.5rem);
   }
 }

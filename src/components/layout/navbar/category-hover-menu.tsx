@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 
+import styles from "@/ui/shop/surface.module.css";
+
 type CategoryItem = {
 	id: string;
 	slug: string;
@@ -40,7 +42,7 @@ export function CategoryHoverMenu({ locale, categories }: CategoryHoverMenuProps
 						href={`/${locale}/search?category=${category.slug}`}
 						onMouseEnter={() => setActiveCategoryId(category.id)}
 						onFocus={() => setActiveCategoryId(category.id)}
-						className="inline-flex rounded-md px-3 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 hover:text-black"
+						className="inline-flex rounded-full border border-border bg-white/80 px-3 py-2 text-sm font-medium text-foreground transition hover:border-[color:var(--primary)] hover:text-[color:var(--primary)] hover:shadow-[0_10px_22px_rgba(18,18,22,0.08)]"
 					>
 						{category.name}
 					</Link>
@@ -49,22 +51,22 @@ export function CategoryHoverMenu({ locale, categories }: CategoryHoverMenuProps
 			</ul>
 
 			{activeCategory ? (
-				<div className="absolute left-0 top-full z-40 mt-2 w-[min(92vw,720px)] rounded-xl border border-neutral-200 bg-white p-4 shadow-xl" onMouseEnter={() => setActiveCategoryId(activeCategory.id)}>
+				<div className={`${styles.panel} absolute left-0 top-full z-40 mt-2 w-[min(92vw,720px)] p-4`} onMouseEnter={() => setActiveCategoryId(activeCategory.id)}>
 					<div className="grid gap-4 md:grid-cols-2">
 						<div>
 							<Link
 								href={`/${locale}/search?category=${activeCategory.slug}`}
-								className="mb-2 block rounded-lg bg-neutral-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 transition hover:bg-neutral-100"
+								className="mb-2 block rounded-lg bg-[color:color-mix(in_oklab,var(--background)_92%,white)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:bg-[color:color-mix(in_oklab,var(--background)_86%,white)]"
 							>
 								{allLabel} {activeCategory.name}
 							</Link>
-							<p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">{subLabel}</p>
+							<p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{subLabel}</p>
 							<ul className="space-y-1">
 								{activeCategory.subcategories.map((subcategory) => (
 									<li key={subcategory.id}>
 										<Link
 											href={`/${locale}/search?category=${subcategory.slug}`}
-											className="line-clamp-1 block rounded-md px-2 py-1.5 text-sm text-neutral-700 transition hover:bg-neutral-100 hover:text-black"
+											className="line-clamp-1 block rounded-md px-2 py-1.5 text-sm text-foreground transition hover:bg-[color:color-mix(in_oklab,var(--background)_88%,white)] hover:text-[color:var(--primary)]"
 										>
 											{subcategory.name}
 										</Link>
@@ -80,7 +82,7 @@ export function CategoryHoverMenu({ locale, categories }: CategoryHoverMenuProps
 									<li key={product.slug}>
 										<Link
 											href={`/${locale}/product/${product.slug}`}
-											className="line-clamp-1 block rounded-md px-2 py-1.5 text-sm text-neutral-700 transition hover:bg-orange-50 hover:text-orange-700"
+											className="line-clamp-1 block rounded-md px-2 py-1.5 text-sm text-foreground transition hover:bg-[color:color-mix(in_oklab,var(--background)_88%,white)] hover:text-[color:var(--primary)]"
 										>
 											{product.name}
 										</Link>

@@ -46,11 +46,54 @@ model Product {
   orderItems      OrderItem[]
   category        Category?           @relation(fields: [categoryId], references: [id])
   interaction     ProductInteraction?
+  reviews         ProductReview[]
+  questions       ProductQuestion[]
   storefrontItems StorefrontItem[]
 
   @@index([categoryId])
   @@index([deleted])
   @@index([stock])
+}
+
+model ProductReview {
+  id               String    @id @default(cuid())
+  productId        String
+  authorUserId     String?   // Application-level, not a foreign key
+  authorName       String
+  rating           Int
+  title            String
+  comment          String
+  verifiedPurchase Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deleted          Boolean   @default(false)
+  deletedDate      DateTime?
+  deletedUserId    String?
+  product          Product   @relation(fields: [productId], references: [id])
+
+  @@index([productId, createdAt])
+  @@index([deleted])
+  @@index([authorUserId])
+  @@index([productId, authorUserId])
+}
+
+model ProductQuestion {
+  id            String    @id @default(cuid())
+  productId     String
+  question      String
+  askedBy       String
+  answer        String?
+  answeredBy    String?
+  answeredAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deleted       Boolean   @default(false)
+  deletedDate   DateTime?
+  deletedUserId String?
+  product       Product   @relation(fields: [productId], references: [id])
+
+  @@index([productId, createdAt])
+  @@index([deleted])
 }
 
 model ProductInteraction {

@@ -1,8 +1,17 @@
 import { prisma } from "@/lib/prisma";
+import type { ProductSort } from "@/modules/catalog/contracts/catalog.contract";
 
 type FindManyArgs = {
   search?: string;
   categoryIds?: string[];
+  inStockOnly?: boolean;
+  outOfStockOnly?: boolean;
+  lowStockOnly?: boolean;
+  newOnly?: boolean;
+  discountedOnly?: boolean;
+  minPrice?: number;
+  maxPrice?: number;
+  sort: ProductSort;
   skip: number;
   take: number;
 };
@@ -10,10 +19,28 @@ type FindManyArgs = {
 type CountArgs = {
   search?: string;
   categoryIds?: string[];
+  inStockOnly?: boolean;
+  outOfStockOnly?: boolean;
+  lowStockOnly?: boolean;
+  newOnly?: boolean;
+  discountedOnly?: boolean;
+  minPrice?: number;
+  maxPrice?: number;
 };
 
-function buildWhere(args: { search?: string; categoryIds?: string[] }) {
-  const { search, categoryIds } = args;
+function buildWhere(args: {
+  search?: string;
+  categoryIds?: string[];
+  inStockOnly?: boolean;
+  outOfStockOnly?: boolean;
+  lowStockOnly?: boolean;
+  newOnly?: boolean;
+  discountedOnly?: boolean;
+  minPrice?: number;
+  maxPrice?: number;
+}) {
+  const { search, categoryIds, inStockOnly, outOfStockOnly, lowStockOnly, newOnly, discountedOnly, minPrice, maxPrice } = args;
+  const createdAtGte = newOnly ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) : undefined;
 
   return {
     deleted: false,
@@ -32,7 +59,63 @@ function buildWhere(args: { search?: string; categoryIds?: string[] }) {
           },
         }
       : {}),
+    ...(inStockOnly
+      ? {
+          stock: {
+            gt: 0,
+          },
+        }
+      : {}),
+    ...(outOfStockOnly
+      ? {
+          stock: {
+            lte: 0,
+          },
+        }
+      : {}),
+    ...(lowStockOnly
+      ? {
+          stock: {
+            gt: 0,
+            lte: 5,
+          },
+        }
+      : {}),
+    ...(createdAtGte
+      ? {
+          createdAt: {
+            gte: createdAtGte,
+          },
+        }
+      : {}),
+    ...(discountedOnly
+      ? {
+          compareAtPrice: {
+            not: null,
+          },
+        }
+      : {}),
+    ...((typeof minPrice === "number" || typeof maxPrice === "number")
+      ? {
+          price: {
+            ...(typeof minPrice === "number" ? { gte: minPrice } : {}),
+            ...(typeof maxPrice === "number" ? { lte: maxPrice } : {}),
+          },
+        }
+      : {}),
   };
+}
+
+function resolveOrderBy(sort: ProductSort) {
+  if (sort === "price-asc") {
+    return { price: "asc" as const };
+  }
+
+  if (sort === "price-desc") {
+    return { price: "desc" as const };
+  }
+
+  return { createdAt: "desc" as const };
 }
 
 export class CatalogRepository {
@@ -42,9 +125,7 @@ export class CatalogRepository {
       include: {
         category: true,
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: resolveOrderBy(args.sort),
       skip: args.skip,
       take: args.take,
     });
@@ -64,6 +145,18 @@ export class CatalogRepository {
       },
       include: {
         category: true,
+      },
+    });
+  }
+
+  async findActiveProductIdBySlug(slug: string) {
+    return prisma.product.findFirst({
+      where: {
+        slug,
+        deleted: false,
+      },
+      select: {
+        id: true,
       },
     });
   }
@@ -100,6 +193,131 @@ export class CatalogRepository {
         productId,
         viewCount: 1,
         lastViewedAt: new Date(),
+      },
+    });
+  }
+
+  async findReviewsByProductId(productId: string, take = 12) {
+    return prisma.productReview.findMany({
+      where: {
+        productId,
+        deleted: false,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take,
+    });
+  }
+
+  async getReviewRatingDistribution(productId: string) {
+    return prisma.productReview.groupBy({
+      by: ["rating"],
+      where: {
+        productId,
+        deleted: false,
+      },
+      _count: {
+        _all: true,
+      },
+    });
+  }
+
+  async findQuestionsByProductId(productId: string, take = 10) {
+    return prisma.productQuestion.findMany({
+      where: {
+        productId,
+        deleted: false,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take,
+    });
+  }
+
+  async createProductReview(input: {
+    productId: string;
+    authorUserId?: string;
+    authorName: string;
+    rating: number;
+    title: string;
+    comment: string;
+    verifiedPurchase: boolean;
+  }) {
+    return prisma.productReview.create({
+      data: {
+        productId: input.productId,
+        authorUserId: input.authorUserId ?? null,
+        authorName: input.authorName,
+        rating: input.rating,
+        title: input.title,
+        comment: input.comment,
+        verifiedPurchase: input.verifiedPurchase,
+      },
+    });
+  }
+
+  async findOwnReviewByProductSlug(slug: string, authorUserId: string) {
+    return prisma.productReview.findFirst({
+      where: {
+        product: {
+          slug,
+          deleted: false,
+        },
+        authorUserId,
+        deleted: false,
+      },
+      include: {
+        product: {
+          select: {
+            slug: true,
+          },
+        },
+      },
+    });
+  }
+
+  async updateOwnReview(reviewId: string, input: {
+    rating: number;
+    title: string;
+    comment: string;
+  }) {
+    return prisma.productReview.update({
+      where: {
+        id: reviewId,
+      },
+      data: {
+        rating: input.rating,
+        title: input.title,
+        comment: input.comment,
+      },
+    });
+  }
+
+  async softDeleteOwnReview(reviewId: string, authorUserId: string) {
+    return prisma.productReview.update({
+      where: {
+        id: reviewId,
+      },
+      data: {
+        deleted: true,
+        deletedDate: new Date(),
+        deletedUserId: authorUserId,
+      },
+    });
+  }
+
+  async createProductQuestion(input: {
+    productId: string;
+    question: string;
+    askedBy: string;
+  }) {
+    return prisma.productQuestion.create({
+      data: {
+        productId: input.productId,
+        question: input.question,
+        askedBy: input.askedBy,
       },
     });
   }

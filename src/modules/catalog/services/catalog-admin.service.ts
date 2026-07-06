@@ -2,11 +2,15 @@ import { z } from "zod";
 
 import { redisCache } from "@/lib/redis";
 import type {
+  AdminAnswerProductQuestionInput,
   AdminCategoryListItem,
   AdminCategoryListQuery,
   AdminCategoryListResult,
   AdminCreateCategoryInput,
   AdminCreateProductInput,
+  AdminProductQuestionItem,
+  AdminProductQuestionListQuery,
+  AdminProductQuestionListResult,
   AdminProductListItem,
   AdminProductListQuery,
   AdminProductListResult,
@@ -15,6 +19,17 @@ import type {
   AdminUpdateProductInput,
 } from "@/modules/catalog/contracts/catalog-admin.contract";
 import { CatalogAdminRepository } from "@/modules/catalog/repositories/catalog-admin.repository";
+import {
+  decodeProductDescriptionWithFeatures,
+  encodeProductDescriptionWithFeatures,
+  sanitizeFeatures,
+} from "@/modules/catalog/services/product-features.codec";
+
+const productFeatureSchema = z.object({
+  key: z.string().trim().min(1),
+  value: z.string().trim().min(1),
+  highlighted: z.boolean().default(false),
+});
 
 const adminListQuerySchema = z.object({
   search: z.string().trim().optional(),
@@ -33,6 +48,7 @@ const createProductSchema = z.object({
   stock: z.coerce.number().int().min(0),
   currency: z.string().trim().min(3).max(3).optional(),
   imageUrl: z.string().trim().url(),
+  features: z.array(productFeatureSchema).max(50).optional().default([]),
   categoryId: z.string().trim().optional().nullable(),
 }).refine((value) => value.compareAtPrice == null || value.compareAtPrice > value.price, {
   message: "Compare-at price must be greater than price",
@@ -50,6 +66,7 @@ const updateProductSchema = z.object({
   stock: z.coerce.number().int().min(0).optional(),
   currency: z.string().trim().min(3).max(3).optional(),
   imageUrl: z.string().trim().url().optional(),
+  features: z.array(productFeatureSchema).max(50).optional(),
   categoryId: z.string().trim().optional().nullable(),
 });
 
@@ -57,6 +74,19 @@ const categoryListQuerySchema = z.object({
   search: z.string().trim().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(10),
+});
+
+const questionListQuerySchema = z.object({
+  status: z.enum(["all", "pending", "answered"]).default("all"),
+  search: z.string().trim().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(10),
+});
+
+const answerQuestionSchema = z.object({
+  id: z.string().trim().min(1),
+  answer: z.string().trim().min(3).max(2000),
+  answeredBy: z.string().trim().min(2).max(120),
 });
 
 const createCategorySchema = z.object({
@@ -90,6 +120,7 @@ function mapProduct(product: {
   categoryId: string | null;
   category: { name: string } | null;
 }): AdminProductListItem {
+  const { cleanDescription, features } = decodeProductDescriptionWithFeatures(product.description);
   const price = product.price.toNumber();
   const compareAtPrice = product.compareAtPrice?.toNumber() ?? null;
   const discountRate = compareAtPrice && compareAtPrice > price
@@ -101,7 +132,7 @@ function mapProduct(product: {
     slug: product.slug,
     sku: product.sku,
     name: product.name,
-    description: product.description,
+    description: cleanDescription,
     price,
     compareAtPrice,
     discountRate,
@@ -109,6 +140,7 @@ function mapProduct(product: {
     inStock: product.stock > 0,
     currency: product.currency,
     imageUrl: product.imageUrl,
+    features,
     categoryId: product.categoryId,
     categoryName: product.category?.name ?? null,
   };
@@ -153,6 +185,35 @@ function mapTopInteraction(item: {
   };
 }
 
+function mapProductQuestion(item: {
+  id: string;
+  question: string;
+  askedBy: string;
+  createdAt: Date;
+  answer: string | null;
+  answeredBy: string | null;
+  answeredAt: Date | null;
+  product: {
+    id: string;
+    slug: string;
+    name: string;
+  };
+}): AdminProductQuestionItem {
+  return {
+    id: item.id,
+    productId: item.product.id,
+    productSlug: item.product.slug,
+    productName: item.product.name,
+    question: item.question,
+    askedBy: item.askedBy,
+    askedAt: item.createdAt.toISOString(),
+    answer: item.answer,
+    answeredBy: item.answeredBy,
+    answeredAt: item.answeredAt ? item.answeredAt.toISOString() : null,
+    isAnswered: item.answer != null,
+  };
+}
+
 export class CatalogCategoryDeleteError extends Error {
   constructor(message: string) {
     super(message);
@@ -166,6 +227,10 @@ async function invalidateCatalogCache() {
     redisCache.delByPrefix("catalog:detail:"),
     redisCache.del("catalog:categories"),
   ]);
+}
+
+async function invalidateProductDetailCache(slug: string) {
+  await redisCache.del(`catalog:detail:${slug}`);
 }
 
 export class CatalogAdminService {
@@ -249,24 +314,40 @@ export class CatalogAdminService {
 
   async createProduct(input: AdminCreateProductInput): Promise<AdminProductListItem> {
     const parsed = createProductSchema.parse(input);
-    const created = await this.repository.createProduct(parsed);
+    const created = await this.repository.createProduct({
+      ...parsed,
+      description: encodeProductDescriptionWithFeatures(parsed.description, sanitizeFeatures(parsed.features ?? [])),
+    });
     await invalidateCatalogCache();
     return mapProduct(created);
   }
 
   async updateProduct(input: AdminUpdateProductInput): Promise<AdminProductListItem> {
     const parsed = updateProductSchema.parse(input);
+    const needsExisting = parsed.price !== undefined
+      || parsed.compareAtPrice !== undefined
+      || parsed.features !== undefined
+      || parsed.description !== undefined;
+
+    const existing = needsExisting
+      ? await this.repository.findActiveProductById(parsed.id)
+      : null;
+
+    if (needsExisting && !existing) {
+      throw new Error("Product not found");
+    }
+
+    const existingProduct = existing;
 
     if (parsed.price !== undefined || parsed.compareAtPrice !== undefined) {
-      const existing = await this.repository.findActiveProductById(parsed.id);
-      if (!existing) {
+      if (!existingProduct) {
         throw new Error("Product not found");
       }
 
-      const nextPrice = parsed.price ?? existing.price.toNumber();
+      const nextPrice = parsed.price ?? existingProduct.price.toNumber();
       const nextCompareAtPrice = parsed.compareAtPrice !== undefined
         ? parsed.compareAtPrice
-        : (existing.compareAtPrice?.toNumber() ?? null);
+        : (existingProduct.compareAtPrice?.toNumber() ?? null);
 
       if (nextCompareAtPrice != null && nextCompareAtPrice <= nextPrice) {
         throw new z.ZodError([
@@ -279,7 +360,19 @@ export class CatalogAdminService {
       }
     }
 
-    const updated = await this.repository.updateProduct(parsed);
+    const payload = {
+      ...parsed,
+      ...(parsed.features !== undefined || parsed.description !== undefined
+        ? {
+            description: encodeProductDescriptionWithFeatures(
+              parsed.description ?? existing?.description ?? "",
+              parsed.features ?? decodeProductDescriptionWithFeatures(existingProduct?.description ?? "").features,
+            ),
+          }
+        : {}),
+    };
+
+    const updated = await this.repository.updateProduct(payload);
     await invalidateCatalogCache();
     return mapProduct(updated);
   }
@@ -351,6 +444,35 @@ export class CatalogAdminService {
   async listTopProductInteractions(limit = 6): Promise<AdminTopInteractionItem[]> {
     const rows = await this.repository.listTopProductInteractions(limit);
     return rows.map(mapTopInteraction);
+  }
+
+  async listProductQuestions(query: AdminProductQuestionListQuery): Promise<AdminProductQuestionListResult> {
+    const parsed = questionListQuerySchema.parse(query);
+
+    const [rows, total] = await Promise.all([
+      this.repository.listProductQuestions(parsed),
+      this.repository.countProductQuestions(parsed),
+    ]);
+
+    return {
+      items: rows.map(mapProductQuestion),
+      page: parsed.page,
+      pageSize: parsed.pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / parsed.pageSize)),
+    };
+  }
+
+  async answerProductQuestion(input: AdminAnswerProductQuestionInput): Promise<AdminProductQuestionItem> {
+    const parsed = answerQuestionSchema.parse(input);
+    const updated = await this.repository.answerProductQuestion(parsed);
+    await invalidateProductDetailCache(updated.product.slug);
+    return mapProductQuestion(updated);
+  }
+
+  async softDeleteProductQuestion(id: string, deletedUserId: string) {
+    const deleted = await this.repository.softDeleteProductQuestion(id, deletedUserId);
+    await invalidateProductDetailCache(deleted.product.slug);
   }
 }
 

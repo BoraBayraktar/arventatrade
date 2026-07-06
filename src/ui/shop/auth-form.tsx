@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import styles from "@/ui/shop/auth.module.css";
 
 type Labels = {
   title: string;
@@ -76,41 +77,97 @@ export function AuthForm({ locale, mode, redirectTo, switchHref, labels }: Props
   }
 
   return (
-    <main className="mx-auto w-full max-w-xl px-4 py-12">
-      <Card>
-        <CardHeader>
-          <CardTitle>{labels.title}</CardTitle>
-          <CardDescription>{labels.subtitle}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="grid gap-4" onSubmit={handleSubmit}>
-            {mode === "register" ? (
+    <main className={styles.authShell}>
+      <section className={styles.formPane}>
+        <Card className={styles.authCard}>
+          <CardHeader>
+            <CardTitle className={styles.authTitle}>{labels.title}</CardTitle>
+            <CardDescription className={styles.authSubtitle}>{labels.subtitle}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className={styles.authForm} onSubmit={handleSubmit}>
+              {mode === "register" ? (
+                <div className="grid gap-2">
+                  <Label>{labels.name}</Label>
+                  <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    minLength={2}
+                    required
+                  />
+                </div>
+              ) : null}
+
               <div className="grid gap-2">
-                <Label>{labels.name}</Label>
-                <Input value={name} onChange={(event) => setName(event.target.value)} minLength={2} required />
+                <Label>{labels.email}</Label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
               </div>
-            ) : null}
 
-            <div className="grid gap-2">
-              <Label>{labels.email}</Label>
-              <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-            </div>
+              <div className="grid gap-2">
+                <Label>{labels.password}</Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  minLength={6}
+                  required
+                />
+              </div>
 
-            <div className="grid gap-2">
-              <Label>{labels.password}</Label>
-              <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={6} required />
-            </div>
+              {error ? <p className={styles.authError}>{error}</p> : null}
 
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? labels.loading : labels.submit}
+              </Button>
 
-            <Button type="submit" disabled={loading}>{loading ? labels.loading : labels.submit}</Button>
+              <p className={styles.authSwitch}>
+                {labels.switchText}{" "}
+                <Link href={`/${locale}/${switchHref}`}>{labels.switchCta}</Link>
+              </p>
+            </form>
+          </CardContent>
+        </Card>
+      </section>
 
-            <p className="text-sm text-neutral-600">
-              {labels.switchText} <Link className="font-medium text-neutral-900 underline" href={`/${locale}/${switchHref}`}>{labels.switchCta}</Link>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+      <section className={styles.visualPane} aria-hidden>
+        <div className={styles.visualFrame}>
+          <div className={styles.visualOverlay} />
+
+          <header className={styles.visualTitle}>
+            <h2>{labels.title}</h2>
+            <p>{labels.subtitle}</p>
+          </header>
+
+          <div className={`${styles.authSlide} ${styles.slide1}`}>
+            <div className={`${styles.slideCard} ${styles.slideCardTop}`} />
+            <div className={`${styles.slideCard} ${styles.slideCardBottom}`} />
+            <div className={styles.slidePill} />
+          </div>
+
+          <div className={`${styles.authSlide} ${styles.slide2}`}>
+            <div className={`${styles.slideCard} ${styles.slideCardAlt}`} />
+            <div className={`${styles.slideCard} ${styles.slideCardSoft}`} />
+            <div className={styles.slidePillAlt} />
+          </div>
+
+          <div className={`${styles.authSlide} ${styles.slide3}`}>
+            <div className={`${styles.slideCard} ${styles.slideCardTop}`} />
+            <div className={`${styles.slideCard} ${styles.slideCardSoft}`} />
+            <div className={styles.slidePill} />
+          </div>
+
+          <div className={styles.dots}>
+            <span className={`${styles.dot} ${styles.dot1}`} />
+            <span className={`${styles.dot} ${styles.dot2}`} />
+            <span className={`${styles.dot} ${styles.dot3}`} />
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

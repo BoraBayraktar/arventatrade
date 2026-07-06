@@ -1,3 +1,5 @@
+import type { ProductFeature } from "@/modules/catalog/contracts/catalog.contract";
+
 export type AdminProductListItem = {
   id: string;
   slug: string;
@@ -11,6 +13,7 @@ export type AdminProductListItem = {
   inStock: boolean;
   currency: string;
   imageUrl: string;
+  features: ProductFeature[];
   categoryId: string | null;
   categoryName: string | null;
 };
@@ -40,6 +43,7 @@ export type AdminCreateProductInput = {
   stock: number;
   currency?: string;
   imageUrl: string;
+  features?: ProductFeature[];
   categoryId?: string | null;
 };
 
@@ -54,6 +58,7 @@ export type AdminUpdateProductInput = {
   stock?: number;
   currency?: string;
   imageUrl?: string;
+  features?: ProductFeature[];
   categoryId?: string | null;
 };
 
@@ -100,4 +105,41 @@ export type AdminTopInteractionItem = {
   imageUrl: string;
   viewCount: number;
   lastViewedAt: string | null;
+};
+
+export type AdminProductQuestionStatus = "all" | "pending" | "answered";
+
+export type AdminProductQuestionItem = {
+  id: string;
+  productId: string;
+  productSlug: string;
+  productName: string;
+  question: string;
+  askedBy: string;
+  askedAt: string;
+  answer: string | null;
+  answeredBy: string | null;
+  answeredAt: string | null;
+  isAnswered: boolean;
+};
+
+export type AdminProductQuestionListQuery = {
+  status?: AdminProductQuestionStatus;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type AdminProductQuestionListResult = {
+  items: AdminProductQuestionItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export type AdminAnswerProductQuestionInput = {
+  id: string;
+  answer: string;
+  answeredBy: string;
 };

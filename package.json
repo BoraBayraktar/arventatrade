@@ -21,7 +21,8 @@
     "verify:checkout": "node scripts/verify-checkout.mjs",
     "verify:orders": "node scripts/verify-orders.mjs",
     "verify:integrations": "node scripts/verify-integrations.mjs",
-    "verify:platform": "node scripts/verify-platform.mjs"
+    "verify:platform": "node scripts/verify-platform.mjs",
+    "verify:media": "node scripts/verify-media-upload.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.18.0",
@@ -37,6 +38,7 @@
     "clsx": "^2.1.1",
     "jose": "^6.2.3",
     "lucide-react": "^1.23.0",
+    "minio": "^8.0.7",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",

@@ -70,6 +70,18 @@ npm run dev
 
 Uygulama varsayilan olarak `http://localhost:3000/tr` adresine yonlenir.
 
+MinIO lokal ortamda su adreslerde calisir:
+
+- API: `http://localhost:9000`
+- Console: `http://localhost:9001`
+
+Varsayilan kimlik bilgileri:
+
+- Username: `minioadmin`
+- Password: `minioadmin`
+
+Admin urun yonetimi ekranindaki gorsel yukleme akisi MinIO bucket'ina (`arventa-media`) dosya yukler ve urune otomatik URL atar.
+
 ## Faz 1 Ozellikleri
 
 - ticari alanlar: `sku`, `stock`, `compareAtPrice`
@@ -226,4 +238,10 @@ Platform (health/readiness/security headers) dogrulamasi icin:
 
 ```bash
 npm run verify:platform
+```
+
+MinIO tabanli gorsel yukleme entegrasyon dogrulamasi icin:
+
+```bash
+npm run verify:media
 ```

@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import type {
+  AdminAnswerProductQuestionInput,
   AdminCategoryListQuery,
   AdminCreateProductInput,
+  AdminProductQuestionListQuery,
   AdminProductListQuery,
   AdminUpdateCategoryInput,
   AdminUpdateProductInput,
@@ -20,6 +22,24 @@ function buildWhere(args: { search?: string; categoryId?: string }) {
         }
       : {}),
     ...(args.categoryId ? { categoryId: args.categoryId } : {}),
+  };
+}
+
+function buildQuestionWhere(args: AdminProductQuestionListQuery) {
+  return {
+    deleted: false,
+    ...(args.status === "pending" ? { answer: null } : {}),
+    ...(args.status === "answered" ? { answer: { not: null } } : {}),
+    ...(args.search
+      ? {
+          OR: [
+            { question: { contains: args.search, mode: "insensitive" as const } },
+            { askedBy: { contains: args.search, mode: "insensitive" as const } },
+            { product: { name: { contains: args.search, mode: "insensitive" as const } } },
+            { product: { slug: { contains: args.search, mode: "insensitive" as const } } },
+          ],
+        }
+      : {}),
   };
 }
 
@@ -108,6 +128,7 @@ export class CatalogAdminRepository {
       },
       select: {
         id: true,
+        description: true,
         price: true,
         compareAtPrice: true,
       },
@@ -285,6 +306,74 @@ export class CatalogAdminRepository {
       },
       orderBy: [{ viewCount: "desc" }, { updatedAt: "desc" }],
       take: limit,
+    });
+  }
+
+  async listProductQuestions(args: AdminProductQuestionListQuery) {
+    return prisma.productQuestion.findMany({
+      where: buildQuestionWhere(args),
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      skip: ((args.page ?? 1) - 1) * (args.pageSize ?? 10),
+      take: args.pageSize,
+    });
+  }
+
+  async countProductQuestions(args: AdminProductQuestionListQuery) {
+    return prisma.productQuestion.count({
+      where: buildQuestionWhere(args),
+    });
+  }
+
+  async answerProductQuestion(input: AdminAnswerProductQuestionInput) {
+    return prisma.productQuestion.update({
+      where: {
+        id: input.id,
+      },
+      data: {
+        answer: input.answer,
+        answeredBy: input.answeredBy,
+        answeredAt: new Date(),
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    });
+  }
+
+  async softDeleteProductQuestion(id: string, deletedUserId: string) {
+    return prisma.productQuestion.update({
+      where: {
+        id,
+      },
+      data: {
+        deleted: true,
+        deletedDate: new Date(),
+        deletedUserId,
+      },
+      include: {
+        product: {
+          select: {
+            slug: true,
+          },
+        },
+      },
     });
   }
 }

@@ -37,19 +37,56 @@ export default async function AdminLoginPage({
 
   return (
     <main className={`container ${styles.loginShell}`}>
-      <LoginForm
-        locale={locale}
-        redirectTo={safeRedirect}
-        labels={{
-          title: dictionary.admin.loginTitle,
-          subtitle: dictionary.admin.loginSubtitle,
-          email: dictionary.admin.email,
-          password: dictionary.admin.password,
-          submit: dictionary.admin.loginButton,
-          invalidCredentials: dictionary.admin.invalidCredentials,
-          loading: dictionary.common.loading,
-        }}
-      />
+      <section className={styles.loginFormPane}>
+        <LoginForm
+          locale={locale}
+          redirectTo={safeRedirect}
+          labels={{
+            title: dictionary.admin.loginTitle,
+            subtitle: dictionary.admin.loginSubtitle,
+            email: dictionary.admin.email,
+            password: dictionary.admin.password,
+            submit: dictionary.admin.loginButton,
+            invalidCredentials: dictionary.admin.invalidCredentials,
+            loading: dictionary.common.loading,
+          }}
+        />
+      </section>
+
+      <section className={styles.loginVisualPane} aria-hidden>
+        <div className={styles.loginVisualFrame}>
+          <div className={styles.loginVisualOverlay} />
+
+          <header className={styles.loginVisualTitle}>
+            <h2>{dictionary.admin.title}</h2>
+            <p>{dictionary.admin.phase2Note}</p>
+          </header>
+
+          <div className={`${styles.authSlide} ${styles.slide1}`}>
+            <div className={`${styles.slideCard} ${styles.slideCardTop}`} />
+            <div className={`${styles.slideCard} ${styles.slideCardBottom}`} />
+            <div className={styles.slidePill} />
+          </div>
+
+          <div className={`${styles.authSlide} ${styles.slide2}`}>
+            <div className={`${styles.slideCard} ${styles.slideCardAlt}`} />
+            <div className={`${styles.slideCard} ${styles.slideCardSoft}`} />
+            <div className={styles.slidePillAlt} />
+          </div>
+
+          <div className={`${styles.authSlide} ${styles.slide3}`}>
+            <div className={`${styles.slideCard} ${styles.slideCardTop}`} />
+            <div className={`${styles.slideCard} ${styles.slideCardSoft}`} />
+            <div className={styles.slidePill} />
+          </div>
+
+          <div className={styles.loginDots}>
+            <span className={`${styles.loginDot} ${styles.dot1}`} />
+            <span className={`${styles.loginDot} ${styles.dot2}`} />
+            <span className={`${styles.loginDot} ${styles.dot3}`} />
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

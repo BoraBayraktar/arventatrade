@@ -31,7 +31,7 @@ export default async function AdminProductsPage({
   }
 
   const query = await searchParams;
-  const [productResult, categories] = await Promise.all([
+  const [productResult, categories, questionResult] = await Promise.all([
     catalogAdminService.listProducts({
       search: query.search,
       categoryId: query.categoryId,
@@ -39,6 +39,11 @@ export default async function AdminProductsPage({
       pageSize: 10,
     }),
     catalogService.listCategories(),
+    catalogAdminService.listProductQuestions({
+      status: "pending",
+      page: 1,
+      pageSize: 12,
+    }),
   ]);
 
   return (
@@ -51,6 +56,7 @@ export default async function AdminProductsPage({
         categoryId: query.categoryId ?? "",
       }}
       categories={categories}
+      initialQuestionResult={questionResult}
       canDelete={user.role === "ADMIN"}
       labels={{
         title: dictionary.admin.productManager,
@@ -86,6 +92,26 @@ export default async function AdminProductsPage({
         validationStock: dictionary.admin.validationStock,
         validationCompareAtPrice: dictionary.admin.validationCompareAtPrice,
         validationImageUrl: dictionary.admin.validationImageUrl,
+        uploadImage: dictionary.admin.uploadImage,
+        uploadingImage: dictionary.admin.uploadingImage,
+        imageUploadFailed: dictionary.admin.imageUploadFailed,
+        imageUploadHint: dictionary.admin.imageUploadHint,
+        features: dictionary.admin.productFeatures,
+        featuresHint: dictionary.admin.featuresHint,
+        featureKey: dictionary.admin.featureKey,
+        featureValue: dictionary.admin.featureValue,
+        highlightFeature: dictionary.admin.highlightFeature,
+        addFeature: dictionary.admin.addFeature,
+        removeFeature: dictionary.admin.removeFeature,
+        questionManager: dictionary.admin.questionManager,
+        status: dictionary.admin.status,
+        statusAll: dictionary.admin.statusAll,
+        statusPending: dictionary.admin.statusPending,
+        statusAnswered: dictionary.admin.statusAnswered,
+        answerLabel: dictionary.admin.answerLabel,
+        answerQuestion: dictionary.admin.answerQuestion,
+        removeQuestion: dictionary.admin.removeQuestion,
+        emptyQuestions: dictionary.admin.emptyQuestions,
         loading: dictionary.common.loading,
         notSpecified: dictionary.common.notSpecified,
       }}

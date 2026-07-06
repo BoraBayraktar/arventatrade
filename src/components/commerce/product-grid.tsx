@@ -1,5 +1,6 @@
 import type { ProductCard as ProductCardType } from "@/modules/catalog/contracts/catalog.contract";
 import type { Locale } from "@/lib/i18n";
+import styles from "@/ui/shop/surface.module.css";
 
 import { ProductCard } from "@/components/commerce/product-card";
 
@@ -12,7 +13,7 @@ type ProductGridProps = {
 
 export function ProductGrid({ locale, products, emptyLabel, detailLabel }: ProductGridProps) {
   if (products.length === 0) {
-    return <p className="rounded-2xl border border-dashed border-black/15 bg-white/70 p-8 text-sm text-neutral-600">{emptyLabel}</p>;
+    return <p className={`${styles.panel} border-dashed border-border p-8 text-sm text-muted-foreground`}>{emptyLabel}</p>;
   }
 
   return (

@@ -6,6 +6,7 @@ import Link from "next/link";
 import Grid from "@/components/grid";
 import { ProductGridItems } from "@/components/layout/product-grid-items";
 import { Button } from "@/components/ui/button";
+import styles from "@/ui/shop/surface.module.css";
 import type { Locale } from "@/lib/i18n";
 import type { ProductCard } from "@/modules/catalog/contracts/catalog.contract";
 
@@ -65,12 +66,12 @@ export function FavoritesClient({ locale, products, labels }: FavoritesClientPro
   }, [favoriteIds, products]);
 
   return (
-    <section className="mx-auto w-[min(1200px,95vw)] py-8">
+    <section className={`${styles.shell} py-8`}>
       <h1 className="mb-6 text-3xl font-semibold tracking-tight">{labels.title}</h1>
 
       {favorites.length === 0 ? (
-        <div className="rounded-xl border border-neutral-200 bg-white p-6">
-          <p className="mb-4 text-sm text-neutral-600">{labels.empty}</p>
+        <div className={`${styles.panel} p-6`}>
+          <p className={`mb-4 text-sm ${styles.panelSubtle}`}>{labels.empty}</p>
           <Button asChild variant="secondary">
             <Link href={`/${locale}/search`}>{labels.continueShopping}</Link>
           </Button>

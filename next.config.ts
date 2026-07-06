@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 const scriptSrc = isDevelopment ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'";
-const contentSecurityPolicy = `default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; ${scriptSrc}; connect-src 'self'; frame-ancestors 'none';`;
+const imgSrc = isDevelopment ? "img-src 'self' https: http: data:" : "img-src 'self' https: data:";
+const contentSecurityPolicy = `default-src 'self'; ${imgSrc}; style-src 'self' 'unsafe-inline'; ${scriptSrc}; connect-src 'self'; frame-ancestors 'none';`;
 
 const nextConfig: NextConfig = {
   async headers() {

@@ -82,7 +82,19 @@
 		},
 		"focusAll": "All products",
 		"focusSearch": "Search focus",
-		"paceText": "Fast scan"
+		"paceText": "Fast scan",
+		"sortPriceAsc": "Price: Low to High",
+		"sortPriceDesc": "Price: High to Low",
+		"lowStockOnly": "Low Stock (1-5)",
+		"newOnly": "New Arrivals (30 days)",
+		"discountedOnly": "Discounted Only",
+		"minPrice": "Minimum Price",
+		"maxPrice": "Maximum Price",
+		"priceRange": "Price Range",
+		"featureFiltersTitle": "Feature Filters",
+		"featureSearchPlaceholder": "Search features",
+		"facetShowMore": "Show More",
+		"facetShowLess": "Show Less"
 	},
 	"commerce": {
 		"addToCart": "Add to Cart",
@@ -102,6 +114,32 @@
 		"checkoutSuccess": "Order created:",
 		"checkoutFailed": "Checkout failed.",
 		"relatedProducts": "Related Products",
+		"featuredFeaturesTitle": "Featured Highlights",
+		"allFeaturesTitle": "Product Features",
+		"ratingsTitle": "Product Ratings (1-5 Stars)",
+		"totalRatingsLabel": "ratings",
+		"starsLabel": "stars",
+		"reviewsTitle": "Product Reviews",
+		"reviewsEmpty": "No reviews for this product yet.",
+		"addReviewTitle": "Write a Review",
+		"ratingLabel": "Rating (1-5)",
+		"reviewTitleLabel": "Review Title",
+		"reviewCommentLabel": "Review Text",
+		"submitReview": "Submit Review",
+		"updateReview": "Update Review",
+		"deleteReview": "Delete Review",
+		"verifiedPurchase": "Verified Purchase",
+		"questionsTitle": "Product Questions & Answers",
+		"questionsEmpty": "No questions for this product yet.",
+		"addQuestionTitle": "Ask a Question",
+		"questionLabel": "Your Question",
+		"submitQuestion": "Submit Question",
+		"submitSuccess": "Your submission has been received.",
+		"submitFailed": "Submission failed. Please try again.",
+		"authRequired": "You must be signed in to perform this action.",
+		"customerQuestion": "Customer Question",
+		"sellerAnswer": "Seller Answer",
+		"noAnswerYet": "No answer yet for this question.",
 		"compareAtPrice": "Compare-at Price",
 		"discount": "discount",
 		"stockStatus": "Stock",
@@ -132,6 +170,7 @@
 		"name": "Full Name",
 		"role": "Role",
 		"productManager": "Product Management",
+		"questionManager": "Product Question Moderation",
 		"orderManager": "Order Management",
 		"integrationManager": "Integration Management",
 		"userManager": "User Management",
@@ -151,10 +190,29 @@
 		"delete": "Delete",
 		"cancel": "Cancel",
 		"emptyProducts": "No products to display.",
+		"emptyQuestions": "No questions to display.",
 		"operationFailed": "Operation failed. Please try again.",
 		"validationRequired": "Please fill all required fields.",
 		"validationPrice": "Price must be greater than 0.",
 		"validationImageUrl": "Please enter a valid image URL."
+		,"uploadImage": "Upload Image"
+		,"uploadingImage": "Uploading..."
+		,"imageUploadFailed": "Image upload failed. Please try again."
+		,"imageUploadHint": "You can upload PNG, JPG, WebP, AVIF, or GIF. Max size 8MB."
+		,"productFeatures": "Product Features"
+		,"featuresHint": "Add feature rows and mark selected rows as featured highlights."
+		,"featureKey": "Feature Name"
+		,"featureValue": "Feature Value"
+		,"highlightFeature": "Highlight"
+		,"addFeature": "Add Feature"
+		,"removeFeature": "Remove"
+		,"status": "Status"
+		,"statusAll": "All"
+		,"statusPending": "Pending"
+		,"statusAnswered": "Answered"
+		,"answerLabel": "Answer"
+		,"answerQuestion": "Answer"
+		,"removeQuestion": "Remove Question"
 		,"categoryManager": "Category Management"
 		,"createCategory": "New Category"
 		,"categoryList": "Category List"

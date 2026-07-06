@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { Locale } from "@/lib/i18n";
+import type { ProductFeature } from "@/modules/catalog/contracts/catalog.contract";
 
 type Category = {
   id: string;
@@ -30,6 +31,7 @@ type Product = {
   inStock: boolean;
   currency: string;
   imageUrl: string;
+  features: ProductFeature[];
   categoryId: string | null;
   categoryName: string | null;
 };
@@ -68,8 +70,42 @@ type Labels = {
   validationStock: string;
   validationCompareAtPrice: string;
   validationImageUrl: string;
+  uploadImage: string;
+  uploadingImage: string;
+  imageUploadFailed: string;
+  imageUploadHint: string;
+  features: string;
+  featuresHint: string;
+  featureKey: string;
+  featureValue: string;
+  highlightFeature: string;
+  addFeature: string;
+  removeFeature: string;
+  questionManager: string;
+  status: string;
+  statusAll: string;
+  statusPending: string;
+  statusAnswered: string;
+  answerLabel: string;
+  answerQuestion: string;
+  removeQuestion: string;
+  emptyQuestions: string;
   loading: string;
   notSpecified: string;
+};
+
+type ProductQuestion = {
+  id: string;
+  productId: string;
+  productSlug: string;
+  productName: string;
+  question: string;
+  askedBy: string;
+  askedAt: string;
+  answer: string | null;
+  answeredBy: string | null;
+  answeredAt: string | null;
+  isAnswered: boolean;
 };
 
 type ProductManagerProps = {
@@ -87,6 +123,13 @@ type ProductManagerProps = {
     categoryId: string;
   };
   categories: Category[];
+  initialQuestionResult: {
+    items: ProductQuestion[];
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
   canDelete: boolean;
 };
 
@@ -100,6 +143,7 @@ type ProductForm = {
   stock: string;
   imageUrl: string;
   categoryId: string;
+  features: ProductFeature[];
 };
 
 type DrawerMode = "create" | "edit";
@@ -108,6 +152,13 @@ const NONE_VALUE = "__none__";
 
 function toPayload(form: ProductForm) {
   const compareAtPrice = form.compareAtPrice.trim() ? Number(form.compareAtPrice) : null;
+  const features = form.features
+    .map((feature) => ({
+      key: feature.key.trim(),
+      value: feature.value.trim(),
+      highlighted: Boolean(feature.highlighted),
+    }))
+    .filter((feature) => feature.key && feature.value);
 
   return {
     slug: form.slug,
@@ -118,7 +169,17 @@ function toPayload(form: ProductForm) {
     compareAtPrice,
     stock: Number(form.stock),
     imageUrl: form.imageUrl,
+    features,
     categoryId: form.categoryId || null,
+  };
+}
+
+
+function createEmptyFeature(): ProductFeature {
+  return {
+    key: "",
+    value: "",
+    highlighted: false,
   };
 }
 
@@ -146,7 +207,7 @@ function formatDiscount(discountRate: number | null) {
   return `%${discountRate}`;
 }
 
-export function ProductManager({ labels, locale, initialResult, initialQuery, categories, canDelete }: ProductManagerProps) {
+export function ProductManager({ labels, locale, initialResult, initialQuery, categories, initialQuestionResult, canDelete }: ProductManagerProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -156,6 +217,27 @@ export function ProductManager({ labels, locale, initialResult, initialQuery, ca
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(initialQuery.search);
   const [categoryFilter, setCategoryFilter] = useState(initialQuery.categoryId);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [questionStatus, setQuestionStatus] = useState<"all" | "pending" | "answered">("pending");
+  const [questionSearch, setQuestionSearch] = useState("");
+  const [questionPage, setQuestionPage] = useState(initialQuestionResult.page);
+  const [questionTotalPages, setQuestionTotalPages] = useState(initialQuestionResult.totalPages);
+  const [questionLoading, setQuestionLoading] = useState(false);
+  const [questions, setQuestions] = useState<ProductQuestion[]>(initialQuestionResult.items);
+  const [answerDrafts, setAnswerDrafts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setAnswerDrafts((prev) => {
+      const next = { ...prev };
+      for (const item of questions) {
+        if (next[item.id] === undefined) {
+          next[item.id] = item.answer ?? "";
+        }
+      }
+      return next;
+    });
+  }, [questions]);
 
   const emptyForm = useMemo<ProductForm>(
     () => ({
@@ -168,6 +250,7 @@ export function ProductManager({ labels, locale, initialResult, initialQuery, ca
       stock: "0",
       imageUrl: "",
       categoryId: "",
+      features: [],
     }),
     [],
   );
@@ -240,6 +323,7 @@ export function ProductManager({ labels, locale, initialResult, initialQuery, ca
     setError(null);
     setEditingId(null);
     setCreateForm(emptyForm);
+    setImageFile(null);
     setDrawerMode("create");
   }
 
@@ -256,7 +340,9 @@ export function ProductManager({ labels, locale, initialResult, initialQuery, ca
       stock: String(product.stock),
       imageUrl: product.imageUrl,
       categoryId: product.categoryId ?? "",
+      features: product.features.length > 0 ? product.features.map((feature) => ({ ...feature })) : [],
     });
+    setImageFile(null);
     setDrawerMode("edit");
   }
 
@@ -267,7 +353,99 @@ export function ProductManager({ labels, locale, initialResult, initialQuery, ca
 
     setDrawerMode(null);
     setEditingId(null);
+    setImageFile(null);
     setError(null);
+  }
+
+  function handleImageFileChange(file: File | null) {
+    setImageFile(file);
+  }
+
+  async function uploadImage() {
+    if (!imageFile) {
+      return;
+    }
+
+    setImageUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", imageFile);
+
+      if (activeForm.slug.trim()) {
+        formData.append("slug", activeForm.slug.trim());
+      }
+
+      const response = await fetch("/api/admin/uploads/product-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(payload?.message ?? labels.imageUploadFailed);
+        return;
+      }
+
+      const payload = (await response.json()) as { item?: { url?: string } };
+      const uploadedUrl = payload.item?.url;
+
+      if (!uploadedUrl) {
+        setError(labels.imageUploadFailed);
+        return;
+      }
+
+      patchActiveField("imageUrl", uploadedUrl);
+      setImageFile(null);
+    } catch {
+      setError(labels.imageUploadFailed);
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  function patchFeature(index: number, patch: Partial<ProductFeature>) {
+    if (drawerMode === "edit") {
+      setEditForm((prev) => ({
+        ...prev,
+        features: prev.features.map((feature, featureIndex) => (
+          featureIndex === index ? { ...feature, ...patch } : feature
+        )),
+      }));
+      return;
+    }
+
+    setCreateForm((prev) => ({
+      ...prev,
+      features: prev.features.map((feature, featureIndex) => (
+        featureIndex === index ? { ...feature, ...patch } : feature
+      )),
+    }));
+  }
+
+  function addFeatureRow() {
+    if (drawerMode === "edit") {
+      setEditForm((prev) => ({ ...prev, features: [...prev.features, createEmptyFeature()] }));
+      return;
+    }
+
+    setCreateForm((prev) => ({ ...prev, features: [...prev.features, createEmptyFeature()] }));
+  }
+
+  function removeFeatureRow(index: number) {
+    if (drawerMode === "edit") {
+      setEditForm((prev) => ({
+        ...prev,
+        features: prev.features.filter((_, featureIndex) => featureIndex !== index),
+      }));
+      return;
+    }
+
+    setCreateForm((prev) => ({
+      ...prev,
+      features: prev.features.filter((_, featureIndex) => featureIndex !== index),
+    }));
   }
 
   async function submitProduct(event: React.FormEvent<HTMLFormElement>) {
@@ -339,6 +517,131 @@ export function ProductManager({ labels, locale, initialResult, initialQuery, ca
 
   function goToPage(nextPage: number) {
     pushQuery({ search: searchQuery, categoryId: categoryFilter, page: nextPage });
+  }
+
+  async function fetchQuestions(params: {
+    status: "all" | "pending" | "answered";
+    search: string;
+    page: number;
+  }) {
+    setQuestionLoading(true);
+    setError(null);
+
+    try {
+      const query = new URLSearchParams();
+      query.set("status", params.status);
+      query.set("page", String(params.page));
+      query.set("pageSize", "10");
+      if (params.search.trim()) {
+        query.set("search", params.search.trim());
+      }
+
+      const response = await fetch(`/api/admin/products/questions?${query.toString()}`);
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(payload?.message ?? labels.opFailed);
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        items?: ProductQuestion[];
+        page?: number;
+        totalPages?: number;
+      };
+      setQuestions(payload.items ?? []);
+      setQuestionPage(payload.page ?? 1);
+      setQuestionTotalPages(payload.totalPages ?? 1);
+    } catch {
+      setError(labels.opFailed);
+    } finally {
+      setQuestionLoading(false);
+    }
+  }
+
+  async function answerQuestion(questionId: string) {
+    const answer = (answerDrafts[questionId] ?? "").trim();
+    if (!answer) {
+      setError(labels.validationRequired);
+      return;
+    }
+
+    setQuestionLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/products/questions/${questionId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ answer }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(payload?.message ?? labels.opFailed);
+        return;
+      }
+
+      setAnswerDrafts((prev) => ({ ...prev, [questionId]: "" }));
+      await fetchQuestions({
+        status: questionStatus,
+        search: questionSearch,
+        page: questionPage,
+      });
+      router.refresh();
+    } catch {
+      setError(labels.opFailed);
+    } finally {
+      setQuestionLoading(false);
+    }
+  }
+
+  async function removeQuestion(questionId: string) {
+    setQuestionLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/products/questions/${questionId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(payload?.message ?? labels.opFailed);
+        return;
+      }
+
+      await fetchQuestions({
+        status: questionStatus,
+        search: questionSearch,
+        page: questionPage,
+      });
+      router.refresh();
+    } catch {
+      setError(labels.opFailed);
+    } finally {
+      setQuestionLoading(false);
+    }
+  }
+
+  function applyQuestionFilters(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setQuestionPage(1);
+    void fetchQuestions({
+      status: questionStatus,
+      search: questionSearch,
+      page: 1,
+    });
+  }
+
+  function goToQuestionPage(nextPage: number) {
+    setQuestionPage(nextPage);
+    void fetchQuestions({
+      status: questionStatus,
+      search: questionSearch,
+      page: nextPage,
+    });
   }
 
   return (
@@ -441,6 +744,111 @@ export function ProductManager({ labels, locale, initialResult, initialQuery, ca
             {labels.next}
           </Button>
         </div>
+
+        <div className="mt-8 rounded-xl border border-neutral-200">
+          <div className="flex flex-col gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
+            <h3 className="text-lg font-semibold text-neutral-900">{labels.questionManager}</h3>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-neutral-500">{labels.status}</span>
+              <Select
+                value={questionStatus}
+                onValueChange={(value: "all" | "pending" | "answered") => {
+                  setQuestionStatus(value);
+                  setQuestionPage(1);
+                  void fetchQuestions({
+                    status: value,
+                    search: questionSearch,
+                    page: 1,
+                  });
+                }}
+              >
+                <SelectTrigger className="w-[170px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{labels.statusAll}</SelectItem>
+                  <SelectItem value="pending">{labels.statusPending}</SelectItem>
+                  <SelectItem value="answered">{labels.statusAnswered}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <form className="border-b border-neutral-200 px-4 py-3" onSubmit={applyQuestionFilters}>
+            <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+              <Input
+                value={questionSearch}
+                onChange={(event) => setQuestionSearch(event.target.value)}
+                placeholder={labels.search}
+              />
+              <Button type="submit" variant="secondary" disabled={questionLoading}>
+                {labels.search}
+              </Button>
+            </div>
+          </form>
+
+          <div className="divide-y divide-neutral-200">
+            {questions.length === 0 ? (
+              <p className="p-4 text-sm text-neutral-500">{labels.emptyQuestions}</p>
+            ) : (
+              questions.map((item) => (
+                <article key={item.id} className="grid gap-3 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-neutral-950">{item.productName}</p>
+                      <p className="text-xs text-neutral-500">{item.productSlug} • {item.askedBy}</p>
+                    </div>
+                    <span className="rounded-full border border-neutral-200 px-2 py-1 text-xs text-neutral-600">
+                      {item.isAnswered ? labels.statusAnswered : labels.statusPending}
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-neutral-700">{item.question}</p>
+
+                  <div className="grid gap-2">
+                    <Label>{labels.answerLabel}</Label>
+                    <Textarea
+                      value={answerDrafts[item.id] ?? ""}
+                      onChange={(event) => setAnswerDrafts((prev) => ({ ...prev, [item.id]: event.target.value }))}
+                      placeholder={labels.answerLabel}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" disabled={questionLoading} onClick={() => answerQuestion(item.id)}>
+                      {item.isAnswered ? labels.save : labels.answerQuestion}
+                    </Button>
+                    <Button type="button" size="sm" variant="destructive" disabled={questionLoading} onClick={() => removeQuestion(item.id)}>
+                      {labels.removeQuestion}
+                    </Button>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+
+          <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={questionLoading || questionPage <= 1}
+              onClick={() => goToQuestionPage(Math.max(1, questionPage - 1))}
+            >
+              {labels.prev}
+            </Button>
+            <span className="text-sm text-neutral-500">
+              {labels.page} {questionPage}/{Math.max(1, questionTotalPages)}
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={questionLoading || questionPage >= Math.max(1, questionTotalPages)}
+              onClick={() => goToQuestionPage(Math.min(Math.max(1, questionTotalPages), questionPage + 1))}
+            >
+              {labels.next}
+            </Button>
+          </div>
+        </div>
       </div>
 
       {drawerMode ? (
@@ -473,6 +881,55 @@ export function ProductManager({ labels, locale, initialResult, initialQuery, ca
               <div className="grid gap-2">
                 <Label>{labels.description}</Label>
                 <Textarea value={activeForm.description} onChange={(event) => patchActiveField("description", event.target.value)} required />
+              </div>
+              <div className="grid gap-2">
+                <Label>{labels.features}</Label>
+                <div className="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                  {activeForm.features.length === 0 ? (
+                    <p className="text-xs text-neutral-500">{labels.featuresHint}</p>
+                  ) : null}
+
+                  {activeForm.features.map((feature, index) => (
+                    <div key={`feature-${index}`} className="grid gap-2 rounded-lg border border-neutral-200 bg-white p-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                      <div className="grid gap-1">
+                        <Label>{labels.featureKey}</Label>
+                        <Input
+                          value={feature.key}
+                          onChange={(event) => patchFeature(index, { key: event.target.value })}
+                          placeholder={locale === "tr" ? "Tip" : "Type"}
+                        />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label>{labels.featureValue}</Label>
+                        <Input
+                          value={feature.value}
+                          onChange={(event) => patchFeature(index, { value: event.target.value })}
+                          placeholder={locale === "tr" ? "Kule Tipi" : "Tower"}
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                        <label className="flex items-center gap-2 text-xs font-medium text-neutral-700">
+                          <input
+                            type="checkbox"
+                            checked={feature.highlighted}
+                            onChange={(event) => patchFeature(index, { highlighted: event.target.checked })}
+                          />
+                          {labels.highlightFeature}
+                        </label>
+                        <Button type="button" size="sm" variant="outline" onClick={() => removeFeatureRow(index)}>
+                          {labels.removeFeature}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div>
+                    <Button type="button" size="sm" variant="secondary" onClick={addFeatureRow}>
+                      {labels.addFeature}
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-neutral-500">{labels.featuresHint}</p>
               </div>
               <div className="grid gap-2 md:grid-cols-2">
                 <div className="grid gap-2">
@@ -509,6 +966,25 @@ export function ProductManager({ labels, locale, initialResult, initialQuery, ca
               <div className="grid gap-2">
                 <Label>{labels.imageUrl}</Label>
                 <Input value={activeForm.imageUrl} onChange={(event) => patchActiveField("imageUrl", event.target.value)} required />
+                <div className="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 md:grid-cols-[1fr_auto] md:items-end">
+                  <div className="grid gap-1">
+                    <Label>{labels.uploadImage}</Label>
+                    <Input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
+                      onChange={(event) => handleImageFileChange(event.target.files?.[0] ?? null)}
+                    />
+                    <p className="text-xs text-neutral-500">{labels.imageUploadHint}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={!imageFile || imageUploading}
+                    onClick={uploadImage}
+                  >
+                    {imageUploading ? labels.uploadingImage : labels.uploadImage}
+                  </Button>
+                </div>
               </div>
 
               {activeForm.imageUrl ? (
@@ -522,7 +998,7 @@ export function ProductManager({ labels, locale, initialResult, initialQuery, ca
                 <Button type="button" variant="secondary" onClick={closeDrawer} disabled={loading}>
                   {labels.cancel}
                 </Button>
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" disabled={loading || imageUploading}>
                   {loading ? labels.loading : activeSubmit}
                 </Button>
               </div>

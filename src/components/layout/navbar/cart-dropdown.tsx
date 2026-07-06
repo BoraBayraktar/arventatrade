@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Compass, CreditCard, ShoppingCart, TicketPercent } from "lucide-react";
+import styles from "@/ui/shop/surface.module.css";
 
 type CartDropdownLabels = {
 	cartTitle: string;
@@ -91,7 +92,6 @@ export function CartDropdown({ locale, labels }: { locale: string; labels: CartD
 		<div className="relative" ref={rootRef}>
 			<button
 				type="button"
-				aria-expanded={open}
 				aria-haspopup="dialog"
 				aria-label={labels.cartTitle}
 				onClick={() => setOpen((prev) => !prev)}
@@ -110,7 +110,7 @@ export function CartDropdown({ locale, labels }: { locale: string; labels: CartD
 			</button>
 
 			{open ? (
-				<div className="absolute right-0 top-full z-50 mt-2 w-[min(92vw,340px)] overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_12px_30px_-12px_rgba(0,0,0,0.24)]">
+				<div className={`${styles.panelSoft} absolute right-0 top-full z-50 mt-2 w-[min(92vw,340px)] overflow-hidden shadow-[0_12px_30px_-12px_rgba(0,0,0,0.24)]`}>
 					<div className="bg-[linear-gradient(115deg,#ff7a00_0%,#ff5a1f_45%,#ff3d68_100%)] p-4 text-white">
 						<p className="text-[11px] uppercase tracking-[0.2em] opacity-90">{labels.cartTitle}</p>
 						<p className="mt-1 text-lg font-semibold">{hasItems ? `${count} ${itemLabel}` : labels.cartEmpty}</p>

@@ -1,0 +1,308 @@
+.homeShell {
+  width: min(100%, 1600px);
+  margin: 0 auto;
+  padding: 1rem 1rem 0;
+}
+
+.hero {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.heroPanel {
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(900px 320px at 80% 10%, rgba(90, 90, 255, 0.14), transparent 55%),
+    linear-gradient(145deg, #ffffff 0%, #f8f9ff 100%);
+  box-shadow: 0 18px 44px rgba(18, 18, 22, 0.08);
+  overflow: hidden;
+}
+
+.heroCopy {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.25rem;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.heroTitle {
+  font-size: clamp(2.2rem, 5vw, 4.4rem);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+  margin: 0;
+}
+
+.heroSubtitle {
+  max-width: 60ch;
+  color: var(--muted-foreground);
+  font-size: 1rem;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.heroButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.75rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--foreground);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.heroButtonPrimary {
+  border-color: transparent;
+  background: linear-gradient(115deg, #ff7a00 0%, #ff5a1f 45%, #ff3d68 100%);
+  color: #fff;
+  box-shadow: 0 14px 26px rgba(255, 90, 31, 0.24);
+}
+
+.heroButton:hover {
+  transform: translateY(-1px);
+}
+
+.heroVisual {
+  position: relative;
+  min-height: 280px;
+  border-top: 1px solid var(--border);
+  background: linear-gradient(145deg, #ffffff 0%, #f4f6ff 52%, #eef1ff 100%);
+}
+
+.heroVisualInner {
+  position: absolute;
+  inset: 1rem;
+  border-radius: 1.1rem;
+  overflow: hidden;
+}
+
+.heroVisualCard {
+  position: absolute;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  box-shadow: 0 12px 30px rgba(14, 18, 45, 0.16);
+}
+
+.heroVisualTop {
+  top: 18%;
+  left: 8%;
+  width: 58%;
+  height: 40%;
+  background: linear-gradient(140deg, rgba(118, 112, 255, 0.94), rgba(70, 65, 207, 0.98));
+}
+
+.heroVisualBottom {
+  bottom: 12%;
+  right: 8%;
+  width: 46%;
+  height: 26%;
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.96), rgba(240, 243, 255, 0.95));
+}
+
+.heroVisualPill {
+  position: absolute;
+  right: 16%;
+  top: 18%;
+  width: 128px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(38, 42, 102, 0.12);
+}
+
+.sectionBlock {
+  margin-top: 1rem;
+  padding: 1rem 0 0;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.85rem;
+}
+
+.sectionKicker {
+  margin: 0 0 0.2rem;
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+  letter-spacing: -0.03em;
+}
+
+.sectionNote {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  max-width: 56ch;
+}
+
+.panelWrap {
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  background: color-mix(in oklab, var(--background) 96%, white);
+  box-shadow: 0 18px 44px rgba(18, 18, 22, 0.08);
+  padding: 1rem;
+}
+
+.scroller {
+  padding-top: 0.25rem;
+}
+
+@media (min-width: 768px) {
+  .homeShell {
+    padding: 1.25rem 1.25rem 0;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+    gap: 1rem;
+    align-items: stretch;
+    margin-bottom: 1.25rem;
+  }
+
+  .heroCopy {
+    padding: 1.5rem;
+  }
+
+  .heroVisual {
+    min-height: 100%;
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+
+  .panelWrap {
+    padding: 1.25rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .homeShell {
+    padding: 1.5rem 1.5rem 0;
+  }
+
+  .heroCopy {
+    padding: 2rem;
+  }
+
+  .panelWrap {
+    padding: 1.5rem;
+  }
+}
+
+
+.footerPanel {
+  margin-top: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: color-mix(in oklab, var(--background) 96%, white);
+  box-shadow: 0 14px 36px rgba(18, 18, 22, 0.08);
+  padding: 1rem 1.25rem;
+}
+
+.footerLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.footerLink {
+  color: var(--muted-foreground);
+  font-weight: 600;
+  transition: color 160ms ease;
+}
+
+.footerLink:hover {
+  color: var(--foreground);
+}
+
+.campaignGrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.campaignCard {
+  display: grid;
+  gap: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 1.15rem;
+  background: linear-gradient(145deg, #ffffff 0%, #f7f8ff 100%);
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(18, 18, 22, 0.06);
+}
+
+.campaignImage {
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: #f4f5fb;
+}
+
+.campaignBody {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0 0.95rem 1rem;
+}
+
+.campaignKicker {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.campaignText {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+@media (min-width: 768px) {
+  .campaignGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .campaignGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import styles from "@/ui/shop/surface.module.css";
 
 type UserMenuProps = {
 	locale: string;
@@ -110,7 +111,7 @@ export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
 				</Button>
 
 				{open ? (
-					<div className="absolute right-0 top-full z-40 mt-1 w-56 rounded-xl border border-neutral-200 bg-white p-2 shadow-xl">
+					<div className={`${styles.panelSoft} absolute right-0 top-full z-40 mt-1 w-56 p-2 shadow-xl`}>
 						<Link href={`/${locale}/login`} className="block rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
 							{labels.loginMenu}
 						</Link>
@@ -135,7 +136,7 @@ export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
 			</button>
 
 			{open ? (
-				<div className="absolute right-0 top-full z-40 mt-1 w-56 rounded-xl border border-neutral-200 bg-white p-2 shadow-xl">
+				<div className={`${styles.panelSoft} absolute right-0 top-full z-40 mt-1 w-56 p-2 shadow-xl`}>
 					<Link href={`/${locale}/account/orders`} className="block rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
 						{labels.orders}
 					</Link>

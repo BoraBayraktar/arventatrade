@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Carousel } from "@/components/carousel";
+import styles from "@/ui/shop/home.module.css";
 import { GridTileImage } from "@/components/grid/tile";
 import { ThreeItemGrid } from "@/components/grid/three-items";
 import { Footer } from "@/components/layout/footer";
@@ -63,46 +64,105 @@ export default async function LocaleHomePage({
   const storefrontItems = [...storefront.campaigns, ...storefront.features];
 
   return (
-    <>
-      <ThreeItemGrid locale={locale} products={products.items} />
-      <Carousel locale={locale} products={products.items} />
+    <main className={styles.homeShell}>
+      <section className={styles.hero}>
+        <div className={styles.heroPanel}>
+          <div className={styles.heroCopy}>
+            <div className={styles.eyebrow}>{dictionary.home.eyebrow}</div>
+            <h1 className={styles.heroTitle}>{dictionary.home.title}</h1>
+            <p className={styles.heroSubtitle}>{dictionary.home.subtitle}</p>
+            <div className={styles.heroActions}>
+              <Link href={`/${locale}/search`} className={`${styles.heroButton} ${styles.heroButtonPrimary}`}>{dictionary.home.cta}</Link>
+              <Link href={`/${locale}/favorites`} className={styles.heroButton}>{dictionary.common.favorites}</Link>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.heroPanel}>
+          <div className={styles.heroVisual}>
+            <div className={styles.heroVisualInner}>
+              <div className={`${styles.heroVisualCard} ${styles.heroVisualTop}`} />
+              <div className={`${styles.heroVisualCard} ${styles.heroVisualBottom}`} />
+              <div className={styles.heroVisualPill} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={styles.sectionBlock}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <p className={styles.sectionKicker}>{dictionary.home.campaignTitle}</p>
+            <h2 className={styles.sectionTitle}>{dictionary.home.spotlightTitle}</h2>
+          </div>
+          <p className={styles.sectionNote}>{dictionary.home.spotlightBody}</p>
+        </div>
+        <div className={styles.panelWrap}>
+          <ThreeItemGrid locale={locale} products={products.items} />
+        </div>
+      </section>
+
+      <section className={styles.sectionBlock}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <p className={styles.sectionKicker}>{dictionary.home.campaignTitle}</p>
+            <h2 className={styles.sectionTitle}>{dictionary.catalog.summaryTitle}</h2>
+          </div>
+          <p className={styles.sectionNote}>{dictionary.home.featureCards.conversion.text}</p>
+        </div>
+        <div className={`${styles.panelWrap} ${styles.scroller}`}>
+          <Carousel locale={locale} products={products.items} />
+        </div>
+      </section>
+
       {storefrontItems.length ? (
-        <section className="mx-auto grid max-w-screen-2xl gap-4 px-4 pb-8 sm:grid-cols-2 lg:grid-cols-3">
-          {storefrontItems.map((item, index) => {
-            const tile = getStorefrontTile(item, locale as Locale, products.items[index % products.items.length]);
+        <section className={styles.sectionBlock}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.sectionKicker}>{dictionary.home.campaignTitle}</p>
+              <h2 className={styles.sectionTitle}>{dictionary.home.featureTitle}</h2>
+            </div>
+            <p className={styles.sectionNote}>{dictionary.home.campaignCards.fast.text}</p>
+          </div>
+          <div className={styles.panelWrap}>
+            <div className={styles.campaignGrid}>
+              {storefrontItems.map((item, index) => {
+                const tile = getStorefrontTile(item, locale as Locale, products.items[index % products.items.length]);
 
-            if (!tile) {
-              return null;
-            }
+                if (!tile) {
+                  return null;
+                }
 
-            return (
-              <Link key={item.id} href={tile.href} className="group block">
-                <article className="grid gap-3">
-                  <div className="aspect-square overflow-hidden rounded-lg bg-neutral-100">
-                    <GridTileImage
-                      alt={tile.imageAlt}
-                      src={tile.imageUrl}
-                      width={600}
-                      height={600}
-                      label={{
-                        title: item.title,
-                        amount: tile.amount,
-                        currencyCode: tile.currency,
-                        locale: locale as Locale,
-                      }}
-                    />
-                  </div>
-                  <div className="px-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{item.targetType === "CATEGORY" ? dictionary.catalog.category : item.variant}</p>
-                    <p className="mt-1 line-clamp-2 text-sm leading-6 text-neutral-500">{item.description}</p>
-                  </div>
-                </article>
-              </Link>
-            );
-          })}
+                return (
+                  <Link key={item.id} href={tile.href} className="group block">
+                    <article className={styles.campaignCard}>
+                      <div className={styles.campaignImage}>
+                        <GridTileImage
+                          alt={tile.imageAlt}
+                          src={tile.imageUrl}
+                          width={600}
+                          height={600}
+                          label={{
+                            title: item.title,
+                            amount: tile.amount,
+                            currencyCode: tile.currency,
+                            locale: locale as Locale,
+                          }}
+                        />
+                      </div>
+                      <div className={styles.campaignBody}>
+                        <p className={styles.campaignKicker}>{item.targetType === "CATEGORY" ? dictionary.catalog.category : item.variant}</p>
+                        <p className={styles.campaignText}>{item.description}</p>
+                      </div>
+                    </article>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         </section>
       ) : null}
       <Footer locale={locale} dictionary={dictionary} />
-    </>
+    </main>
   );
 }

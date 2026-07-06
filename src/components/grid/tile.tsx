@@ -20,8 +20,8 @@ export function GridTileImage({ isInteractive = true, active, label, className, 
   return (
     <div
       className={cn(
-        "group flex h-full w-full items-center justify-center overflow-hidden rounded-lg border bg-white hover:border-blue-600",
-        active ? "border-2 border-blue-600" : "border-neutral-200",
+        "group flex h-full w-full items-center justify-center overflow-hidden rounded-2xl border bg-white transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(18,18,22,0.12)]",
+        active ? "border-2 border-[color:var(--primary)]" : "border-border",
         label ? "relative" : "",
       )}
     >
@@ -30,7 +30,7 @@ export function GridTileImage({ isInteractive = true, active, label, className, 
           alt={alt}
           className={cn(
             "relative h-full w-full object-contain",
-            isInteractive ? "transition duration-300 ease-in-out group-hover:scale-105" : "",
+            isInteractive ? "transition duration-300 ease-in-out group-hover:scale-[1.03]" : "",
             className,
           )}
           unoptimized
