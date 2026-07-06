@@ -85,7 +85,7 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
   const resultsText = products.total > 1 ? "results" : "result";
 
   return (
-    <section className={`${surfaceStyles.shell} py-8`}>
+    <section className="w-full py-8">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{dictionary.home.campaignTitle}</p>
