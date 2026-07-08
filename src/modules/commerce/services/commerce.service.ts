@@ -4,6 +4,8 @@ import { redisCache } from "@/lib/redis";
 import type {
   AdminOrderDetail,
   AdminOrderDetailItem,
+  AdminOrderInventoryMovementEntry,
+  AdminOrderInventorySummary,
   AdminOrderListItem,
   AdminOrderListQuery,
   AdminOrderListResult,
@@ -18,6 +20,7 @@ import type {
   CommerceQuoteResult,
 } from "@/modules/commerce/contracts/commerce.contract";
 import { CommerceRepository } from "@/modules/commerce/repositories/commerce.repository";
+import { inventoryService } from "@/modules/inventory/services/inventory.service";
 import { pricingService } from "@/modules/pricing/services/pricing.service";
 
 const lineSchema = z.object({
@@ -79,15 +82,15 @@ function normalizeLines(lines: CommerceQuoteInput["lines"]) {
 function mapQuoteLine(args: {
   line: { productId: string; quantity: number };
   product: {
-    id: string;
+    productId: string;
     slug: string;
     sku: string;
     name: string;
     imageUrl: string;
     currency: string;
-    price: { toNumber: () => number };
-    compareAtPrice: { toNumber: () => number } | null;
-    stock: number;
+    unitPrice: number;
+    compareAtPrice: number | null;
+    availableStock: number;
   } | undefined;
 }): CommerceLineQuote {
   if (!args.product) {
@@ -107,22 +110,19 @@ function mapQuoteLine(args: {
     };
   }
 
-  const unitPrice = args.product.price.toNumber();
-  const compareAtPrice = args.product.compareAtPrice?.toNumber() ?? null;
-
   return {
-    productId: args.product.id,
+    productId: args.product.productId,
     slug: args.product.slug,
     sku: args.product.sku,
     name: args.product.name,
     imageUrl: args.product.imageUrl,
     currency: args.product.currency,
     quantity: args.line.quantity,
-    unitPrice,
-    compareAtPrice,
-    lineTotal: unitPrice * args.line.quantity,
-    inStock: args.product.stock >= args.line.quantity,
-    availableStock: args.product.stock,
+    unitPrice: args.product.unitPrice,
+    compareAtPrice: args.product.compareAtPrice,
+    lineTotal: args.product.unitPrice * args.line.quantity,
+    inStock: args.product.availableStock >= args.line.quantity,
+    availableStock: args.product.availableStock,
   };
 }
 
@@ -162,6 +162,21 @@ function mapOrderDetailItem(item: {
   };
 }
 
+function mapRestockStatus(args: {
+  reservationCount: number;
+  restockMovementCount: number;
+}): "NOT_RESTOCKED" | "RESTOCKED" | "PARTIALLY_RESTOCKED" {
+  if (args.restockMovementCount === 0) {
+    return "NOT_RESTOCKED";
+  }
+
+  if (args.restockMovementCount < args.reservationCount) {
+    return "PARTIALLY_RESTOCKED";
+  }
+
+  return "RESTOCKED";
+}
+
 function mapOrderDetail(order: {
   id: string;
   orderNumber: string;
@@ -186,6 +201,26 @@ function mapOrderDetail(order: {
     compareAtPrice: { toNumber: () => number } | null;
     lineTotal: { toNumber: () => number };
     currency: string;
+  }>;
+  stockReservations: Array<{
+    id: string;
+    quantity: number;
+    status: "ACTIVE" | "RELEASED" | "COMMITTED" | "EXPIRED" | "CANCELLED";
+    createdAt: Date;
+    warehouse: {
+      code: string;
+    };
+    inventoryMovements: Array<{
+      id: string;
+      type: string;
+      quantity: number;
+      note: string | null;
+      reservationId: string | null;
+      createdAt: Date;
+      warehouse: {
+        code: string;
+      };
+    }>;
   }>;
   statusHistory: Array<{
     id: string;
@@ -226,6 +261,44 @@ function mapOrderDetail(order: {
     createdAt: item.createdAt.toISOString(),
   }));
 
+  const inventoryMovements: AdminOrderInventoryMovementEntry[] = order.stockReservations
+    .flatMap((reservation) => reservation.inventoryMovements)
+    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+    .map((movement) => ({
+      id: movement.id,
+      type: movement.type,
+      quantity: movement.quantity,
+      warehouseCode: movement.warehouse.code ?? null,
+      reservationId: movement.reservationId,
+      note: movement.note,
+      createdAt: movement.createdAt.toISOString(),
+    }));
+
+  const totalReservedQuantity = order.stockReservations.reduce((sum, reservation) => sum + reservation.quantity, 0);
+  const releasedReservationCount = order.stockReservations.filter((reservation) => reservation.status === "RELEASED").length;
+  const cancelledReservationCount = order.stockReservations.filter((reservation) => reservation.status === "CANCELLED").length;
+  const committedReservationCount = order.stockReservations.filter((reservation) => reservation.status === "COMMITTED").length;
+  const activeReservationCount = order.stockReservations.filter((reservation) => reservation.status === "ACTIVE").length;
+  const restockMovements = inventoryMovements.filter((movement) => movement.type === "ORDER_CANCEL_RESTOCK" || movement.type === "RETURN_RESTOCK");
+
+  let restockStatus: AdminOrderInventorySummary["restockStatus"] = "NOT_RESTOCKED";
+  if (restockMovements.length > 0 && restockMovements.length < order.stockReservations.length) {
+    restockStatus = "PARTIALLY_RESTOCKED";
+  } else if (restockMovements.length > 0) {
+    restockStatus = "RESTOCKED";
+  }
+
+  const inventorySummary: AdminOrderInventorySummary = {
+    reservationCount: order.stockReservations.length,
+    committedReservationCount,
+    releasedReservationCount,
+    cancelledReservationCount,
+    activeReservationCount,
+    totalReservedQuantity,
+    restockStatus,
+    lastRestockedAt: restockMovements[0]?.createdAt ?? null,
+  };
+
   return {
     id: order.id,
     orderNumber: order.orderNumber,
@@ -239,6 +312,8 @@ function mapOrderDetail(order: {
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     items: order.items.map(mapOrderDetailItem),
+    inventorySummary,
+    inventoryMovements,
     statusHistory,
     paymentStatusHistory,
   };
@@ -250,8 +325,8 @@ export class CommerceService {
   async quote(input: CommerceQuoteInput): Promise<CommerceQuoteResult> {
     const parsed = quoteSchema.parse(input);
     const normalized = normalizeLines(parsed.lines);
-    const products = await this.repository.listActiveProductsByIds(normalized.map((line) => line.productId));
-    const productMap = new Map(products.map((item) => [item.id, item]));
+    const products = await inventoryService.getProductAvailability(normalized.map((line) => line.productId));
+    const productMap = new Map(products.map((item) => [item.productId, item]));
 
     const lines = normalized.map((line) => mapQuoteLine({ line, product: productMap.get(line.productId) }));
     const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
@@ -295,7 +370,7 @@ export class CommerceService {
     let createdOrderNumber = orderNumber;
 
     try {
-      const createdOrder = await this.repository.createOrderAndDecrementStock({
+      const createdOrder = await this.repository.createOrderAndCommitInventory({
         orderNumber,
         lines: quote.lines,
         subtotal: quote.subtotal,
@@ -342,6 +417,14 @@ export class CommerceService {
       orderNumber: order.orderNumber,
       status: order.status,
       paymentStatus: order.paymentStatus,
+      restockStatus: mapRestockStatus({
+        reservationCount: order.stockReservations.length,
+        restockMovementCount: order.stockReservations.reduce((sum, reservation) => sum + reservation.inventoryMovements.length, 0),
+      }),
+      lastRestockedAt: order.stockReservations
+        .flatMap((reservation) => reservation.inventoryMovements)
+        .map((movement) => movement.createdAt)
+        .sort((left, right) => right.getTime() - left.getTime())[0]?.toISOString() ?? null,
       subtotal: order.subtotal.toNumber(),
       discountTotal: order.discountTotal.toNumber(),
       total: order.total.toNumber(),
@@ -393,6 +476,8 @@ export class CommerceService {
     }
 
     let current = existing;
+    const shouldRestockForCancellation = parsed.status === "CANCELLED" && current.status !== "CANCELLED";
+    const shouldRestockForRefund = parsed.paymentStatus === "REFUNDED" && current.paymentStatus !== "REFUNDED";
 
     if (parsed.status && current.status !== parsed.status) {
       current = await this.repository.updateOrderStatus({
@@ -412,6 +497,22 @@ export class CommerceService {
         changedByUserId: parsed.changedByUserId,
         note: parsed.note,
       });
+    }
+
+    if (shouldRestockForCancellation) {
+      await this.repository.restockOrderInventory({
+        id: parsed.id,
+        movementType: "ORDER_CANCEL_RESTOCK",
+        note: parsed.note ?? "Order cancelled and stock restored",
+      });
+      current = await this.repository.findOrderById(parsed.id) ?? current;
+    } else if (shouldRestockForRefund) {
+      await this.repository.restockOrderInventory({
+        id: parsed.id,
+        movementType: "RETURN_RESTOCK",
+        note: parsed.note ?? "Order refunded and stock restored",
+      });
+      current = await this.repository.findOrderById(parsed.id) ?? current;
     }
 
     return mapOrderDetail(current);

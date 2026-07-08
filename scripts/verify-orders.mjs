@@ -110,8 +110,11 @@ async function main() {
   const createProductPayload = await createProductResponse.json();
   const productId = createProductPayload?.item?.id;
   assert(productId, "Create product response should include id");
+  const initialProductStock = createProductPayload?.item?.stock;
+  assert(initialProductStock === 3, `Initial product stock expected 3, got ${initialProductStock}`);
 
   let createdOrderId = null;
+  let refundOrderId = null;
 
   try {
     const checkoutResponse = await fetch(`${baseUrl}/api/commerce/checkout`, {
@@ -136,6 +139,8 @@ async function main() {
     assert(Array.isArray(adminPayload.items), "Orders list should include items array");
     const createdOrder = adminPayload.items.find((item) => item.orderNumber === orderNumber);
     assert(createdOrder, "Created order should be listed");
+    assert(createdOrder.restockStatus === "NOT_RESTOCKED", "Fresh order should list restock status as NOT_RESTOCKED");
+    assert(createdOrder.lastRestockedAt === null, "Fresh order should not have a last restocked timestamp");
     createdOrderId = createdOrder.id;
 
     const editorListResponse = await authFetch("/api/admin/orders?page=1&pageSize=5", editorCookie);
@@ -154,6 +159,9 @@ async function main() {
     assert(Array.isArray(adminDetailPayload?.paymentStatusHistory), "Order detail should include payment status history");
     assert(adminDetailPayload.paymentStatusHistory.length >= 1, "Order should have initial payment history");
     assert(adminDetailPayload.paymentStatusHistory[0].toStatus === "PENDING", "Initial payment history should be PENDING");
+    assert(adminDetailPayload.inventorySummary?.restockStatus === "NOT_RESTOCKED", "Initial restock status should be NOT_RESTOCKED");
+    assert(Array.isArray(adminDetailPayload.inventoryMovements), "Order detail should include inventory movements");
+    assert(adminDetailPayload.inventoryMovements.some((item) => item.type === "ORDER_COMMIT"), "Order detail should include ORDER_COMMIT movement");
 
     const editorDetailResponse = await authFetch(`/api/admin/orders/${createdOrderId}`, editorCookie);
     assert(editorDetailResponse.status === 200, `Editor order detail expected 200, got ${editorDetailResponse.status}`);
@@ -187,6 +195,87 @@ async function main() {
     assert(patchedPayload.item.paymentStatusHistory[0].toStatus === "PAID", "Latest payment history should be PAID");
     assert(patchedPayload.item.paymentStatusHistory[0].source === "ADMIN", "Latest payment history source should be ADMIN");
     assert(patchedPayload.item.paymentStatusHistory[0].changedByUserId === adminUser.id, "Payment history actor should match admin user");
+    assert(patchedPayload.item.inventorySummary.restockStatus === "RESTOCKED", "Cancelled order should be marked as restocked");
+    assert(patchedPayload.item.inventoryMovements.some((item) => item.type === "ORDER_CANCEL_RESTOCK"), "Cancelled order should include cancel restock movement");
+
+    const cancelledOrderListResponse = await authFetch(`/api/admin/orders?search=${encodeURIComponent(orderNumber)}&page=1&pageSize=5`, adminCookie);
+    assert(cancelledOrderListResponse.status === 200, `Cancelled order list expected 200, got ${cancelledOrderListResponse.status}`);
+    const cancelledOrderListPayload = await cancelledOrderListResponse.json();
+    const cancelledOrder = cancelledOrderListPayload.items.find((item) => item.orderNumber === orderNumber);
+    assert(cancelledOrder?.restockStatus === "RESTOCKED", "Cancelled order should list restock status as RESTOCKED");
+    assert(typeof cancelledOrder?.lastRestockedAt === "string", "Cancelled order should include last restocked timestamp");
+
+    const restockedAfterCancel = await prisma.product.findUnique({
+      where: {
+        id: productId,
+      },
+      select: {
+        stock: true,
+      },
+    });
+    assert(restockedAfterCancel?.stock === initialProductStock, `Cancelled order should restore stock to ${initialProductStock}`);
+
+    const refundCheckoutResponse = await fetch(`${baseUrl}/api/commerce/checkout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        lines: [{ productId, quantity: 1 }],
+      }),
+    });
+    assert(refundCheckoutResponse.status === 201, `Refund checkout expected 201, got ${refundCheckoutResponse.status}`);
+    const refundCheckoutPayload = await refundCheckoutResponse.json();
+    const refundOrderNumber = refundCheckoutPayload?.orderNumber;
+    assert(refundOrderNumber, "Refund checkout should return order number");
+
+    const refundOrderListResponse = await authFetch(`/api/admin/orders?search=${encodeURIComponent(refundOrderNumber)}&page=1&pageSize=5`, adminCookie);
+    assert(refundOrderListResponse.status === 200, `Refund order list expected 200, got ${refundOrderListResponse.status}`);
+    const refundOrderListPayload = await refundOrderListResponse.json();
+    const refundOrder = refundOrderListPayload.items.find((item) => item.orderNumber === refundOrderNumber);
+    assert(refundOrder, "Refund order should be listed");
+    assert(refundOrder.restockStatus === "NOT_RESTOCKED", "Refund order should start with NOT_RESTOCKED in list");
+    assert(refundOrder.lastRestockedAt === null, "Refund order should not have last restocked timestamp before refund");
+    refundOrderId = refundOrder.id;
+
+    const paidOrderPatchResponse = await authFetch(`/api/admin/orders/${refundOrderId}`, adminCookie, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ paymentStatus: "PAID" }),
+    });
+    assert(paidOrderPatchResponse.status === 200, `Refund order paid patch expected 200, got ${paidOrderPatchResponse.status}`);
+
+    const refundedOrderPatchResponse = await authFetch(`/api/admin/orders/${refundOrderId}`, adminCookie, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ paymentStatus: "REFUNDED" }),
+    });
+    assert(refundedOrderPatchResponse.status === 200, `Refund order refund patch expected 200, got ${refundedOrderPatchResponse.status}`);
+    const refundedPayload = await refundedOrderPatchResponse.json();
+    assert(refundedPayload?.item?.paymentStatus === "REFUNDED", "Refund patch should update payment status to REFUNDED");
+    assert(refundedPayload.item.inventorySummary.restockStatus === "RESTOCKED", "Refunded order should be marked as restocked");
+    assert(refundedPayload.item.inventoryMovements.some((item) => item.type === "RETURN_RESTOCK"), "Refunded order should include return restock movement");
+
+    const refundedOrderListResponse = await authFetch(`/api/admin/orders?search=${encodeURIComponent(refundOrderNumber)}&page=1&pageSize=5`, adminCookie);
+    assert(refundedOrderListResponse.status === 200, `Refunded order list expected 200, got ${refundedOrderListResponse.status}`);
+    const refundedOrderListPayload = await refundedOrderListResponse.json();
+    const refundedOrder = refundedOrderListPayload.items.find((item) => item.orderNumber === refundOrderNumber);
+    assert(refundedOrder?.restockStatus === "RESTOCKED", "Refunded order should list restock status as RESTOCKED");
+    assert(typeof refundedOrder?.lastRestockedAt === "string", "Refunded order should include last restocked timestamp");
+
+    const restockedAfterRefund = await prisma.product.findUnique({
+      where: {
+        id: productId,
+      },
+      select: {
+        stock: true,
+      },
+    });
+    assert(restockedAfterRefund?.stock === initialProductStock, `Refunded order should restore stock to ${initialProductStock}`);
 
     const editorDeleteResponse = await authFetch(`/api/admin/orders/${createdOrderId}`, editorCookie, {
       method: "DELETE",
@@ -198,13 +287,65 @@ async function main() {
     });
     assert(adminDeleteResponse.status === 200, `Admin order delete expected 200, got ${adminDeleteResponse.status}`);
 
+    const inventoryStateBeforeDelete = await prisma.order.findUnique({
+      where: {
+        id: createdOrderId,
+      },
+      select: {
+        stockReservations: {
+          select: {
+            id: true,
+            status: true,
+            inventoryMovements: {
+              select: {
+                id: true,
+                type: true,
+                quantity: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
     const adminDetailAfterDeleteResponse = await authFetch(`/api/admin/orders/${createdOrderId}`, adminCookie);
     assert(adminDetailAfterDeleteResponse.status === 404, `Deleted order detail expected 404, got ${adminDetailAfterDeleteResponse.status}`);
+
+    const inventoryStateAfterDelete = await prisma.order.findUnique({
+      where: {
+        id: createdOrderId,
+      },
+      select: {
+        deleted: true,
+        stockReservations: {
+          select: {
+            id: true,
+            status: true,
+            inventoryMovements: {
+              select: {
+                id: true,
+                type: true,
+                quantity: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    assert(inventoryStateBeforeDelete != null, "Inventory state before delete should exist");
+    assert(inventoryStateAfterDelete?.deleted === true, "Soft-deleted order should remain in database");
+    assert(JSON.stringify(inventoryStateAfterDelete?.stockReservations) === JSON.stringify(inventoryStateBeforeDelete.stockReservations), "Soft delete should not mutate inventory reservations or movements");
 
     console.log("Orders admin integration verification passed");
   } finally {
     if (createdOrderId) {
       await authFetch(`/api/admin/orders/${createdOrderId}`, adminCookie, {
+        method: "DELETE",
+      });
+    }
+
+    if (refundOrderId) {
+      await authFetch(`/api/admin/orders/${refundOrderId}`, adminCookie, {
         method: "DELETE",
       });
     }

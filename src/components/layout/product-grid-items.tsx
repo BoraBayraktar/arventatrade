@@ -29,7 +29,7 @@ export function ProductGridItems({ locale, products }: ProductGridItemsProps) {
 								src={product.imageUrl}
 								secondarySrc={product.imageUrls?.[0] ?? undefined}
 								fill
-								sizes="(min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
+								sizes="(min-width: 1536px) 19vw, (min-width: 1280px) 24vw, (min-width: 768px) 32vw, 48vw"
 							/>
 						</Link>
 						<FavoriteToggle productId={product.id} productName={product.name} />

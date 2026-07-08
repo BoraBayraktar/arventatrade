@@ -10,18 +10,18 @@ type ThreeItemGridProps = {
   products: ProductCard[];
 };
 
-function ThreeItemGridItem({ locale, item, size, priority }: { locale: Locale; item: ProductCard; size: "full" | "half"; priority?: boolean }) {
+function ThreeItemGridItem({ locale, item, priority }: { locale: Locale; item: ProductCard; priority?: boolean }) {
   return (
-    <div className={size === "full" ? "relative md:col-span-4 md:row-span-2" : "relative md:col-span-2 md:row-span-1"}>
+    <div className="relative">
       <Link className="relative block aspect-square h-full w-full" href={`/${locale}/product/${item.slug}`} prefetch>
         <GridTileImage
           src={item.imageUrl}
           fill
-          sizes={size === "full" ? "(min-width: 768px) 66vw, 100vw" : "(min-width: 768px) 33vw, 100vw"}
+          sizes="(min-width: 1024px) 31vw, (min-width: 768px) 48vw, 100vw"
           priority={priority}
           alt={item.name}
           label={{
-            position: size === "full" ? "center" : "bottom",
+            position: "bottom",
             title: item.name,
             amount: item.price,
             currencyCode: item.currency,
@@ -35,15 +35,22 @@ function ThreeItemGridItem({ locale, item, size, priority }: { locale: Locale; i
 }
 
 export function ThreeItemGrid({ locale, products }: ThreeItemGridProps) {
-  if (!products[0] || !products[1] || !products[2]) {
+  if (!products[0]) {
     return null;
   }
 
+  const showcaseItems = products.slice(0, 4);
+
   return (
-    <section className="mx-auto grid max-w-screen-2xl gap-4 px-4 pb-4 md:grid-cols-6 md:grid-rows-2 lg:max-h-[calc(100vh-200px)]">
-      <ThreeItemGridItem locale={locale} size="full" item={products[0]} priority />
-      <ThreeItemGridItem locale={locale} size="half" item={products[1]} priority />
-      <ThreeItemGridItem locale={locale} size="half" item={products[2]} />
+    <section className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-2 px-2 pb-2 sm:grid-cols-2 md:grid-cols-4 md:gap-3 md:px-3 md:pb-3">
+      {showcaseItems.map((product, index) => (
+        <ThreeItemGridItem
+          key={product.id}
+          locale={locale}
+          item={product}
+          priority={index < 2}
+        />
+      ))}
     </section>
   );
 }

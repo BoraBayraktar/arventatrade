@@ -24,6 +24,25 @@ function formatDate(value: string, locale: Locale) {
   }).format(date);
 }
 
+function formatRestockStatus(value: "NOT_RESTOCKED" | "RESTOCKED" | "PARTIALLY_RESTOCKED", dictionary: ReturnType<typeof getDictionary>) {
+  switch (value) {
+    case "RESTOCKED":
+      return dictionary.admin.inventoryMovementRestockDone;
+    case "PARTIALLY_RESTOCKED":
+      return dictionary.admin.inventoryMovementRestockPartial;
+    default:
+      return dictionary.admin.inventoryMovementRestockNone;
+  }
+}
+
+function formatLastRestockedAt(value: string | null, locale: Locale, dictionary: ReturnType<typeof getDictionary>) {
+  if (!value) {
+    return dictionary.common.notSpecified;
+  }
+
+  return formatDate(value, locale);
+}
+
 export default async function AdminOrdersPage({ params, searchParams }: OrdersPageProps) {
   const { locale } = await params;
 
@@ -71,10 +90,12 @@ export default async function AdminOrdersPage({ params, searchParams }: OrdersPa
       </div>
 
       <div className="overflow-hidden rounded-b-2xl">
-        <div className="hidden grid-cols-[1.1fr_120px_120px_90px_140px_140px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+        <div className="hidden grid-cols-[1fr_120px_120px_160px_180px_90px_140px_140px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
           <span>{dictionary.admin.orderNumber}</span>
           <span>{dictionary.admin.orderStatus}</span>
           <span>{dictionary.admin.paymentStatus}</span>
+          <span>{dictionary.admin.inventoryRestockStatus}</span>
+          <span>{dictionary.admin.inventoryLastRestockedAt}</span>
           <span>{dictionary.admin.orderItems}</span>
           <span>{dictionary.admin.orderSubtotal}</span>
           <span>{dictionary.admin.orderTotal}</span>
@@ -86,7 +107,7 @@ export default async function AdminOrdersPage({ params, searchParams }: OrdersPa
         ) : (
           <div className="divide-y divide-neutral-200">
             {result.items.map((item) => (
-              <article key={item.id} className="grid gap-3 p-4 lg:grid-cols-[1.1fr_120px_120px_90px_140px_140px_190px] lg:items-center">
+              <article key={item.id} className="grid gap-3 p-4 lg:grid-cols-[1fr_120px_120px_160px_180px_90px_140px_140px_190px] lg:items-center">
                 <p className="font-medium text-neutral-950">
                   <Link href={`/${locale}/admin/orders/${item.id}`} className="underline-offset-4 hover:underline">
                     {item.orderNumber}
@@ -102,6 +123,12 @@ export default async function AdminOrdersPage({ params, searchParams }: OrdersPa
                     {item.paymentStatus}
                   </span>
                 </p>
+                <p>
+                  <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${item.restockStatus === "RESTOCKED" ? "bg-emerald-100 text-emerald-700" : item.restockStatus === "PARTIALLY_RESTOCKED" ? "bg-amber-100 text-amber-700" : "bg-neutral-200 text-neutral-700"}`}>
+                    {formatRestockStatus(item.restockStatus, dictionary)}
+                  </span>
+                </p>
+                <p className="text-sm text-neutral-500">{formatLastRestockedAt(item.lastRestockedAt, locale as Locale, dictionary)}</p>
                 <p className="text-sm text-neutral-700">{item.itemCount}</p>
                 <p className="text-sm text-neutral-700">{formatMoney(item.subtotal, item.currency, locale as Locale)}</p>
                 <p className="text-sm font-semibold text-neutral-950">{formatMoney(item.total, item.currency, locale as Locale)}</p>

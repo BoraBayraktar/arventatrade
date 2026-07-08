@@ -62,63 +62,16 @@ export default async function LocaleHomePage({
     storefrontService.getHomeSections(locale as Locale),
   ]);
   const storefrontItems = [...storefront.campaigns, ...storefront.features];
-  const hasEyebrow = Boolean(dictionary.home.eyebrow.trim());
-  const hasSubtitle = Boolean(dictionary.home.subtitle.trim());
-  const hasSpotlightKicker = Boolean(dictionary.home.campaignTitle.trim());
-  const hasSpotlightTitle = Boolean(dictionary.home.spotlightTitle.trim());
-  const hasSpotlightBody = Boolean(dictionary.home.spotlightBody.trim());
-  const hasSummaryTitle = Boolean(dictionary.catalog.summaryTitle.trim());
-  const hasSummaryBody = Boolean(dictionary.home.featureCards.conversion.text.trim());
-  const hasFeatureKicker = Boolean(dictionary.home.campaignTitle.trim());
-  const hasFeatureNote = Boolean(dictionary.home.campaignCards.fast.text.trim());
 
   return (
     <main className={styles.homeShell}>
-      <section className={styles.hero}>
-        <div className={styles.heroPanel}>
-          <div className={styles.heroCopy}>
-            {hasEyebrow ? <div className={styles.eyebrow}>{dictionary.home.eyebrow}</div> : null}
-            <h1 className={styles.heroTitle}>{dictionary.home.title}</h1>
-            {hasSubtitle ? <p className={styles.heroSubtitle}>{dictionary.home.subtitle}</p> : null}
-            <div className={styles.heroActions}>
-              <Link href={`/${locale}/search`} className={`${styles.heroButton} ${styles.heroButtonPrimary}`}>{dictionary.home.cta}</Link>
-              <Link href={`/${locale}/favorites`} className={styles.heroButton}>{dictionary.common.favorites}</Link>
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.heroPanel}>
-          <div className={styles.heroVisual}>
-            <div className={styles.heroVisualInner}>
-              <div className={`${styles.heroVisualCard} ${styles.heroVisualTop}`} />
-              <div className={`${styles.heroVisualCard} ${styles.heroVisualBottom}`} />
-              <div className={styles.heroVisualPill} />
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section className={styles.sectionBlock}>
-        <div className={styles.sectionHeader}>
-          <div>
-            {hasSpotlightKicker ? <p className={styles.sectionKicker}>{dictionary.home.campaignTitle}</p> : null}
-            {hasSpotlightTitle ? <h2 className={styles.sectionTitle}>{dictionary.home.spotlightTitle}</h2> : null}
-          </div>
-          {hasSpotlightBody ? <p className={styles.sectionNote}>{dictionary.home.spotlightBody}</p> : null}
-        </div>
         <div className={styles.panelWrap}>
           <ThreeItemGrid locale={locale} products={products.items} />
         </div>
       </section>
 
       <section className={styles.sectionBlock}>
-        <div className={styles.sectionHeader}>
-          <div>
-            {hasSpotlightKicker ? <p className={styles.sectionKicker}>{dictionary.home.campaignTitle}</p> : null}
-            {hasSummaryTitle ? <h2 className={styles.sectionTitle}>{dictionary.catalog.summaryTitle}</h2> : null}
-          </div>
-          {hasSummaryBody ? <p className={styles.sectionNote}>{dictionary.home.featureCards.conversion.text}</p> : null}
-        </div>
         <div className={`${styles.panelWrap} ${styles.scroller}`}>
           <Carousel locale={locale} products={products.items} />
         </div>
@@ -126,13 +79,6 @@ export default async function LocaleHomePage({
 
       {storefrontItems.length ? (
         <section className={styles.sectionBlock}>
-          <div className={styles.sectionHeader}>
-            <div>
-              {hasFeatureKicker ? <p className={styles.sectionKicker}>{dictionary.home.campaignTitle}</p> : null}
-              <h2 className={styles.sectionTitle}>{dictionary.home.featureTitle}</h2>
-            </div>
-            {hasFeatureNote ? <p className={styles.sectionNote}>{dictionary.home.campaignCards.fast.text}</p> : null}
-          </div>
           <div className={styles.panelWrap}>
             <div className={styles.campaignGrid}>
               {storefrontItems.map((item, index) => {

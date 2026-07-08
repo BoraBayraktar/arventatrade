@@ -21,6 +21,7 @@ import type {
   AdminUpdateCategoryInput,
   AdminUpdateProductInput,
 } from "@/modules/catalog/contracts/catalog-admin.contract";import { CatalogAdminRepository } from "@/modules/catalog/repositories/catalog-admin.repository";
+import { inventoryService } from "@/modules/inventory/services/inventory.service";
 import {
   decodeProductDescriptionWithFeatures,
   encodeProductDescriptionWithFeatures,
@@ -349,11 +350,29 @@ export class CatalogAdminService {
   async createProduct(input: AdminCreateProductInput): Promise<AdminProductListItem> {
     const parsed = createProductSchema.parse(input);
     const created = await this.repository.createProduct({
-      ...parsed,
       description: encodeProductDescriptionWithFeatures(parsed.description, sanitizeFeatures(parsed.features ?? [])),
+      slug: parsed.slug,
+      sku: parsed.sku,
+      name: parsed.name,
+      price: parsed.price,
+      compareAtPrice: parsed.compareAtPrice,
+      currency: parsed.currency,
+      imageUrl: parsed.imageUrl,
+      imageUrls: parsed.imageUrls,
+      categoryId: parsed.categoryId,
     });
+    await inventoryService.syncProductInventoryState({
+      productId: created.id,
+      sku: created.sku,
+      targetOnHandStock: parsed.stock,
+      note: "Catalog admin initial stock setup",
+    });
+    const hydrated = await this.repository.findActiveProductForAdminById(created.id);
+    if (!hydrated) {
+      throw new Error("Product not found");
+    }
     await invalidateCatalogCache();
-    return mapProduct(created);
+    return mapProduct(hydrated);
   }
 
   async updateProduct(input: AdminUpdateProductInput): Promise<AdminProductListItem> {
@@ -395,7 +414,16 @@ export class CatalogAdminService {
     }
 
     const payload = {
-      ...parsed,
+      id: parsed.id,
+      slug: parsed.slug,
+      sku: parsed.sku,
+      name: parsed.name,
+      price: parsed.price,
+      compareAtPrice: parsed.compareAtPrice,
+      currency: parsed.currency,
+      imageUrl: parsed.imageUrl,
+      imageUrls: parsed.imageUrls,
+      categoryId: parsed.categoryId,
       ...(parsed.features !== undefined || parsed.description !== undefined
         ? {
             description: encodeProductDescriptionWithFeatures(
@@ -407,8 +435,26 @@ export class CatalogAdminService {
     };
 
     const updated = await this.repository.updateProduct(payload);
+
+    if (parsed.stock !== undefined || parsed.sku !== undefined) {
+      await inventoryService.syncProductInventoryState({
+        productId: updated.id,
+        sku: parsed.sku ?? updated.sku,
+        ...(parsed.stock !== undefined ? { targetOnHandStock: parsed.stock } : {}),
+        note: parsed.stock !== undefined ? "Catalog admin stock update" : undefined,
+      });
+    }
+
+    const hydrated = parsed.stock !== undefined || parsed.sku !== undefined
+      ? await this.repository.findActiveProductForAdminById(updated.id)
+      : updated;
+
+    if (!hydrated) {
+      throw new Error("Product not found");
+    }
+
     await invalidateCatalogCache();
-    return mapProduct(updated);
+    return mapProduct(hydrated);
   }
 
   async softDeleteProduct(productId: string, deletedUserId: string) {

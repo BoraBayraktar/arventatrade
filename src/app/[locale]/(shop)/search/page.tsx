@@ -72,7 +72,7 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
       maxPrice: Number.isFinite(maxPrice) ? maxPrice : undefined,
       featureFilters,
       page,
-      pageSize: 12,
+      pageSize: 20,
     }),
     catalogService.listCategories(),
   ]);
@@ -85,8 +85,8 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
   const resultsText = products.total > 1 ? "results" : "result";
 
   return (
-    <section className="w-full py-8">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <section className="w-full py-5">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{dictionary.home.campaignTitle}</p>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{dictionary.catalog.title}</h1>
@@ -94,8 +94,8 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
         {categoryName ? <p className="text-sm text-muted-foreground">{dictionary.catalog.category}: {categoryName}</p> : null}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
-        <aside className={`${surfaceStyles.panel} h-fit p-5 md:p-6 lg:sticky lg:top-24`}>
+      <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start">
+        <aside className={`${surfaceStyles.panel} h-fit p-4 md:p-5 lg:sticky lg:top-24`}>
           <CatalogFilters
             locale={locale}
             categories={categories.map((item) => ({ id: item.id, slug: item.slug, name: item.name }))}
@@ -140,8 +140,8 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
           />
         </aside>
 
-        <div className="grid gap-5">
-          <div className={`${surfaceStyles.panel} p-5 md:p-6`}>
+        <div className="grid gap-3">
+          <div className={`${surfaceStyles.panel} p-4 md:p-5`}>
             {query.q ? (
               <p className="mb-4 text-sm text-muted-foreground">
                 {products.total === 0
@@ -152,7 +152,7 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
             ) : null}
 
             {products.items.length > 0 ? (
-              <Grid className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+              <Grid className="grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 <ProductGridItems locale={locale} products={products.items} />
               </Grid>
             ) : null}

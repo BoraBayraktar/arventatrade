@@ -66,8 +66,8 @@ export function FavoritesClient({ locale, products, labels }: FavoritesClientPro
   }, [favoriteIds, products]);
 
   return (
-    <section className={`${styles.shell} py-8`}>
-      <h1 className="mb-6 text-3xl font-semibold tracking-tight">{labels.title}</h1>
+    <section className={`${styles.shell} py-5`}>
+      <h1 className="mb-4 text-3xl font-semibold tracking-tight">{labels.title}</h1>
 
       {favorites.length === 0 ? (
         <div className={`${styles.panel} p-6`}>
@@ -77,7 +77,7 @@ export function FavoritesClient({ locale, products, labels }: FavoritesClientPro
           </Button>
         </div>
       ) : (
-        <Grid className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <Grid className="grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           <ProductGridItems locale={locale} products={favorites} />
         </Grid>
       )}

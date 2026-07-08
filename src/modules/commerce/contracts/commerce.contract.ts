@@ -55,6 +55,8 @@ export type AdminOrderListItem = {
   orderNumber: string;
   status: AdminOrderStatus;
   paymentStatus: AdminPaymentStatus;
+  restockStatus: "NOT_RESTOCKED" | "RESTOCKED" | "PARTIALLY_RESTOCKED";
+  lastRestockedAt: string | null;
   subtotal: number;
   discountTotal: number;
   total: number;
@@ -116,8 +118,31 @@ export type AdminOrderDetail = {
   createdAt: string;
   updatedAt: string;
   items: AdminOrderDetailItem[];
+  inventorySummary: AdminOrderInventorySummary;
+  inventoryMovements: AdminOrderInventoryMovementEntry[];
   statusHistory: AdminOrderStatusHistoryEntry[];
   paymentStatusHistory: AdminPaymentStatusHistoryEntry[];
+};
+
+export type AdminOrderInventorySummary = {
+  reservationCount: number;
+  committedReservationCount: number;
+  releasedReservationCount: number;
+  cancelledReservationCount: number;
+  activeReservationCount: number;
+  totalReservedQuantity: number;
+  restockStatus: "NOT_RESTOCKED" | "RESTOCKED" | "PARTIALLY_RESTOCKED";
+  lastRestockedAt: string | null;
+};
+
+export type AdminOrderInventoryMovementEntry = {
+  id: string;
+  type: string;
+  quantity: number;
+  warehouseCode: string | null;
+  reservationId: string | null;
+  note: string | null;
+  createdAt: string;
 };
 
 export type AdminOrderStatusHistoryEntry = {

@@ -2,12 +2,37 @@ import { prisma } from "@/lib/prisma";
 import type {
   AdminAnswerProductQuestionInput,
   AdminCategoryListQuery,
-  AdminCreateProductInput,
   AdminProductQuestionListQuery,
   AdminProductListQuery,
   AdminUpdateCategoryInput,
-  AdminUpdateProductInput,
 } from "@/modules/catalog/contracts/catalog-admin.contract";
+
+type AdminCreateProductRecordInput = {
+  slug: string;
+  sku: string;
+  name: string;
+  description: string;
+  price: number;
+  compareAtPrice?: number | null;
+  currency?: string;
+  imageUrl: string;
+  imageUrls?: string[];
+  categoryId?: string | null;
+};
+
+type AdminUpdateProductRecordInput = {
+  id: string;
+  slug?: string;
+  sku?: string;
+  name?: string;
+  description?: string;
+  price?: number;
+  compareAtPrice?: number | null;
+  currency?: string;
+  imageUrl?: string;
+  imageUrls?: string[];
+  categoryId?: string | null;
+};
 
 function buildWhere(args: { search?: string; categoryId?: string }) {
   return {
@@ -77,7 +102,7 @@ export class CatalogAdminRepository {
     });
   }
 
-  async createProduct(input: AdminCreateProductInput) {
+  async createProduct(input: AdminCreateProductRecordInput) {
     return prisma.product.create({
       data: {
         slug: input.slug,
@@ -86,7 +111,7 @@ export class CatalogAdminRepository {
         description: input.description,
         price: input.price,
         compareAtPrice: input.compareAtPrice ?? null,
-        stock: input.stock,
+        stock: 0,
         currency: input.currency ?? "TRY",
         imageUrl: input.imageUrl,
         imageUrls: input.imageUrls ?? [],
@@ -98,7 +123,7 @@ export class CatalogAdminRepository {
     });
   }
 
-  async updateProduct(input: AdminUpdateProductInput) {
+  async updateProduct(input: AdminUpdateProductRecordInput) {
     return prisma.product.update({
       where: {
         id: input.id,
@@ -110,11 +135,22 @@ export class CatalogAdminRepository {
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.price !== undefined ? { price: input.price } : {}),
         ...(input.compareAtPrice !== undefined ? { compareAtPrice: input.compareAtPrice } : {}),
-        ...(input.stock !== undefined ? { stock: input.stock } : {}),
         ...(input.currency !== undefined ? { currency: input.currency } : {}),
         ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
         ...(input.imageUrls !== undefined ? { imageUrls: input.imageUrls } : {}),
         ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
+      },
+      include: {
+        category: true,
+      },
+    });
+  }
+
+  async findActiveProductForAdminById(id: string) {
+    return prisma.product.findFirst({
+      where: {
+        id,
+        deleted: false,
       },
       include: {
         category: true,

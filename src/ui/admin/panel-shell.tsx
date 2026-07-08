@@ -29,6 +29,7 @@ export type MenuItem = {
 
 const adminMenuIcons: Array<{ route: string; icon: LucideIcon }> = [
   { route: "/admin/products", icon: Package },
+  { route: "/admin/inventory", icon: Boxes },
   { route: "/admin/product-questions", icon: ClipboardList },
   { route: "/admin/categories", icon: FolderTree },
   { route: "/admin/storefront", icon: LayoutGrid },

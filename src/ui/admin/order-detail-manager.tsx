@@ -35,6 +35,25 @@ type OrderDetail = {
   createdAt: string;
   updatedAt: string;
   items: Item[];
+  inventorySummary: {
+    reservationCount: number;
+    committedReservationCount: number;
+    releasedReservationCount: number;
+    cancelledReservationCount: number;
+    activeReservationCount: number;
+    totalReservedQuantity: number;
+    restockStatus: "NOT_RESTOCKED" | "RESTOCKED" | "PARTIALLY_RESTOCKED";
+    lastRestockedAt: string | null;
+  };
+  inventoryMovements: {
+    id: string;
+    type: string;
+    quantity: number;
+    warehouseCode: string | null;
+    reservationId: string | null;
+    note: string | null;
+    createdAt: string;
+  }[];
   statusHistory: {
     id: string;
     fromStatus: OrderStatus | null;
@@ -84,6 +103,28 @@ type Labels = {
   paymentHistoryTitle: string;
   paymentHistoryFrom: string;
   paymentHistoryTo: string;
+  inventorySummaryTitle: string;
+  inventoryReservations: string;
+  inventoryReservedQuantity: string;
+  inventoryRestockStatus: string;
+  inventoryLastRestockedAt: string;
+  inventoryMovementTitle: string;
+  inventoryMovementType: string;
+  inventoryMovementQuantity: string;
+  inventoryMovementWarehouse: string;
+  inventoryMovementReservation: string;
+  inventoryMovementInitialLoad: string;
+  inventoryMovementManualAdjustment: string;
+  inventoryMovementPurchaseReceipt: string;
+  inventoryMovementReservationHold: string;
+  inventoryMovementReservationRelease: string;
+  inventoryMovementOrderCommit: string;
+  inventoryMovementOrderCancelRestock: string;
+  inventoryMovementReturnRestock: string;
+  inventoryMovementDamageWriteOff: string;
+  inventoryMovementRestockNone: string;
+  inventoryMovementRestockPartial: string;
+  inventoryMovementRestockDone: string;
   notSpecified: string;
 };
 
@@ -100,6 +141,63 @@ function formatDate(value: string, locale: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function formatRestockStatus(value: OrderDetail["inventorySummary"]["restockStatus"], labels: Labels) {
+  if (value === "RESTOCKED") {
+    return labels.inventoryMovementRestockDone;
+  }
+
+  if (value === "PARTIALLY_RESTOCKED") {
+    return labels.inventoryMovementRestockPartial;
+  }
+
+  return labels.inventoryMovementRestockNone;
+}
+
+function formatMovementType(value: OrderDetail["inventoryMovements"][number]["type"], labels: Labels) {
+  switch (value) {
+    case "INITIAL_LOAD":
+      return labels.inventoryMovementInitialLoad;
+    case "MANUAL_ADJUSTMENT":
+      return labels.inventoryMovementManualAdjustment;
+    case "PURCHASE_RECEIPT":
+      return labels.inventoryMovementPurchaseReceipt;
+    case "RESERVATION_HOLD":
+      return labels.inventoryMovementReservationHold;
+    case "RESERVATION_RELEASE":
+      return labels.inventoryMovementReservationRelease;
+    case "ORDER_COMMIT":
+      return labels.inventoryMovementOrderCommit;
+    case "ORDER_CANCEL_RESTOCK":
+      return labels.inventoryMovementOrderCancelRestock;
+    case "RETURN_RESTOCK":
+      return labels.inventoryMovementReturnRestock;
+    case "DAMAGE_WRITE_OFF":
+      return labels.inventoryMovementDamageWriteOff;
+    default:
+      return value;
+  }
+}
+
+function movementBadgeClass(value: OrderDetail["inventoryMovements"][number]["type"]) {
+  switch (value) {
+    case "ORDER_CANCEL_RESTOCK":
+    case "RETURN_RESTOCK":
+      return "bg-emerald-100 text-emerald-700";
+    case "ORDER_COMMIT":
+    case "DAMAGE_WRITE_OFF":
+      return "bg-rose-100 text-rose-700";
+    case "RESERVATION_HOLD":
+    case "RESERVATION_RELEASE":
+      return "bg-amber-100 text-amber-700";
+    case "MANUAL_ADJUSTMENT":
+    case "PURCHASE_RECEIPT":
+      return "bg-blue-100 text-blue-700";
+    case "INITIAL_LOAD":
+    default:
+      return "bg-neutral-200 text-neutral-700";
+  }
 }
 
 export function OrderDetailManager({ locale, order, labels, canManage }: { locale: string; order: OrderDetail; labels: Labels; canManage: boolean }) {
@@ -225,6 +323,55 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
               </article>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="border-t border-neutral-200 p-5">
+        <h3 className="mb-3 text-lg font-semibold tracking-tight text-neutral-950">{labels.inventorySummaryTitle}</h3>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.inventoryReservations}</p>
+            <p className="mt-2 text-sm font-semibold text-neutral-950">{order.inventorySummary.reservationCount}</p>
+            <p className="mt-1 text-xs text-neutral-500">Committed: {order.inventorySummary.committedReservationCount} · Active: {order.inventorySummary.activeReservationCount}</p>
+          </article>
+          <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.inventoryReservedQuantity}</p>
+            <p className="mt-2 text-sm font-semibold text-neutral-950">{order.inventorySummary.totalReservedQuantity}</p>
+            <p className="mt-1 text-xs text-neutral-500">Released: {order.inventorySummary.releasedReservationCount} · Cancelled: {order.inventorySummary.cancelledReservationCount}</p>
+          </article>
+          <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.inventoryRestockStatus}</p>
+            <p className="mt-2 text-sm font-semibold text-neutral-950">{formatRestockStatus(order.inventorySummary.restockStatus, labels)}</p>
+          </article>
+          <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.inventoryLastRestockedAt}</p>
+            <p className="mt-2 text-sm font-semibold text-neutral-950">{order.inventorySummary.lastRestockedAt ? formatDate(order.inventorySummary.lastRestockedAt, locale) : labels.notSpecified}</p>
+          </article>
+        </div>
+      </div>
+
+      <div className="border-t border-neutral-200 p-5">
+        <h3 className="mb-3 text-lg font-semibold tracking-tight text-neutral-950">{labels.inventoryMovementTitle}</h3>
+        <div className="space-y-3">
+          {order.inventoryMovements.map((movement) => (
+            <article key={movement.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <div className="grid gap-2 text-sm text-neutral-700 md:grid-cols-2">
+                <p><span className="font-medium text-neutral-900">{labels.inventoryMovementType}:</span> {movement.type}</p>
+                <p>
+                  <span className="font-medium text-neutral-900">{labels.inventoryMovementType}:</span>{" "}
+                  <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${movementBadgeClass(movement.type)}`}>
+                    {formatMovementType(movement.type, labels)}
+                  </span>
+                </p>
+                <p><span className="font-medium text-neutral-900">{labels.inventoryMovementQuantity}:</span> {movement.quantity}</p>
+                <p><span className="font-medium text-neutral-900">{labels.inventoryMovementWarehouse}:</span> {movement.warehouseCode ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.inventoryMovementReservation}:</span> {movement.reservationId ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyAt}:</span> {formatDate(movement.createdAt, locale)}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyNote}:</span> {movement.note ?? labels.notSpecified}</p>
+              </div>
+            </article>
+          ))}
+          {order.inventoryMovements.length === 0 ? <p className="text-sm text-neutral-500">{labels.notSpecified}</p> : null}
         </div>
       </div>
 

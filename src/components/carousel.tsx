@@ -18,10 +18,10 @@ export function Carousel({ locale, products }: CarouselProps) {
   const carouselProducts = [...products, ...products, ...products];
 
   return (
-    <div className="w-full overflow-x-auto pb-6 pt-1">
-      <ul className="flex animate-carousel gap-4">
+    <div className="w-full overflow-x-auto pb-3 pt-1">
+      <ul className="flex animate-carousel gap-2 md:gap-3">
         {carouselProducts.map((product, index) => (
-          <li key={`${product.slug}-${index}`} className="relative aspect-square h-[30vh] max-h-[275px] w-2/3 max-w-[475px] flex-none md:w-1/3">
+          <li key={`${product.slug}-${index}`} className="relative aspect-square h-[24vh] max-h-[220px] w-1/2 max-w-[340px] flex-none md:h-[26vh] md:w-1/3 lg:w-1/4">
             <Link href={`/${locale}/product/${product.slug}`} className="relative h-full w-full">
               <GridTileImage
                 alt={product.name}
