@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "verify:rbac": "node scripts/verify-rbac.mjs",
@@ -18,11 +19,17 @@
     "verify:storefront": "node scripts/verify-storefront.mjs",
     "verify:categories": "node scripts/verify-categories.mjs",
     "verify:users": "node scripts/verify-users.mjs",
+    "verify:auth": "node scripts/verify-auth.mjs",
     "verify:checkout": "node scripts/verify-checkout.mjs",
     "verify:orders": "node scripts/verify-orders.mjs",
     "verify:integrations": "node scripts/verify-integrations.mjs",
     "verify:platform": "node scripts/verify-platform.mjs",
-    "verify:media": "node scripts/verify-media-upload.mjs"
+    "verify:media": "node scripts/verify-media-upload.mjs",
+    "verify:questions-phase4": "node scripts/verify-questions-phase4.mjs",
+    "verify:phase5": "npm run verify:platform && npm run verify:integrations && npm run verify:auth && npm run verify:rbac && npm run verify:users && npm run verify:questions-phase4",
+    "worker:notifications": "tsx --tsconfig tsconfig.json scripts/process-notification-emails.ts",
+    "test:notification-email-live": "tsx --tsconfig tsconfig.json scripts/test-notification-email-live.ts",
+    "worker:notifications:cron": "bash scripts/run-notification-worker-cron.sh"
   },
   "dependencies": {
     "@prisma/client": "^6.18.0",

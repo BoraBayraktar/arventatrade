@@ -10,7 +10,7 @@ export async function GET() {
   const user = await identityService.getAuthenticatedUser(token);
 
   if (!user) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ user: null });
   }
 
   return NextResponse.json({ user });

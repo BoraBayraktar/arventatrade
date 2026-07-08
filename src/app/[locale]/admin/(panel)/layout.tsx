@@ -39,8 +39,8 @@ export default async function AdminPanelLayout({
       : [];
 
   const menuItems: MenuItem[] = [
-    { href: `/${locale}/admin`, label: dictionary.admin.dashboardMenu },
     { href: `/${locale}/admin/products`, label: dictionary.admin.productManager },
+    { href: `/${locale}/admin/product-questions`, label: dictionary.admin.questionManager },
     { href: `/${locale}/admin/categories`, label: dictionary.admin.categoryManager },
     { href: `/${locale}/admin/storefront`, label: dictionary.admin.storefrontManager },
     { href: `/${locale}/admin/orders`, label: dictionary.admin.orderManager },
@@ -57,6 +57,10 @@ export default async function AdminPanelLayout({
       userRole={localizedRole}
       logoutLabel={dictionary.admin.logout}
       loadingLabel={dictionary.common.loading}
+      storeLabel={dictionary.admin.goStore}
+      notificationsLabel={dictionary.admin.notifications}
+      noNotificationsLabel={dictionary.admin.noNotifications}
+      markAllReadLabel={dictionary.admin.markAllRead}
       menuItems={menuItems}
     >
       {children}

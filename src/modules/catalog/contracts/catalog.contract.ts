@@ -76,6 +76,7 @@ export type ProductCard = {
   inStock: boolean;
   currency: string;
   imageUrl: string;
+  imageUrls: string[];
   features: ProductFeature[];
   category: {
     slug: string;

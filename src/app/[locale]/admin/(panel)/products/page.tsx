@@ -31,7 +31,7 @@ export default async function AdminProductsPage({
   }
 
   const query = await searchParams;
-  const [productResult, categories, questionResult] = await Promise.all([
+  const [productResult, categories] = await Promise.all([
     catalogAdminService.listProducts({
       search: query.search,
       categoryId: query.categoryId,
@@ -39,16 +39,11 @@ export default async function AdminProductsPage({
       pageSize: 10,
     }),
     catalogService.listCategories(),
-    catalogAdminService.listProductQuestions({
-      status: "pending",
-      page: 1,
-      pageSize: 12,
-    }),
   ]);
 
   return (
     <ProductManager
-      key={`${query.search ?? ""}:${query.categoryId ?? ""}:${query.page ?? "1"}`}
+      key="admin-products"
       locale={locale as Locale}
       initialResult={productResult}
       initialQuery={{
@@ -56,7 +51,6 @@ export default async function AdminProductsPage({
         categoryId: query.categoryId ?? "",
       }}
       categories={categories}
-      initialQuestionResult={questionResult}
       canDelete={user.role === "ADMIN"}
       labels={{
         title: dictionary.admin.productManager,
@@ -75,6 +69,8 @@ export default async function AdminProductsPage({
         compareAtPrice: dictionary.admin.compareAtPrice,
         stock: dictionary.admin.stock,
         imageUrl: dictionary.admin.imageUrl,
+        additionalImageUrls: dictionary.admin.additionalImageUrls,
+        additionalImageUrlsHint: dictionary.admin.additionalImageUrlsHint,
         category: dictionary.catalog.category,
         discount: dictionary.admin.discount,
         stockStatus: dictionary.admin.stockStatus,
@@ -92,8 +88,12 @@ export default async function AdminProductsPage({
         validationStock: dictionary.admin.validationStock,
         validationCompareAtPrice: dictionary.admin.validationCompareAtPrice,
         validationImageUrl: dictionary.admin.validationImageUrl,
+        validationImageUrls: dictionary.admin.validationImageUrls,
+        validationImageUrlsLimit: dictionary.admin.validationImageUrlsLimit,
         uploadImage: dictionary.admin.uploadImage,
+        uploadImages: dictionary.admin.uploadImages,
         uploadingImage: dictionary.admin.uploadingImage,
+        uploadingImages: dictionary.admin.uploadingImages,
         imageUploadFailed: dictionary.admin.imageUploadFailed,
         imageUploadHint: dictionary.admin.imageUploadHint,
         features: dictionary.admin.productFeatures,
@@ -103,15 +103,6 @@ export default async function AdminProductsPage({
         highlightFeature: dictionary.admin.highlightFeature,
         addFeature: dictionary.admin.addFeature,
         removeFeature: dictionary.admin.removeFeature,
-        questionManager: dictionary.admin.questionManager,
-        status: dictionary.admin.status,
-        statusAll: dictionary.admin.statusAll,
-        statusPending: dictionary.admin.statusPending,
-        statusAnswered: dictionary.admin.statusAnswered,
-        answerLabel: dictionary.admin.answerLabel,
-        answerQuestion: dictionary.admin.answerQuestion,
-        removeQuestion: dictionary.admin.removeQuestion,
-        emptyQuestions: dictionary.admin.emptyQuestions,
         loading: dictionary.common.loading,
         notSpecified: dictionary.common.notSpecified,
       }}

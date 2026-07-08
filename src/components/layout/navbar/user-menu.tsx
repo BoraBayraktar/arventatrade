@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, LogIn, LogOut, MessageSquare, Package, Shield, TicketPercent, UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import styles from "@/ui/shop/surface.module.css";
@@ -17,6 +16,7 @@ type AuthUser = {
 	id: string;
 	name: string;
 	email: string;
+	role: "ADMIN" | "EDITOR" | "CUSTOMER";
 };
 
 export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
@@ -24,6 +24,7 @@ export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
 		? {
 			login: "Giriş Yap",
 			account: "Hesabım",
+			adminPanel: "Admin Paneli",
 			orders: "Siparişlerim",
 			coupons: "İndirim Kuponlarım",
 			messages: "Mesajlarım",
@@ -34,6 +35,7 @@ export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
 		: {
 			login: "Sign In",
 			account: "My Account",
+			adminPanel: "Admin Panel",
 			orders: "My Orders",
 			coupons: "My Coupons",
 			messages: "Messages",
@@ -42,41 +44,10 @@ export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
 			registerMenu: "Sign Up",
 		};
 
-	const [user, setUser] = useState<AuthUser | null>(initialUser);
 	const [open, setOpen] = useState(false);
 	const rootRef = useRef<HTMLDivElement | null>(null);
-	const pathname = usePathname();
 
 	useEffect(() => {
-		if (initialUser) {
-			setUser(initialUser);
-		}
-
-		let active = true;
-
-		async function loadMe() {
-			try {
-				const response = await fetch("/api/identity/me", { cache: "no-store" });
-				if (!response.ok) {
-					if (active) {
-						setUser(null);
-					}
-					return;
-				}
-
-				const payload = (await response.json()) as { user?: AuthUser };
-				if (active) {
-					setUser(payload.user ?? null);
-				}
-			} catch {
-				if (active) {
-					setUser(null);
-				}
-			}
-		}
-
-		void loadMe();
-
 		const onOutsidePointer = (event: MouseEvent) => {
 			if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
 				setOpen(false);
@@ -86,17 +57,16 @@ export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
 		window.addEventListener("mousedown", onOutsidePointer);
 
 		return () => {
-			active = false;
 			window.removeEventListener("mousedown", onOutsidePointer);
 		};
-	}, [pathname, initialUser]);
+	}, []);
 
 	async function logout() {
 		await fetch("/api/identity/logout", { method: "POST" });
 		window.location.href = `/${locale}`;
 	}
 
-	if (!user) {
+	if (!initialUser) {
 		return (
 			<div className="relative" ref={rootRef}>
 				<Button
@@ -112,10 +82,12 @@ export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
 
 				{open ? (
 					<div className={`${styles.panelSoft} absolute right-0 top-full z-40 mt-1 w-56 p-2 shadow-xl`}>
-						<Link href={`/${locale}/login`} className="block rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
+						<Link href={`/${locale}/login`} className="inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
+							<LogIn className="h-4 w-4" />
 							{labels.loginMenu}
 						</Link>
-						<Link href={`/${locale}/register`} className="block rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
+						<Link href={`/${locale}/register`} className="inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
+							<UserPlus className="h-4 w-4" />
 							{labels.registerMenu}
 						</Link>
 					</div>
@@ -131,22 +103,32 @@ export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
 				onClick={() => setOpen((prev) => !prev)}
 				className="inline-flex h-9 items-center gap-1 rounded-md px-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 hover:text-black"
 			>
-				<span className="max-w-[140px] truncate">{user.name || labels.account}</span>
+				<span className="max-w-[140px] truncate">{initialUser.name || labels.account}</span>
 				<ChevronDown className="h-4 w-4" />
 			</button>
 
 			{open ? (
 				<div className={`${styles.panelSoft} absolute right-0 top-full z-40 mt-1 w-56 p-2 shadow-xl`}>
-					<Link href={`/${locale}/account/orders`} className="block rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
+					{initialUser.role === "ADMIN" ? (
+						<Link href={`/${locale}/admin`} className="inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
+							<Shield className="h-4 w-4" />
+							{labels.adminPanel}
+						</Link>
+					) : null}
+					<Link href={`/${locale}/account/orders`} className="inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
+						<Package className="h-4 w-4" />
 						{labels.orders}
 					</Link>
-					<Link href={`/${locale}/account/coupons`} className="block rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
+					<Link href={`/${locale}/account/coupons`} className="inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
+						<TicketPercent className="h-4 w-4" />
 						{labels.coupons}
 					</Link>
-					<Link href={`/${locale}/account/messages`} className="block rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
+					<Link href={`/${locale}/account/messages`} className="inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" onClick={() => setOpen(false)}>
+						<MessageSquare className="h-4 w-4" />
 						{labels.messages}
 					</Link>
-					<button type="button" onClick={logout} className="mt-1 block w-full rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
+					<button type="button" onClick={logout} className="mt-1 inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
+						<LogOut className="h-4 w-4" />
 						{labels.logout}
 					</button>
 				</div>

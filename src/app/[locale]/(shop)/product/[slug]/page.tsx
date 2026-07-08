@@ -45,6 +45,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
   await catalogService.trackProductView(product.id);
 
+  const galleryImages = [product.imageUrl, ...(product.imageUrls ?? [])]
+    .map((url) => url.trim())
+    .filter((url, index, list) => Boolean(url) && list.indexOf(url) === index)
+    .map((src) => ({ src, altText: product.name }));
+
   const featuredFeatures = product.features.filter((item) => item.highlighted);
   const allFeatures = product.features;
 
@@ -67,7 +72,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     "@type": "Product",
     name: product.name,
     description: product.description,
-    image: product.imageUrl,
+    image: galleryImages.map((item) => item.src),
     offers: {
       "@type": "AggregateOffer",
       availability: product.inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
@@ -106,11 +111,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           <div className="flex flex-col lg:flex-row lg:gap-8">
             <div className="h-full w-full basis-full lg:basis-4/6">
               <Suspense fallback={<div className="relative aspect-square h-full max-h-[550px] w-full overflow-hidden" />}>
-                <Gallery images={[{ src: product.imageUrl, altText: product.name }]} />
+                <Gallery images={galleryImages} zoomTargetId="product-detail-info" />
               </Suspense>
             </div>
 
-            <div className="basis-full lg:basis-2/6">
+            <div id="product-detail-info" className="basis-full lg:basis-2/6">
               <Suspense fallback={null}>
                 <ProductDescription
                   locale={locale}

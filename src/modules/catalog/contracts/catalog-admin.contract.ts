@@ -13,6 +13,7 @@ export type AdminProductListItem = {
   inStock: boolean;
   currency: string;
   imageUrl: string;
+  imageUrls: string[];
   features: ProductFeature[];
   categoryId: string | null;
   categoryName: string | null;
@@ -43,6 +44,7 @@ export type AdminCreateProductInput = {
   stock: number;
   currency?: string;
   imageUrl: string;
+  imageUrls?: string[];
   features?: ProductFeature[];
   categoryId?: string | null;
 };
@@ -58,6 +60,7 @@ export type AdminUpdateProductInput = {
   stock?: number;
   currency?: string;
   imageUrl?: string;
+  imageUrls?: string[];
   features?: ProductFeature[];
   categoryId?: string | null;
 };
@@ -108,6 +111,7 @@ export type AdminTopInteractionItem = {
 };
 
 export type AdminProductQuestionStatus = "all" | "pending" | "answered";
+export type AdminProductQuestionSort = "priority" | "latest" | "oldest";
 
 export type AdminProductQuestionItem = {
   id: string;
@@ -125,7 +129,9 @@ export type AdminProductQuestionItem = {
 
 export type AdminProductQuestionListQuery = {
   status?: AdminProductQuestionStatus;
+  sort?: AdminProductQuestionSort;
   search?: string;
+  questionId?: string;
   page?: number;
   pageSize?: number;
 };
@@ -142,4 +148,26 @@ export type AdminAnswerProductQuestionInput = {
   id: string;
   answer: string;
   answeredBy: string;
+};
+
+export type AdminBulkProductQuestionAction = "answer" | "delete";
+
+export type AdminBulkModerateProductQuestionsInput = {
+  ids: string[];
+  action: AdminBulkProductQuestionAction;
+  answer?: string;
+  answeredBy?: string;
+  deletedUserId?: string;
+};
+
+export type AdminProductQuestionModerationResult = {
+  affected: number;
+};
+
+export type AdminProductQuestionStats = {
+  total: number;
+  pending: number;
+  answered: number;
+  overdue: number;
+  slaHours: number;
 };

@@ -27,12 +27,12 @@
   },
   "home": {
     "title": "ArventaTrade Ürün Vitrini",
-    "subtitle": "İlk fazda hızlı, mobil uyumlu ve servis odaklı ürün keşfi deneyimi.",
+    "subtitle": "",
     "cta": "Ürünleri Keşfet",
-    "eyebrow": "Yeni nesil e-ticaret vitrin deneyimi",
-    "spotlightTitle": "Günlük keşif, kampanya ve kategori akışını tek bakışta yönetin.",
-    "spotlightBody": "Kategori girişleri, dikkat odakları ve hızlı karar destek modülleri ile vitrin deneyimini modern pazaryeri kalitesine taşıyoruz.",
-    "campaignTitle": "Öne Çıkan Alanlar",
+    "eyebrow": "",
+    "spotlightTitle": "",
+    "spotlightBody": "",
+    "campaignTitle": "",
     "campaignCards": {
       "new": {
         "title": "Yeni Gelenler",
@@ -51,7 +51,7 @@
     "featureCards": {
       "curation": {
         "title": "Editoryal kurasyon",
-        "text": "Liste karmaşasını azaltıp en kritik ürünleri öne çıkarır."
+        "text": ""
       },
       "responsive": {
         "title": "Mobil öncelikli akış",
@@ -59,7 +59,7 @@
       },
       "conversion": {
         "title": "Dönüşüm odaklı bloklar",
-        "text": "Kampanya, kategori ve güven sinyallerini aynı akışta toplar."
+        "text": ""
       }
     }
   },
@@ -74,7 +74,7 @@
     "back": "Kataloğa dön",
     "empty": "Kriterlere uygun ürün bulunamadı.",
     "page": "Sayfa",
-    "summaryTitle": "Keşif Panosu",
+    "summaryTitle": "",
     "summaryCards": {
       "total": "Toplam ürün",
       "focused": "Aktif filtre",
@@ -163,7 +163,6 @@
     "loginButton": "Giriş Yap",
     "invalidCredentials": "E-posta veya şifre hatalı.",
     "logout": "Çıkış Yap",
-    "dashboardMenu": "Pano",
     "userInfo": "Kullanıcı Bilgisi",
     "quickActions": "Hızlı İşlem",
     "phase2Note": "Bir sonraki adım ürün yönetimi ekranları ve role dayalı yetkilendirme genişletmesidir.",
@@ -179,6 +178,8 @@
     "slug": "Slug",
     "description": "Açıklama",
     "imageUrl": "Görsel URL",
+    "additionalImageUrls": "Ek Görseller",
+    "additionalImageUrlsHint": "Her satıra bir URL girin. İlk alan ana görseldir, buradakiler galeride ek görsel olarak görünür.",
     "search": "Ürün ara",
     "allCategories": "Tüm kategoriler",
     "prev": "Geri",
@@ -195,8 +196,25 @@
     "validationRequired": "Tüm zorunlu alanları doldurun.",
     "validationPrice": "Fiyat 0'dan büyük olmalıdır.",
     "validationImageUrl": "Geçerli bir görsel URL girin.",
+    "validationImageUrls": "Ek görsellerdeki tüm URL'ler geçerli olmalıdır.",
+    "validationImageUrlsLimit": "Toplam en fazla 6 görsel ekleyebilirsiniz.",
+    "sort": "Sıralama",
+    "sortPriority": "Öncelik",
+    "sortLatest": "En yeni",
+    "sortOldest": "En eski",
+    "clearFilters": "Filtreleri temizle",
+    "summaryTitle": "Mevcut listedeki soru sayıları",
+    "summaryCurrent": "Toplam",
+    "summaryPending": "Yanıtsız",
+    "summaryAnswered": "Yanıtlandı",
+    "summaryOverdue": "SLA aşıldı",
+    "askedAt": "Sorulma",
+    "answeredBy": "Yanıtlayan",
+    "answeredAt": "Yanıt zamanı",
     "uploadImage": "Görsel Yükle",
+    "uploadImages": "Görselleri Yükle",
     "uploadingImage": "Yükleniyor...",
+    "uploadingImages": "Görseller yükleniyor...",
     "imageUploadFailed": "Görsel yüklenemedi. Lütfen tekrar deneyin.",
     "imageUploadHint": "PNG, JPG, WebP, AVIF veya GIF yükleyebilirsiniz. En fazla 8MB.",
     "productFeatures": "Ürün Özellikleri",
@@ -226,6 +244,8 @@
     "endAt": "Bitiş",
     "noDateWindow": "Sınırsız",
     "validationDateRange": "Bitiş tarihi başlangıç tarihinden önce olamaz.",
+    "roleAdmin": "Yönetici",
+    "roleEditor": "Editör",
     "roleCustomer": "Müşteri",
     "customerManager": "Müşteri Yönetimi",
     "createCustomer": "Yeni Müşteri",
@@ -258,6 +278,20 @@
     "dark": "Koyu",
     "defaultVariant": "Varsayılan",
     "validationTarget": "Hedef seçimi zorunludur.",
-    "validationOrder": "Sıra 1 ile 99 arasında olmalı."
+    "validationOrder": "Sıra 1 ile 99 arasında olmalı.",
+    "goStore": "Mağazaya git",
+    "notifications": "Bildirimler",
+    "noNotifications": "Bildirim bulunmuyor.",
+    "markAllRead": "Tümünü okundu yap",
+    "questionOverdue": "SLA aşıldı",
+    "questionOpsTitle": "Operasyon Özeti",
+    "searchHistory": "Geçmiş",
+    "bulkActions": "Toplu İşlemler",
+    "selectedCount": "Seçili",
+    "selectAllOnPage": "Bu sayfadakileri seç",
+    "clearSelection": "Seçimi temizle",
+    "bulkAnswer": "Toplu Yanıtla",
+    "bulkDelete": "Toplu Kaldır",
+    "bulkAnswerPlaceholder": "Seçili sorular için toplu yanıt"
   }
 }

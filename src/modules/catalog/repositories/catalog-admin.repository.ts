@@ -28,6 +28,7 @@ function buildWhere(args: { search?: string; categoryId?: string }) {
 function buildQuestionWhere(args: AdminProductQuestionListQuery) {
   return {
     deleted: false,
+    ...(args.questionId ? { id: args.questionId } : {}),
     ...(args.status === "pending" ? { answer: null } : {}),
     ...(args.status === "answered" ? { answer: { not: null } } : {}),
     ...(args.search
@@ -41,6 +42,18 @@ function buildQuestionWhere(args: AdminProductQuestionListQuery) {
         }
       : {}),
   };
+}
+
+function buildQuestionOrderBy(args: AdminProductQuestionListQuery) {
+  switch (args.sort ?? "priority") {
+    case "latest":
+      return [{ createdAt: "desc" as const }];
+    case "oldest":
+      return [{ createdAt: "asc" as const }];
+    case "priority":
+    default:
+      return [{ answeredAt: "asc" as const }, { createdAt: "desc" as const }];
+  }
 }
 
 export class CatalogAdminRepository {
@@ -76,6 +89,7 @@ export class CatalogAdminRepository {
         stock: input.stock,
         currency: input.currency ?? "TRY",
         imageUrl: input.imageUrl,
+        imageUrls: input.imageUrls ?? [],
         categoryId: input.categoryId ?? null,
       },
       include: {
@@ -99,6 +113,7 @@ export class CatalogAdminRepository {
         ...(input.stock !== undefined ? { stock: input.stock } : {}),
         ...(input.currency !== undefined ? { currency: input.currency } : {}),
         ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
+        ...(input.imageUrls !== undefined ? { imageUrls: input.imageUrls } : {}),
         ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
       },
       include: {
@@ -321,9 +336,7 @@ export class CatalogAdminRepository {
           },
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: buildQuestionOrderBy(args),
       skip: ((args.page ?? 1) - 1) * (args.pageSize ?? 10),
       take: args.pageSize,
     });
@@ -333,6 +346,52 @@ export class CatalogAdminRepository {
     return prisma.productQuestion.count({
       where: buildQuestionWhere(args),
     });
+  }
+
+  async countProductQuestionsByStatus(status: "pending" | "answered") {
+    return prisma.productQuestion.count({
+      where: {
+        deleted: false,
+        ...(status === "pending" ? { answer: null } : { answer: { not: null } }),
+      },
+    });
+  }
+
+  async countOverdueProductQuestions(slaHours: number) {
+    const threshold = new Date(Date.now() - Math.max(1, slaHours) * 60 * 60 * 1000);
+
+    return prisma.productQuestion.count({
+      where: {
+        deleted: false,
+        answer: null,
+        createdAt: {
+          lt: threshold,
+        },
+      },
+    });
+  }
+
+  async listProductSlugsByQuestionIds(ids: string[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const rows = await prisma.productQuestion.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: {
+        product: {
+          select: {
+            slug: true,
+          },
+        },
+      },
+    });
+
+    return rows.map((item) => item.product.slug);
   }
 
   async answerProductQuestion(input: AdminAnswerProductQuestionInput) {
@@ -373,6 +432,46 @@ export class CatalogAdminRepository {
             slug: true,
           },
         },
+      },
+    });
+  }
+
+  async bulkAnswerProductQuestions(ids: string[], answer: string, answeredBy: string) {
+    if (ids.length === 0) {
+      return { count: 0 };
+    }
+
+    return prisma.productQuestion.updateMany({
+      where: {
+        id: {
+          in: ids,
+        },
+        deleted: false,
+      },
+      data: {
+        answer,
+        answeredBy,
+        answeredAt: new Date(),
+      },
+    });
+  }
+
+  async bulkSoftDeleteProductQuestions(ids: string[], deletedUserId: string) {
+    if (ids.length === 0) {
+      return { count: 0 };
+    }
+
+    return prisma.productQuestion.updateMany({
+      where: {
+        id: {
+          in: ids,
+        },
+        deleted: false,
+      },
+      data: {
+        deleted: true,
+        deletedDate: new Date(),
+        deletedUserId,
       },
     });
   }

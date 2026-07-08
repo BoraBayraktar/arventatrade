@@ -32,6 +32,26 @@ export class IdentityRepository {
     });
   }
 
+  async listUsersByRoles(roles: Array<"ADMIN" | "EDITOR" | "CUSTOMER">) {
+    return prisma.user.findMany({
+      where: {
+        deleted: false,
+        role: {
+          in: roles,
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+    });
+  }
+
   async listUsers(args: {
     search?: string;
     role?: "ADMIN" | "EDITOR" | "CUSTOMER";

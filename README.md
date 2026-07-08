@@ -58,9 +58,11 @@ docker compose up -d
 
 ```bash
 npm run db:generate
-npm run db:push
+npm run db:migrate
 npm run db:seed
 ```
+
+Not: Migration tablosu olmayan eski lokal ortamlarda gecis asamasinda bir kez `npm run db:push` calistirilabilir.
 
 4. Uygulamayi baslatin.
 
@@ -81,6 +83,32 @@ Varsayilan kimlik bilgileri:
 - Password: `minioadmin`
 
 Admin urun yonetimi ekranindaki gorsel yukleme akisi MinIO bucket'ina (`arventa-media`) dosya yukler ve urune otomatik URL atar.
+
+## Notification ve SLA Ortam Degiskenleri
+
+- `PRODUCT_QUESTION_SLA_HOURS`: Urun soru moderasyonundaki SLA asim esigi, saat cinsinden (varsayilan: `24`).
+- `NOTIFICATION_EMAIL_FROM`: Bildirim e-posta gonderici adresi.
+- `RESEND_API_KEY`: Resend ile e-posta gonderimi icin API anahtari.
+- `NOTIFICATION_EMAIL_WEBHOOK_URL`: Alternatif e-posta gateway webhook adresi.
+- `NOTIFICATION_EMAIL_WEBHOOK_SECRET`: Webhook header'i icin opsiyonel secret (`x-webhook-secret`).
+
+Bildirim e-posta kuyruğunu manuel calistirmak icin:
+
+```bash
+npm run worker:notifications -- 20
+```
+
+Canli e-posta transport testi icin:
+
+```bash
+npm run test:notification-email-live
+```
+
+Cron-safe worker tetigi icin:
+
+```bash
+npm run worker:notifications:cron
+```
 
 ## Faz 1 Ozellikleri
 
@@ -140,6 +168,15 @@ Admin urun yonetimi ekranindaki gorsel yukleme akisi MinIO bucket'ina (`arventa-
 	- backup/restore + DR runbook: `docs/OPERATIONS.md`
 	- release train ve domain ownership modeli: `docs/RELEASE_TRAIN.md`
 	- CODEOWNERS tanimi: `.github/CODEOWNERS`
+
+	## Faz 6 Tamamlama Notlari (Soru SLA + Bildirim)
+
+	- `UserNotification` modeli eklendi (`IN_APP`, `EMAIL`).
+	- Yeni urun sorusu acildiginda backoffice kullanicilarina bildirim fan-out edilir.
+	- Admin ust panelde bildirim rozeti + dropdown listeleme eklendi.
+	- Deep-link destekli soru odaklama aktif: `/admin/product-questions?questionId=...`.
+	- Soru SLA esigi artik ortam degiskeni ile yonetilir: `PRODUCT_QUESTION_SLA_HOURS`.
+	- E-posta kuyruk worker endpointi: `POST /api/admin/notifications/worker`.
 
 ## Faz 2 Baslangici (Auth + Rol)
 

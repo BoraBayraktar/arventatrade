@@ -1,0 +1,103 @@
+name: Verify Questions Phase4
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  verify-questions-phase4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://arventa:arventa123@localhost:5432/arventatrade?schema=public
+      REDIS_URL: redis://localhost:6379
+      AUTH_SECRET: ci-auth-secret
+      APP_URL: http://localhost:3000
+      MINIO_ENDPOINT: localhost
+      MINIO_PORT: "9000"
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: arventa-media
+      MEDIA_PUBLIC_BASE_URL: http://localhost:9000/arventa-media
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: arventatrade
+          POSTGRES_USER: arventa
+          POSTGRES_PASSWORD: arventa123
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arventa -d arventatrade"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Sync database schema
+        run: npm run db:push
+
+      - name: Seed database
+        run: npm run db:seed
+
+      - name: Start app
+        run: |
+          npm run dev > /tmp/arventa-dev.log 2>&1 &
+          echo $! > /tmp/arventa-dev.pid
+
+      - name: Wait for app
+        run: |
+          for i in {1..90}; do
+            if curl -fsS "http://localhost:3000/api/identity/me" > /dev/null 2>&1; then
+              echo "App is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "App did not become ready"
+          cat /tmp/arventa-dev.log || true
+          exit 1
+
+      - name: Verify phase4 questions flow
+        run: npm run verify:questions-phase4
+
+      - name: Print app logs on failure
+        if: failure()
+        run: cat /tmp/arventa-dev.log || true
+
+      - name: Stop app
+        if: always()
+        run: |
+          if [ -f /tmp/arventa-dev.pid ]; then
+            kill "$(cat /tmp/arventa-dev.pid)" || true
+          fi

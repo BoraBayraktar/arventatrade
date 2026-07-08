@@ -19,6 +19,8 @@ import {
   formatFeatureFiltersForUrl,
   productMatchesFeatureFilters,
 } from "@/modules/catalog/services/product-features.codec";
+import { identityAdminService } from "@/modules/identity/services/identity-admin.service";
+import { notificationService } from "@/modules/system/services/notification.service";
 
 const productListQuerySchema = z.object({
   search: z.string().trim().optional(),
@@ -80,6 +82,7 @@ function mapProduct(product: {
   stock: number;
   currency: string;
   imageUrl: string;
+  imageUrls: string[];
   category: { slug: string; name: string } | null;
 }): ProductCard {
   const { cleanDescription, features } = decodeProductDescriptionWithFeatures(product.description);
@@ -102,6 +105,7 @@ function mapProduct(product: {
     inStock: product.stock > 0,
     currency: product.currency,
     imageUrl: product.imageUrl,
+    imageUrls: product.imageUrls ?? [],
     features,
     category: product.category
       ? {
@@ -484,6 +488,22 @@ export class CatalogService {
       askedBy: parsed.askedBy,
       question: parsed.question,
     });
+
+    try {
+      const recipients = await identityAdminService.listBackofficeUsers();
+      if (recipients.length > 0) {
+        await notificationService.createForRecipients({
+          recipients: recipients.map((item) => ({ id: item.id })),
+          channels: ["IN_APP", "EMAIL"],
+          type: "PRODUCT_QUESTION_CREATED",
+          title: `New question for ${product.name}`,
+          message: `${parsed.askedBy}: ${parsed.question}`,
+          linkUrl: `/admin/product-questions?questionId=${question.id}`,
+        });
+      }
+    } catch {
+      // Do not block customer flow if notification fan-out fails.
+    }
 
     await invalidateProductDetailCache(parsed.slug);
     return mapQuestion(question);

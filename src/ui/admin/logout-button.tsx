@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -30,8 +31,9 @@ export function LogoutButton({ locale, label, loadingLabel }: LogoutButtonProps)
   }
 
   return (
-    <Button type="button" variant="secondary" onClick={handleLogout} disabled={loading}>
-      {loading ? loadingLabel : label}
+    <Button type="button" variant="outline" size="icon" onClick={handleLogout} disabled={loading} aria-label={loading ? loadingLabel : label}>
+      <LogOut className="h-4 w-4" />
+      <span className="sr-only">{loading ? loadingLabel : label}</span>
     </Button>
   );
 }

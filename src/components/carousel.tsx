@@ -32,6 +32,7 @@ export function Carousel({ locale, products }: CarouselProps) {
                   locale,
                 }}
                 src={product.imageUrl}
+                secondarySrc={product.imageUrls?.[0] ?? undefined}
                 fill
                 sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
               />

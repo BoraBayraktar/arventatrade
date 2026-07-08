@@ -27,6 +27,7 @@ export function ProductGridItems({ locale, products }: ProductGridItemsProps) {
 									locale,
 								}}
 								src={product.imageUrl}
+								secondarySrc={product.imageUrls?.[0] ?? undefined}
 								fill
 								sizes="(min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
 							/>

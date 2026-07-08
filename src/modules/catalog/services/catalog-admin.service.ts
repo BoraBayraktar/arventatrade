@@ -3,6 +3,7 @@ import { z } from "zod";
 import { redisCache } from "@/lib/redis";
 import type {
   AdminAnswerProductQuestionInput,
+  AdminBulkModerateProductQuestionsInput,
   AdminCategoryListItem,
   AdminCategoryListQuery,
   AdminCategoryListResult,
@@ -11,14 +12,15 @@ import type {
   AdminProductQuestionItem,
   AdminProductQuestionListQuery,
   AdminProductQuestionListResult,
+  AdminProductQuestionModerationResult,
+  AdminProductQuestionStats,
   AdminProductListItem,
   AdminProductListQuery,
   AdminProductListResult,
   AdminTopInteractionItem,
   AdminUpdateCategoryInput,
   AdminUpdateProductInput,
-} from "@/modules/catalog/contracts/catalog-admin.contract";
-import { CatalogAdminRepository } from "@/modules/catalog/repositories/catalog-admin.repository";
+} from "@/modules/catalog/contracts/catalog-admin.contract";import { CatalogAdminRepository } from "@/modules/catalog/repositories/catalog-admin.repository";
 import {
   decodeProductDescriptionWithFeatures,
   encodeProductDescriptionWithFeatures,
@@ -48,6 +50,7 @@ const createProductSchema = z.object({
   stock: z.coerce.number().int().min(0),
   currency: z.string().trim().min(3).max(3).optional(),
   imageUrl: z.string().trim().url(),
+  imageUrls: z.array(z.string().trim().url()).max(20).optional().default([]),
   features: z.array(productFeatureSchema).max(50).optional().default([]),
   categoryId: z.string().trim().optional().nullable(),
 }).refine((value) => value.compareAtPrice == null || value.compareAtPrice > value.price, {
@@ -66,6 +69,7 @@ const updateProductSchema = z.object({
   stock: z.coerce.number().int().min(0).optional(),
   currency: z.string().trim().min(3).max(3).optional(),
   imageUrl: z.string().trim().url().optional(),
+  imageUrls: z.array(z.string().trim().url()).max(20).optional(),
   features: z.array(productFeatureSchema).max(50).optional(),
   categoryId: z.string().trim().optional().nullable(),
 });
@@ -78,7 +82,9 @@ const categoryListQuerySchema = z.object({
 
 const questionListQuerySchema = z.object({
   status: z.enum(["all", "pending", "answered"]).default("all"),
+  sort: z.enum(["priority", "latest", "oldest"]).default("priority"),
   search: z.string().trim().optional(),
+  questionId: z.string().trim().min(1).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(10),
 });
@@ -88,6 +94,32 @@ const answerQuestionSchema = z.object({
   answer: z.string().trim().min(3).max(2000),
   answeredBy: z.string().trim().min(2).max(120),
 });
+
+const bulkModerateQuestionsSchema = z
+  .object({
+    ids: z.array(z.string().trim().min(1)).min(1).max(100),
+    action: z.enum(["answer", "delete"]),
+    answer: z.string().trim().min(3).max(2000).optional(),
+    answeredBy: z.string().trim().min(2).max(120).optional(),
+    deletedUserId: z.string().trim().min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === "answer" && (!value.answer || !value.answeredBy)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["answer"],
+        message: "Answer moderation requires answer and answeredBy",
+      });
+    }
+
+    if (value.action === "delete" && !value.deletedUserId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["deletedUserId"],
+        message: "Delete moderation requires deletedUserId",
+      });
+    }
+  });
 
 const createCategorySchema = z.object({
   slug: z.string().trim().min(2),
@@ -117,6 +149,7 @@ function mapProduct(product: {
   stock: number;
   currency: string;
   imageUrl: string;
+  imageUrls: string[];
   categoryId: string | null;
   category: { name: string } | null;
 }): AdminProductListItem {
@@ -140,6 +173,7 @@ function mapProduct(product: {
     inStock: product.stock > 0,
     currency: product.currency,
     imageUrl: product.imageUrl,
+    imageUrls: product.imageUrls ?? [],
     features,
     categoryId: product.categoryId,
     categoryName: product.category?.name ?? null,
@@ -473,6 +507,48 @@ export class CatalogAdminService {
   async softDeleteProductQuestion(id: string, deletedUserId: string) {
     const deleted = await this.repository.softDeleteProductQuestion(id, deletedUserId);
     await invalidateProductDetailCache(deleted.product.slug);
+  }
+
+  async getProductQuestionStats(slaHours = 24): Promise<AdminProductQuestionStats> {
+    const normalizedSlaHours = Number.isFinite(slaHours) && slaHours > 0 ? slaHours : 24;
+
+    const [total, pending, answered, overdue] = await Promise.all([
+      this.repository.countProductQuestions({ status: "all" }),
+      this.repository.countProductQuestionsByStatus("pending"),
+      this.repository.countProductQuestionsByStatus("answered"),
+      this.repository.countOverdueProductQuestions(normalizedSlaHours),
+    ]);
+
+    return {
+      total,
+      pending,
+      answered,
+      overdue,
+      slaHours: normalizedSlaHours,
+    };
+  }
+
+  async bulkModerateProductQuestions(
+    input: AdminBulkModerateProductQuestionsInput,
+  ): Promise<AdminProductQuestionModerationResult> {
+    const parsed = bulkModerateQuestionsSchema.parse(input);
+    const uniqueIds = [...new Set(parsed.ids)];
+    const productSlugs = await this.repository.listProductSlugsByQuestionIds(uniqueIds);
+
+    if (parsed.action === "answer") {
+      const result = await this.repository.bulkAnswerProductQuestions(
+        uniqueIds,
+        parsed.answer!,
+        parsed.answeredBy!,
+      );
+
+      await Promise.all([...new Set(productSlugs)].map((slug) => invalidateProductDetailCache(slug)));
+      return { affected: result.count };
+    }
+
+    const result = await this.repository.bulkSoftDeleteProductQuestions(uniqueIds, parsed.deletedUserId!);
+    await Promise.all([...new Set(productSlugs)].map((slug) => invalidateProductDetailCache(slug)));
+    return { affected: result.count };
   }
 }
 

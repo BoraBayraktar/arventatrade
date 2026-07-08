@@ -14,7 +14,9 @@ export async function GET(request: Request) {
 
     const result = await catalogAdminService.listProductQuestions({
       status: (searchParams.get("status") as "all" | "pending" | "answered" | null) ?? "all",
+      sort: (searchParams.get("sort") as "priority" | "latest" | "oldest" | null) ?? "priority",
       search: searchParams.get("search") ?? undefined,
+      questionId: searchParams.get("questionId") ?? undefined,
       page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
       pageSize: searchParams.get("pageSize") ? Number(searchParams.get("pageSize")) : 10,
     });

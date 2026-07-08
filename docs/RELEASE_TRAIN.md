@@ -19,6 +19,11 @@ A change is release-ready only if all gates pass:
 4. `APP_URL=http://localhost:3000 npm run verify:integrations`
 5. Existing regression suite (`verify:*` scripts)
 
+CI enforcement:
+
+- Workflow: `.github/workflows/phase5-quality-gates.yml`
+- Aggregate local command: `npm run verify:phase5`
+
 ## Domain Ownership
 
 - Catalog: `src/modules/catalog/**`

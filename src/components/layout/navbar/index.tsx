@@ -54,7 +54,7 @@ export async function Navbar({ locale, dictionary }: NavbarProps) {
 	);
 
 	return (
-		<nav className="relative border-b border-neutral-200 bg-white px-4 py-3 lg:px-6">
+		<nav className="relative border-b border-neutral-200 bg-white px-2 py-2 lg:px-4">
 			<div className="mx-auto w-full max-w-screen-2xl">
 				<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
 					<div className="flex items-center gap-3 lg:min-w-[220px]">

@@ -62,6 +62,10 @@ export class IdentityAdminDeleteError extends Error {
 export class IdentityAdminService {
   constructor(private readonly repository: IdentityRepository) {}
 
+  async listBackofficeUsers() {
+    return this.repository.listUsersByRoles(["ADMIN", "EDITOR"]);
+  }
+
   async listUsers(query: AdminUserListQuery): Promise<AdminUserListResult> {
     const parsed = listUsersQuerySchema.parse(query);
 

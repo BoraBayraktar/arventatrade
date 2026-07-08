@@ -163,7 +163,6 @@
 		"loginButton": "Sign In",
 		"invalidCredentials": "E-mail or password is incorrect.",
 		"logout": "Log Out",
-		"dashboardMenu": "Dashboard",
 		"userInfo": "User Information",
 		"quickActions": "Quick Actions",
 		"phase2Note": "Next step is product management screens and role-based authorization expansion.",
@@ -179,6 +178,8 @@
 		"slug": "Slug",
 		"description": "Description",
 		"imageUrl": "Image URL",
+		"additionalImageUrls": "Additional Images",
+		"additionalImageUrlsHint": "Enter one URL per line. The first field is the main image, these are shown as extra gallery images.",
 		"search": "Search product",
 		"allCategories": "All categories",
 		"prev": "Previous",
@@ -194,9 +195,26 @@
 		"operationFailed": "Operation failed. Please try again.",
 		"validationRequired": "Please fill all required fields.",
 		"validationPrice": "Price must be greater than 0.",
-		"validationImageUrl": "Please enter a valid image URL."
+		"validationImageUrl": "Please enter a valid image URL.",
+		"validationImageUrls": "All additional image URLs must be valid.",
+		"validationImageUrlsLimit": "You can add up to 6 images in total."
+		,"sort": "Sort"
+		,"sortPriority": "Priority"
+		,"sortLatest": "Latest"
+		,"sortOldest": "Oldest"
+		,"clearFilters": "Clear filters"
+		,"summaryTitle": "Current question counts"
+		,"summaryCurrent": "Total"
+		,"summaryPending": "Pending"
+		,"summaryAnswered": "Answered"
+		,"summaryOverdue": "SLA overdue"
+		,"askedAt": "Asked at"
+		,"answeredBy": "Answered by"
+		,"answeredAt": "Answered at"
 		,"uploadImage": "Upload Image"
+		,"uploadImages": "Upload Images"
 		,"uploadingImage": "Uploading..."
+		,"uploadingImages": "Uploading images..."
 		,"imageUploadFailed": "Image upload failed. Please try again."
 		,"imageUploadHint": "You can upload PNG, JPG, WebP, AVIF, or GIF. Max size 8MB."
 		,"productFeatures": "Product Features"
@@ -226,6 +244,8 @@
 		,"endAt": "End"
 		,"noDateWindow": "Unbounded"
 		,"validationDateRange": "End date cannot be earlier than start date."
+		,"roleAdmin": "Admin"
+		,"roleEditor": "Editor"
 		,"roleCustomer": "Customer"
 		,"customerManager": "Customer Management"
 		,"createCustomer": "New Customer"
@@ -259,5 +279,19 @@
 		,"defaultVariant": "Default"
 		,"validationTarget": "Target selection is required."
 		,"validationOrder": "Order must be between 1 and 99."
+		,"goStore": "Go to store"
+		,"notifications": "Notifications"
+		,"noNotifications": "No notifications."
+		,"markAllRead": "Mark all as read"
+		,"questionOverdue": "SLA overdue"
+		,"questionOpsTitle": "Operations Overview"
+		,"searchHistory": "History"
+		,"bulkActions": "Bulk Actions"
+		,"selectedCount": "Selected"
+		,"selectAllOnPage": "Select all on page"
+		,"clearSelection": "Clear selection"
+		,"bulkAnswer": "Bulk Answer"
+		,"bulkDelete": "Bulk Remove"
+		,"bulkAnswerPlaceholder": "Bulk answer for selected questions"
 	}
 }

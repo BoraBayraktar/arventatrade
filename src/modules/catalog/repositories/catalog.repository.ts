@@ -157,6 +157,8 @@ export class CatalogRepository {
       },
       select: {
         id: true,
+        name: true,
+        slug: true,
       },
     });
   }
