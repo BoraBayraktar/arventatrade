@@ -18,6 +18,16 @@ export type RegisterInput = {
   password: string;
 };
 
+export type ForgotPasswordInput = {
+  email: string;
+  locale?: string;
+};
+
+export type ResetPasswordInput = {
+  token: string;
+  password: string;
+};
+
 export type LoginResult = {
   token: string;
   user: AuthUser;

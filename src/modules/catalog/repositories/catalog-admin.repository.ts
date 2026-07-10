@@ -10,11 +10,19 @@ import type {
 type AdminCreateProductRecordInput = {
   slug: string;
   sku: string;
+  barcode?: string | null;
   name: string;
   description: string;
+  productType?: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  unitType?: "PIECE" | "KILOGRAM" | "GRAM" | "LITER" | "MILLILITER" | "METER" | "CENTIMETER" | "BOX" | "PACK";
   price: number;
+  purchasePrice?: number | null;
   compareAtPrice?: number | null;
   currency?: string;
+  vatRate?: number;
+  stockTrackingEnabled?: boolean;
+  preferredSalesWarehouseId?: string | null;
+  preferredPurchaseWarehouseId?: string | null;
   imageUrl: string;
   imageUrls?: string[];
   categoryId?: string | null;
@@ -24,11 +32,19 @@ type AdminUpdateProductRecordInput = {
   id: string;
   slug?: string;
   sku?: string;
+  barcode?: string | null;
   name?: string;
   description?: string;
+  productType?: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  unitType?: "PIECE" | "KILOGRAM" | "GRAM" | "LITER" | "MILLILITER" | "METER" | "CENTIMETER" | "BOX" | "PACK";
   price?: number;
+  purchasePrice?: number | null;
   compareAtPrice?: number | null;
   currency?: string;
+  vatRate?: number;
+  stockTrackingEnabled?: boolean;
+  preferredSalesWarehouseId?: string | null;
+  preferredPurchaseWarehouseId?: string | null;
   imageUrl?: string;
   imageUrls?: string[];
   categoryId?: string | null;
@@ -87,6 +103,21 @@ export class CatalogAdminRepository {
       where: buildWhere(args),
       include: {
         category: true,
+        inventoryItem: {
+          select: {
+            inventoryLevels: {
+              where: {
+                warehouse: {
+                  isActive: true,
+                },
+              },
+              select: {
+                onHand: true,
+                reserved: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         updatedAt: "desc",
@@ -107,18 +138,41 @@ export class CatalogAdminRepository {
       data: {
         slug: input.slug,
         sku: input.sku,
+        barcode: input.barcode ?? null,
         name: input.name,
         description: input.description,
+        productType: input.productType ?? "PHYSICAL",
+        unitType: input.unitType ?? "PIECE",
         price: input.price,
+        purchasePrice: input.purchasePrice ?? null,
         compareAtPrice: input.compareAtPrice ?? null,
         stock: 0,
         currency: input.currency ?? "TRY",
+        vatRate: input.vatRate ?? 20,
+        stockTrackingEnabled: input.stockTrackingEnabled ?? true,
+        preferredSalesWarehouseId: input.preferredSalesWarehouseId ?? null,
+        preferredPurchaseWarehouseId: input.preferredPurchaseWarehouseId ?? null,
         imageUrl: input.imageUrl,
         imageUrls: input.imageUrls ?? [],
         categoryId: input.categoryId ?? null,
       },
       include: {
         category: true,
+        inventoryItem: {
+          select: {
+            inventoryLevels: {
+              where: {
+                warehouse: {
+                  isActive: true,
+                },
+              },
+              select: {
+                onHand: true,
+                reserved: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -131,17 +185,40 @@ export class CatalogAdminRepository {
       data: {
         ...(input.slug !== undefined ? { slug: input.slug } : {}),
         ...(input.sku !== undefined ? { sku: input.sku } : {}),
+        ...(input.barcode !== undefined ? { barcode: input.barcode } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.productType !== undefined ? { productType: input.productType } : {}),
+        ...(input.unitType !== undefined ? { unitType: input.unitType } : {}),
         ...(input.price !== undefined ? { price: input.price } : {}),
+        ...(input.purchasePrice !== undefined ? { purchasePrice: input.purchasePrice } : {}),
         ...(input.compareAtPrice !== undefined ? { compareAtPrice: input.compareAtPrice } : {}),
         ...(input.currency !== undefined ? { currency: input.currency } : {}),
+        ...(input.vatRate !== undefined ? { vatRate: input.vatRate } : {}),
+        ...(input.stockTrackingEnabled !== undefined ? { stockTrackingEnabled: input.stockTrackingEnabled } : {}),
+        ...(input.preferredSalesWarehouseId !== undefined ? { preferredSalesWarehouseId: input.preferredSalesWarehouseId } : {}),
+        ...(input.preferredPurchaseWarehouseId !== undefined ? { preferredPurchaseWarehouseId: input.preferredPurchaseWarehouseId } : {}),
         ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
         ...(input.imageUrls !== undefined ? { imageUrls: input.imageUrls } : {}),
         ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
       },
       include: {
         category: true,
+        inventoryItem: {
+          select: {
+            inventoryLevels: {
+              where: {
+                warehouse: {
+                  isActive: true,
+                },
+              },
+              select: {
+                onHand: true,
+                reserved: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -154,6 +231,21 @@ export class CatalogAdminRepository {
       },
       include: {
         category: true,
+        inventoryItem: {
+          select: {
+            inventoryLevels: {
+              where: {
+                warehouse: {
+                  isActive: true,
+                },
+              },
+              select: {
+                onHand: true,
+                reserved: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -182,6 +274,7 @@ export class CatalogAdminRepository {
         description: true,
         price: true,
         compareAtPrice: true,
+        productType: true,
       },
     });
   }

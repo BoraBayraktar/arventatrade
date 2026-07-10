@@ -3,6 +3,7 @@ export type AuditLogEntityType =
   | "PRODUCT"
   | "CATEGORY"
   | "ORDER"
+  | "WAREHOUSE"
   | "STOREFRONT_ITEM"
   | "AUTH";
 

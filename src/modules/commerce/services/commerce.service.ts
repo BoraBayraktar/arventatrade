@@ -20,6 +20,7 @@ import type {
   CommerceQuoteResult,
 } from "@/modules/commerce/contracts/commerce.contract";
 import { CommerceRepository } from "@/modules/commerce/repositories/commerce.repository";
+import { integrationService } from "@/modules/integration/services/integration.service";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
 import { pricingService } from "@/modules/pricing/services/pricing.service";
 
@@ -389,6 +390,17 @@ export class CommerceService {
     }
 
     await invalidateCatalogCache();
+    await Promise.all((["TRENDYOL", "N11"] as const).map((channel) => integrationService.dispatchJobs({
+      channel,
+      jobType: "STOCK_SYNC",
+      entityType: "PRODUCT",
+      entityIds: Array.from(new Set(quote.lines.map((line) => line.productId))),
+      idempotencySuffix: createdOrderNumber,
+      payload: {
+        trigger: "ORDER_COMMIT",
+        reference: createdOrderNumber,
+      },
+    })));
 
     if (quote.promotionCode) {
       await pricingService.markPromotionUsage(quote.promotionCode);

@@ -20,7 +20,7 @@ const listNotificationsSchema = z.object({
 
 const createUserNotificationsSchema = z.object({
   recipients: z.array(z.object({ id: z.string().trim().min(1) })).min(1),
-  type: z.enum(["PRODUCT_QUESTION_CREATED"]),
+  type: z.enum(["PRODUCT_QUESTION_CREATED", "INVENTORY_ALERT_CREATED", "STOCK_COUNT_APPLIED"]),
   title: z.string().trim().min(1).max(180),
   message: z.string().trim().min(1).max(2000),
   linkUrl: z.string().trim().optional().nullable(),

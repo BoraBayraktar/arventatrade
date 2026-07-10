@@ -10,6 +10,8 @@ const adjustInventorySchema = z.object({
   sku: z.string().trim().min(1).max(64),
   warehouseCode: z.string().trim().min(1).max(32).optional(),
   targetOnHandStock: z.coerce.number().int().min(0),
+  reorderPoint: z.coerce.number().int().min(0).optional(),
+  safetyStock: z.coerce.number().int().min(0).optional(),
   note: z.string().trim().min(3).max(280).optional(),
 });
 
@@ -23,6 +25,8 @@ export async function POST(request: Request) {
       sku: payload.sku,
       warehouseCode: payload.warehouseCode,
       targetOnHandStock: payload.targetOnHandStock,
+      reorderPoint: payload.reorderPoint,
+      safetyStock: payload.safetyStock,
       note: payload.note ?? "Inventory manager manual adjustment",
     });
 
@@ -35,6 +39,8 @@ export async function POST(request: Request) {
       metadata: {
         warehouseCode: payload.warehouseCode ?? null,
         targetOnHandStock: payload.targetOnHandStock,
+        reorderPoint: payload.reorderPoint ?? null,
+        safetyStock: payload.safetyStock ?? null,
       },
     });
 

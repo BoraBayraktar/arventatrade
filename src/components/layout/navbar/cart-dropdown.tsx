@@ -19,7 +19,10 @@ type CartLine = {
 	quantity: number;
 };
 
-const CART_KEY = "arventa:cart";
+const CART_KEY = "2bem:cart";
+const LEGACY_CART_KEY = "arventa:cart";
+const CART_UPDATED_EVENT = "2bem:cart-updated";
+const LEGACY_CART_UPDATED_EVENT = "arventa:cart-updated";
 
 function readCartCount() {
 	if (typeof window === "undefined") {
@@ -27,7 +30,7 @@ function readCartCount() {
 	}
 
 	try {
-		const raw = window.localStorage.getItem(CART_KEY);
+		const raw = window.localStorage.getItem(CART_KEY) ?? window.localStorage.getItem(LEGACY_CART_KEY);
 		if (!raw) {
 			return 0;
 		}
@@ -63,7 +66,8 @@ export function CartDropdown({ locale, labels }: { locale: string; labels: CartD
 
 		syncCount();
 		window.addEventListener("storage", syncCount);
-		window.addEventListener("arventa:cart-updated", syncCount);
+		window.addEventListener(CART_UPDATED_EVENT, syncCount);
+		window.addEventListener(LEGACY_CART_UPDATED_EVENT, syncCount);
 
 		const onOutsidePointer = (event: MouseEvent) => {
 			if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
@@ -82,7 +86,8 @@ export function CartDropdown({ locale, labels }: { locale: string; labels: CartD
 
 		return () => {
 			window.removeEventListener("storage", syncCount);
-			window.removeEventListener("arventa:cart-updated", syncCount);
+			window.removeEventListener(CART_UPDATED_EVENT, syncCount);
+			window.removeEventListener(LEGACY_CART_UPDATED_EVENT, syncCount);
 			window.removeEventListener("mousedown", onOutsidePointer);
 			window.removeEventListener("keydown", onEscape);
 		};

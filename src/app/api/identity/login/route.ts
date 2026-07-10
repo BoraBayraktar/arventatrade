@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { AUTH_COOKIE_NAME, AUTH_TOKEN_TTL_SECONDS } from "@/lib/auth";
+import { AUTH_COOKIE_NAME, AUTH_TOKEN_REMEMBER_ME_TTL_SECONDS, AUTH_TOKEN_TTL_SECONDS } from "@/lib/auth";
 import { identityService } from "@/modules/identity/services/identity.service";
 
 export async function POST(request: Request) {
   const payload = await request.json();
+  const maxAge = payload?.rememberMe ? AUTH_TOKEN_REMEMBER_ME_TTL_SECONDS : AUTH_TOKEN_TTL_SECONDS;
 
   const result = await identityService.login(payload);
   if (!result) {
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: AUTH_TOKEN_TTL_SECONDS,
+    maxAge,
   });
 
   return response;

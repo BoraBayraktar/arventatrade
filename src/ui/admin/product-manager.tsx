@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import type { Locale } from "@/lib/i18n";
 import type { ProductFeature } from "@/modules/catalog/contracts/catalog.contract";
+import type { AdminWarehouseItem } from "@/modules/inventory/contracts/inventory.contract";
 
 type Category = {
   id: string;
@@ -22,14 +23,22 @@ type Product = {
   id: string;
   slug: string;
   sku: string;
+  barcode: string | null;
   name: string;
   description: string;
+  productType: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  unitType: "PIECE" | "KILOGRAM" | "GRAM" | "LITER" | "MILLILITER" | "METER" | "CENTIMETER" | "BOX" | "PACK";
   price: number;
+  purchasePrice: number | null;
   compareAtPrice: number | null;
   discountRate: number | null;
   stock: number;
   inStock: boolean;
   currency: string;
+  vatRate: number;
+  stockTrackingEnabled: boolean;
+  preferredSalesWarehouseId: string | null;
+  preferredPurchaseWarehouseId: string | null;
   imageUrl: string;
   imageUrls?: string[];
   features: ProductFeature[];
@@ -48,11 +57,19 @@ type Labels = {
   next: string;
   slug: string;
   sku: string;
+  barcode: string;
   name: string;
   description: string;
+  productType: string;
+  unitType: string;
   price: string;
+  purchasePrice: string;
   compareAtPrice: string;
   stock: string;
+  vatRate: string;
+  stockTrackingEnabled: string;
+  preferredSalesWarehouse: string;
+  preferredPurchaseWarehouse: string;
   imageUrl: string;
   additionalImageUrls: string;
   additionalImageUrlsHint: string;
@@ -107,17 +124,26 @@ type ProductManagerProps = {
     categoryId: string;
   };
   categories: Category[];
+  warehouses: AdminWarehouseItem[];
   canDelete: boolean;
 };
 
 type ProductForm = {
   slug: string;
   sku: string;
+  barcode: string;
   name: string;
   description: string;
+  productType: string;
+  unitType: string;
   price: string;
+  purchasePrice: string;
   compareAtPrice: string;
   stock: string;
+  vatRate: string;
+  stockTrackingEnabled: boolean;
+  preferredSalesWarehouseId: string;
+  preferredPurchaseWarehouseId: string;
   imageUrl: string;
   imageUrls: string[];
   categoryId: string;
@@ -129,7 +155,27 @@ type DrawerMode = "create" | "edit";
 const NONE_VALUE = "__none__";
 const MAX_PRODUCT_IMAGES = 6;
 
+const PRODUCT_TYPE_OPTIONS = [
+  { value: "PHYSICAL", tr: "Fiziksel", en: "Physical" },
+  { value: "SERVICE", tr: "Hizmet", en: "Service" },
+  { value: "RAW_MATERIAL", tr: "Hammadde", en: "Raw Material" },
+  { value: "SEMI_FINISHED", tr: "Yarı Mamul", en: "Semi Finished" },
+] as const;
+
+const UNIT_TYPE_OPTIONS = [
+  { value: "PIECE", tr: "Adet", en: "Piece" },
+  { value: "KILOGRAM", tr: "Kilogram", en: "Kilogram" },
+  { value: "GRAM", tr: "Gram", en: "Gram" },
+  { value: "LITER", tr: "Litre", en: "Liter" },
+  { value: "MILLILITER", tr: "Mililitre", en: "Milliliter" },
+  { value: "METER", tr: "Metre", en: "Meter" },
+  { value: "CENTIMETER", tr: "Santimetre", en: "Centimeter" },
+  { value: "BOX", tr: "Kutu", en: "Box" },
+  { value: "PACK", tr: "Paket", en: "Pack" },
+] as const;
+
 function toPayload(form: ProductForm) {
+  const stockTrackingEnabled = form.productType === "SERVICE" ? false : form.stockTrackingEnabled;
   const compareAtPrice = form.compareAtPrice.trim() ? Number(form.compareAtPrice) : null;
   const mergedImages = Array.from(
     new Set([form.imageUrl, ...(form.imageUrls ?? [])].map((value) => value.trim()).filter(Boolean)),
@@ -156,11 +202,19 @@ function toPayload(form: ProductForm) {
   return {
     slug: form.slug,
     sku: form.sku,
+    barcode: form.barcode.trim() || null,
     name: form.name,
     description: form.description,
+    productType: form.productType,
+    unitType: form.unitType,
     price: Number(form.price),
+    purchasePrice: form.purchasePrice.trim() ? Number(form.purchasePrice) : null,
     compareAtPrice,
-    stock: Number(form.stock),
+    stock: stockTrackingEnabled ? Number(form.stock) : 0,
+    vatRate: Number(form.vatRate),
+    stockTrackingEnabled,
+    preferredSalesWarehouseId: form.preferredSalesWarehouseId.trim() || null,
+    preferredPurchaseWarehouseId: form.preferredPurchaseWarehouseId.trim() || null,
     imageUrl: mainImage,
     imageUrls,
     features,
@@ -210,6 +264,7 @@ export function ProductManager({
   initialResult,
   initialQuery,
   categories,
+  warehouses,
   canDelete,
 }: ProductManagerProps) {
   const router = useRouter();
@@ -230,11 +285,19 @@ export function ProductManager({
     () => ({
       slug: "",
       sku: "",
+      barcode: "",
       name: "",
       description: "",
+      productType: "PHYSICAL",
+      unitType: "PIECE",
       price: "",
+      purchasePrice: "",
       compareAtPrice: "",
       stock: "0",
+      vatRate: "20",
+      stockTrackingEnabled: true,
+      preferredSalesWarehouseId: "",
+      preferredPurchaseWarehouseId: "",
       imageUrl: "",
       imageUrls: [],
       categoryId: "",
@@ -249,6 +312,7 @@ export function ProductManager({
   const activeForm = drawerMode === "edit" ? editForm : createForm;
   const activeTitle = drawerMode === "edit" ? labels.edit : labels.createTitle;
   const activeSubmit = drawerMode === "edit" ? labels.save : labels.create;
+  const isStockManaged = activeForm.stockTrackingEnabled && activeForm.productType !== "SERVICE";
 
   function pushQuery(next: { search: string; categoryId: string; page: number }) {
     const params = new URLSearchParams();
@@ -270,7 +334,9 @@ export function ProductManager({
   }
 
   function validateForm(form: ProductForm) {
-    if (!form.slug.trim() || !form.sku.trim() || !form.name.trim() || !form.description.trim() || !form.price.trim() || !form.stock.trim() || !form.imageUrl.trim()) {
+    const requiresStock = form.stockTrackingEnabled && form.productType !== "SERVICE";
+
+    if (!form.slug.trim() || !form.sku.trim() || !form.name.trim() || !form.description.trim() || !form.price.trim() || (requiresStock && !form.stock.trim()) || !form.vatRate.trim() || !form.imageUrl.trim()) {
       return labels.validationRequired;
     }
 
@@ -279,9 +345,14 @@ export function ProductManager({
       return labels.validationPrice;
     }
 
-    const numericStock = Number(form.stock);
-    if (!Number.isInteger(numericStock) || numericStock < 0) {
+    const numericStock = Number(form.stock || "0");
+    if (requiresStock && (!Number.isInteger(numericStock) || numericStock < 0)) {
       return labels.validationStock;
+    }
+
+    const numericVatRate = Number(form.vatRate);
+    if (!Number.isInteger(numericVatRate) || numericVatRate < 0 || numericVatRate > 100) {
+      return labels.validationRequired;
     }
 
     if (form.compareAtPrice.trim()) {
@@ -337,11 +408,19 @@ export function ProductManager({
     setEditForm({
       slug: product.slug,
       sku: product.sku,
+      barcode: product.barcode ?? "",
       name: product.name,
       description: product.description,
+      productType: product.productType,
+      unitType: product.unitType,
       price: String(product.price),
+      purchasePrice: product.purchasePrice ? String(product.purchasePrice) : "",
       compareAtPrice: product.compareAtPrice ? String(product.compareAtPrice) : "",
       stock: String(product.stock),
+      vatRate: String(product.vatRate),
+      stockTrackingEnabled: product.stockTrackingEnabled,
+      preferredSalesWarehouseId: product.preferredSalesWarehouseId ?? "",
+      preferredPurchaseWarehouseId: product.preferredPurchaseWarehouseId ?? "",
       imageUrl: product.imageUrl,
       imageUrls: (product.imageUrls ?? []).slice(0, MAX_PRODUCT_IMAGES - 1),
       categoryId: product.categoryId ?? "",
@@ -660,6 +739,7 @@ export function ProductManager({
                   <div>
                     <h3 className="font-medium text-neutral-950">{product.name}</h3>
                     <p className="mt-1 text-sm text-neutral-500">{product.slug} • {product.sku}</p>
+                    <p className="mt-1 text-xs text-neutral-500">{labels.barcode}: {product.barcode ?? labels.notSpecified}</p>
                     <p className="mt-2 line-clamp-2 text-sm text-neutral-500 lg:hidden">{product.description}</p>
                   </div>
                   <p className="text-sm text-neutral-600">{product.categoryName ?? labels.notSpecified}</p>
@@ -739,8 +819,44 @@ export function ProductManager({
                 <Input value={activeForm.sku} onChange={(event) => patchActiveField("sku", event.target.value)} required />
               </div>
               <div className="grid gap-2">
+                <Label>{labels.barcode}</Label>
+                <Input value={activeForm.barcode} onChange={(event) => patchActiveField("barcode", event.target.value)} />
+              </div>
+              <div className="grid gap-2">
                 <Label>{labels.name}</Label>
                 <Input value={activeForm.name} onChange={(event) => patchActiveField("name", event.target.value)} required />
+              </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label>{labels.productType}</Label>
+                  <Select value={activeForm.productType} onValueChange={(value) => patchActiveField("productType", value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRODUCT_TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {locale === "tr" ? option.tr : option.en}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>{labels.unitType}</Label>
+                  <Select value={activeForm.unitType} onValueChange={(value) => patchActiveField("unitType", value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UNIT_TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {locale === "tr" ? option.tr : option.en}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label>{labels.description}</Label>
@@ -801,14 +917,32 @@ export function ProductManager({
                   <Input type="number" min="0" step="0.01" value={activeForm.price} onChange={(event) => patchActiveField("price", event.target.value)} required />
                 </div>
                 <div className="grid gap-2">
+                  <Label>{labels.purchasePrice}</Label>
+                  <Input type="number" min="0" step="0.01" value={activeForm.purchasePrice} onChange={(event) => patchActiveField("purchasePrice", event.target.value)} />
+                </div>
+              </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="grid gap-2">
                   <Label>{labels.compareAtPrice}</Label>
                   <Input type="number" min="0" step="0.01" value={activeForm.compareAtPrice} onChange={(event) => patchActiveField("compareAtPrice", event.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>{labels.vatRate}</Label>
+                  <Input type="number" min="0" max="100" step="1" value={activeForm.vatRate} onChange={(event) => patchActiveField("vatRate", event.target.value)} required />
                 </div>
               </div>
               <div className="grid gap-2 md:grid-cols-2">
                 <div className="grid gap-2">
                   <Label>{labels.stock}</Label>
-                  <Input type="number" min="0" step="1" value={activeForm.stock} onChange={(event) => patchActiveField("stock", event.target.value)} required />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={activeForm.stock}
+                    onChange={(event) => patchActiveField("stock", event.target.value)}
+                    required={isStockManaged}
+                    disabled={!isStockManaged}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>{labels.category}</Label>
@@ -827,6 +961,56 @@ export function ProductManager({
                   </Select>
                 </div>
               </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label>{labels.preferredPurchaseWarehouse}</Label>
+                  <Select
+                    value={activeForm.preferredPurchaseWarehouseId || NONE_VALUE}
+                    onValueChange={(value) => patchActiveField("preferredPurchaseWarehouseId", value === NONE_VALUE ? "" : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={labels.notSpecified} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE_VALUE}>{labels.notSpecified}</SelectItem>
+                      {warehouses.filter((warehouse) => warehouse.isActive).map((warehouse) => (
+                        <SelectItem key={warehouse.id} value={warehouse.id}>
+                          {warehouse.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>{labels.preferredSalesWarehouse}</Label>
+                  <Select
+                    value={activeForm.preferredSalesWarehouseId || NONE_VALUE}
+                    onValueChange={(value) => patchActiveField("preferredSalesWarehouseId", value === NONE_VALUE ? "" : value)}
+                    disabled={!isStockManaged}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={labels.notSpecified} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE_VALUE}>{labels.notSpecified}</SelectItem>
+                      {warehouses.filter((warehouse) => warehouse.isActive).map((warehouse) => (
+                        <SelectItem key={warehouse.id} value={warehouse.id}>
+                          {warehouse.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700">
+                <input
+                  type="checkbox"
+                  checked={activeForm.productType === "SERVICE" ? false : activeForm.stockTrackingEnabled}
+                  onChange={(event) => patchActiveForm((prev) => ({ ...prev, stockTrackingEnabled: event.target.checked }))}
+                  disabled={activeForm.productType === "SERVICE"}
+                />
+                {labels.stockTrackingEnabled}
+              </label>
               <div className="grid gap-2">
                 <p className="text-xs text-neutral-500">{locale === "tr" ? `Toplam görsel adedi: ${getGalleryImages(activeForm).length}/${MAX_PRODUCT_IMAGES}` : `Total image count: ${getGalleryImages(activeForm).length}/${MAX_PRODUCT_IMAGES}`}</p>
                 <div className="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 md:grid-cols-[1fr_auto] md:items-end">

@@ -124,6 +124,21 @@ export class CatalogRepository {
       where: buildWhere(args),
       include: {
         category: true,
+        inventoryItem: {
+          select: {
+            inventoryLevels: {
+              where: {
+                warehouse: {
+                  isActive: true,
+                },
+              },
+              select: {
+                onHand: true,
+                reserved: true,
+              },
+            },
+          },
+        },
       },
       orderBy: resolveOrderBy(args.sort),
       skip: args.skip,
@@ -145,6 +160,21 @@ export class CatalogRepository {
       },
       include: {
         category: true,
+        inventoryItem: {
+          select: {
+            inventoryLevels: {
+              where: {
+                warehouse: {
+                  isActive: true,
+                },
+              },
+              select: {
+                onHand: true,
+                reserved: true,
+              },
+            },
+          },
+        },
       },
     });
   }

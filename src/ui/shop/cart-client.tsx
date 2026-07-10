@@ -51,7 +51,10 @@ type QuoteResult = {
 	allInStock: boolean;
 };
 
-const CART_KEY = "arventa:cart";
+const CART_KEY = "2bem:cart";
+const LEGACY_CART_KEY = "arventa:cart";
+const CART_UPDATED_EVENT = "2bem:cart-updated";
+const LEGACY_CART_UPDATED_EVENT = "arventa:cart-updated";
 
 function readCart(): CartLine[] {
 	if (typeof window === "undefined") {
@@ -59,7 +62,7 @@ function readCart(): CartLine[] {
 	}
 
 	try {
-		const raw = window.localStorage.getItem(CART_KEY);
+		const raw = window.localStorage.getItem(CART_KEY) ?? window.localStorage.getItem(LEGACY_CART_KEY);
 		if (!raw) {
 			return [];
 		}
@@ -77,7 +80,8 @@ function readCart(): CartLine[] {
 
 function writeCart(lines: CartLine[]) {
 	window.localStorage.setItem(CART_KEY, JSON.stringify(lines));
-	window.dispatchEvent(new Event("arventa:cart-updated"));
+	window.dispatchEvent(new Event(CART_UPDATED_EVENT));
+	window.dispatchEvent(new Event(LEGACY_CART_UPDATED_EVENT));
 }
 
 function formatMoney(amount: number, currency: string, locale: string) {

@@ -10,7 +10,10 @@ import styles from "@/ui/shop/surface.module.css";
 import type { Locale } from "@/lib/i18n";
 import type { ProductCard } from "@/modules/catalog/contracts/catalog.contract";
 
-const FAVORITES_KEY = "arventa:favorites";
+const FAVORITES_KEY = "2bem:favorites";
+const LEGACY_FAVORITES_KEY = "arventa:favorites";
+const FAVORITES_UPDATED_EVENT = "2bem:favorites-updated";
+const LEGACY_FAVORITES_UPDATED_EVENT = "arventa:favorites-updated";
 
 function readFavorites(): string[] {
   if (typeof window === "undefined") {
@@ -18,7 +21,7 @@ function readFavorites(): string[] {
   }
 
   try {
-    const raw = window.localStorage.getItem(FAVORITES_KEY);
+    const raw = window.localStorage.getItem(FAVORITES_KEY) ?? window.localStorage.getItem(LEGACY_FAVORITES_KEY);
     if (!raw) {
       return [];
     }
@@ -52,11 +55,13 @@ export function FavoritesClient({ locale, products, labels }: FavoritesClientPro
     sync();
 
     window.addEventListener("storage", sync);
-    window.addEventListener("arventa:favorites-updated", sync);
+    window.addEventListener(FAVORITES_UPDATED_EVENT, sync);
+    window.addEventListener(LEGACY_FAVORITES_UPDATED_EVENT, sync);
 
     return () => {
       window.removeEventListener("storage", sync);
-      window.removeEventListener("arventa:favorites-updated", sync);
+      window.removeEventListener(FAVORITES_UPDATED_EVENT, sync);
+      window.removeEventListener(LEGACY_FAVORITES_UPDATED_EVENT, sync);
     };
   }, []);
 

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-import { AUTH_COOKIE_NAME, AUTH_TOKEN_TTL_SECONDS } from "@/lib/auth";
+import { AUTH_COOKIE_NAME, AUTH_TOKEN_REMEMBER_ME_TTL_SECONDS, AUTH_TOKEN_TTL_SECONDS } from "@/lib/auth";
 import { identityService } from "@/modules/identity/services/identity.service";
 
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
     const result = await identityService.register(payload);
+    const maxAge = payload?.rememberMe ? AUTH_TOKEN_REMEMBER_ME_TTL_SECONDS : AUTH_TOKEN_TTL_SECONDS;
 
     const response = NextResponse.json({ user: result.user }, { status: 201 });
     response.cookies.set({
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: AUTH_TOKEN_TTL_SECONDS,
+      maxAge,
     });
 
     return response;

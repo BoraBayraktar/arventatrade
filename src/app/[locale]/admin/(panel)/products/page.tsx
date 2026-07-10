@@ -4,6 +4,7 @@ import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { catalogService } from "@/modules/catalog/services/catalog.service";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { inventoryService } from "@/modules/inventory/services/inventory.service";
 import { ProductManager } from "@/ui/admin/product-manager";
 
 export default async function AdminProductsPage({
@@ -31,7 +32,7 @@ export default async function AdminProductsPage({
   }
 
   const query = await searchParams;
-  const [productResult, categories] = await Promise.all([
+  const [productResult, categories, warehouses] = await Promise.all([
     catalogAdminService.listProducts({
       search: query.search,
       categoryId: query.categoryId,
@@ -39,6 +40,7 @@ export default async function AdminProductsPage({
       pageSize: 10,
     }),
     catalogService.listCategories(),
+    inventoryService.listWarehouses(),
   ]);
 
   return (
@@ -51,6 +53,7 @@ export default async function AdminProductsPage({
         categoryId: query.categoryId ?? "",
       }}
       categories={categories}
+      warehouses={warehouses}
       canDelete={user.role === "ADMIN"}
       labels={{
         title: dictionary.admin.productManager,
@@ -63,11 +66,19 @@ export default async function AdminProductsPage({
         next: dictionary.admin.next,
         slug: dictionary.admin.slug,
         sku: dictionary.admin.sku,
+        barcode: dictionary.admin.barcode,
         name: dictionary.admin.name,
         description: dictionary.admin.description,
+        productType: dictionary.admin.productType,
+        unitType: dictionary.admin.unitType,
         price: dictionary.catalog.price,
+        purchasePrice: dictionary.admin.purchasePrice,
         compareAtPrice: dictionary.admin.compareAtPrice,
         stock: dictionary.admin.stock,
+        vatRate: dictionary.admin.vatRate,
+        stockTrackingEnabled: dictionary.admin.stockTrackingEnabled,
+        preferredSalesWarehouse: dictionary.admin.preferredSalesWarehouse,
+        preferredPurchaseWarehouse: dictionary.admin.preferredPurchaseWarehouse,
         imageUrl: dictionary.admin.imageUrl,
         additionalImageUrls: dictionary.admin.additionalImageUrls,
         additionalImageUrlsHint: dictionary.admin.additionalImageUrlsHint,

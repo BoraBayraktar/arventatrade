@@ -43,6 +43,7 @@ export type DispatchIntegrationJobsInput = {
   entityIds: string[];
   maxAttempts?: number;
   payload?: Record<string, string | number | boolean | null>;
+  idempotencySuffix?: string;
 };
 
 export type DispatchIntegrationJobsResult = {
@@ -83,4 +84,13 @@ export type IntegrationDeadLetterListResult = {
 export type RetryDeadLetterInput = {
   jobId: string;
   resolvedByUserId: string;
+};
+
+export type StockSyncDashboardResult = {
+  pendingCount: number;
+  processingCount: number;
+  failedCount: number;
+  deadLetterCount: number;
+  successCount: number;
+  recentJobs: AdminIntegrationJobItem[];
 };

@@ -15,6 +15,7 @@ import {
   Store,
   UserRound,
   Users,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,7 +35,7 @@ const adminMenuIcons: Array<{ route: string; icon: LucideIcon }> = [
   { route: "/admin/categories", icon: FolderTree },
   { route: "/admin/storefront", icon: LayoutGrid },
   { route: "/admin/orders", icon: ReceiptText },
-  { route: "/admin/integrations", icon: Boxes },
+  { route: "/admin/integrations", icon: Workflow },
   { route: "/admin/customers", icon: Users },
   { route: "/admin/users", icon: UserRound },
   { route: "/admin/audit-logs", icon: ShieldCheck },
@@ -112,13 +113,16 @@ export function AdminPanelShell({
   }
 
   useEffect(() => {
-    void loadNotifications();
+    const initialTimer = window.setTimeout(() => {
+      void loadNotifications();
+    }, 0);
 
     const interval = window.setInterval(() => {
       void loadNotifications();
     }, 30000);
 
     return () => {
+      window.clearTimeout(initialTimer);
       window.clearInterval(interval);
     };
   }, []);
@@ -137,7 +141,13 @@ export function AdminPanelShell({
   }, []);
 
   useEffect(() => {
-    setNotificationsOpen(false);
+    const timer = window.setTimeout(() => {
+      setNotificationsOpen(false);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [pathname]);
 
   async function markNotificationAsRead(notificationId: string) {

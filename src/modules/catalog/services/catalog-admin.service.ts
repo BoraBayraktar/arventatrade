@@ -44,12 +44,20 @@ const adminListQuerySchema = z.object({
 const createProductSchema = z.object({
   slug: z.string().trim().min(3),
   sku: z.string().trim().min(3).max(64),
+  barcode: z.string().trim().min(3).max(64).optional().nullable(),
   name: z.string().trim().min(2),
   description: z.string().trim().min(3),
+  productType: z.enum(["PHYSICAL", "SERVICE", "RAW_MATERIAL", "SEMI_FINISHED"]).default("PHYSICAL"),
+  unitType: z.enum(["PIECE", "KILOGRAM", "GRAM", "LITER", "MILLILITER", "METER", "CENTIMETER", "BOX", "PACK"]).default("PIECE"),
   price: z.coerce.number().positive(),
+  purchasePrice: z.coerce.number().nonnegative().optional().nullable(),
   compareAtPrice: z.coerce.number().positive().optional().nullable(),
   stock: z.coerce.number().int().min(0),
   currency: z.string().trim().min(3).max(3).optional(),
+  vatRate: z.coerce.number().int().min(0).max(100).default(20),
+  stockTrackingEnabled: z.boolean().default(true),
+  preferredSalesWarehouseId: z.string().trim().min(1).optional().nullable(),
+  preferredPurchaseWarehouseId: z.string().trim().min(1).optional().nullable(),
   imageUrl: z.string().trim().url(),
   imageUrls: z.array(z.string().trim().url()).max(20).optional().default([]),
   features: z.array(productFeatureSchema).max(50).optional().default([]),
@@ -63,12 +71,20 @@ const updateProductSchema = z.object({
   id: z.string().trim().min(1),
   slug: z.string().trim().min(3).optional(),
   sku: z.string().trim().min(3).max(64).optional(),
+  barcode: z.string().trim().min(3).max(64).optional().nullable(),
   name: z.string().trim().min(2).optional(),
   description: z.string().trim().min(3).optional(),
+  productType: z.enum(["PHYSICAL", "SERVICE", "RAW_MATERIAL", "SEMI_FINISHED"]).optional(),
+  unitType: z.enum(["PIECE", "KILOGRAM", "GRAM", "LITER", "MILLILITER", "METER", "CENTIMETER", "BOX", "PACK"]).optional(),
   price: z.coerce.number().positive().optional(),
+  purchasePrice: z.coerce.number().nonnegative().optional().nullable(),
   compareAtPrice: z.coerce.number().positive().optional().nullable(),
   stock: z.coerce.number().int().min(0).optional(),
   currency: z.string().trim().min(3).max(3).optional(),
+  vatRate: z.coerce.number().int().min(0).max(100).optional(),
+  stockTrackingEnabled: z.boolean().optional(),
+  preferredSalesWarehouseId: z.string().trim().min(1).optional().nullable(),
+  preferredPurchaseWarehouseId: z.string().trim().min(1).optional().nullable(),
   imageUrl: z.string().trim().url().optional(),
   imageUrls: z.array(z.string().trim().url()).max(20).optional(),
   features: z.array(productFeatureSchema).max(50).optional(),
@@ -143,16 +159,30 @@ function mapProduct(product: {
   id: string;
   slug: string;
   sku: string;
+  barcode: string | null;
   name: string;
   description: string;
+  productType: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  unitType: "PIECE" | "KILOGRAM" | "GRAM" | "LITER" | "MILLILITER" | "METER" | "CENTIMETER" | "BOX" | "PACK";
   price: { toNumber: () => number };
+  purchasePrice: { toNumber: () => number } | null;
   compareAtPrice: { toNumber: () => number } | null;
   stock: number;
   currency: string;
+  vatRate: number;
+  stockTrackingEnabled: boolean;
+  preferredSalesWarehouseId: string | null;
+  preferredPurchaseWarehouseId: string | null;
   imageUrl: string;
   imageUrls: string[];
   categoryId: string | null;
   category: { name: string } | null;
+  inventoryItem?: {
+    inventoryLevels: Array<{
+      onHand: number;
+      reserved: number;
+    }>;
+  } | null;
 }): AdminProductListItem {
   const { cleanDescription, features } = decodeProductDescriptionWithFeatures(product.description);
   const price = product.price.toNumber();
@@ -160,19 +190,31 @@ function mapProduct(product: {
   const discountRate = compareAtPrice && compareAtPrice > price
     ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
     : null;
+  const inventoryLevels = product.inventoryItem?.inventoryLevels ?? [];
+  const aggregateStock = inventoryLevels.length > 0
+    ? inventoryLevels.reduce((sum, level) => sum + Math.max(0, level.onHand - level.reserved), 0)
+    : product.stock;
 
   return {
     id: product.id,
     slug: product.slug,
     sku: product.sku,
+    barcode: product.barcode,
     name: product.name,
     description: cleanDescription,
+    productType: product.productType,
+    unitType: product.unitType,
     price,
+    purchasePrice: product.purchasePrice?.toNumber() ?? null,
     compareAtPrice,
     discountRate,
-    stock: product.stock,
-    inStock: product.stock > 0,
+    stock: aggregateStock,
+    inStock: aggregateStock > 0,
     currency: product.currency,
+    vatRate: product.vatRate,
+    stockTrackingEnabled: product.stockTrackingEnabled,
+    preferredSalesWarehouseId: product.preferredSalesWarehouseId,
+    preferredPurchaseWarehouseId: product.preferredPurchaseWarehouseId,
     imageUrl: product.imageUrl,
     imageUrls: product.imageUrls ?? [],
     features,
@@ -353,10 +395,18 @@ export class CatalogAdminService {
       description: encodeProductDescriptionWithFeatures(parsed.description, sanitizeFeatures(parsed.features ?? [])),
       slug: parsed.slug,
       sku: parsed.sku,
+      barcode: parsed.barcode ?? null,
       name: parsed.name,
+      productType: parsed.productType,
+      unitType: parsed.unitType,
       price: parsed.price,
+      purchasePrice: parsed.purchasePrice,
       compareAtPrice: parsed.compareAtPrice,
       currency: parsed.currency,
+      vatRate: parsed.vatRate,
+      stockTrackingEnabled: parsed.stockTrackingEnabled,
+      preferredSalesWarehouseId: parsed.preferredSalesWarehouseId,
+      preferredPurchaseWarehouseId: parsed.preferredPurchaseWarehouseId,
       imageUrl: parsed.imageUrl,
       imageUrls: parsed.imageUrls,
       categoryId: parsed.categoryId,
@@ -417,10 +467,18 @@ export class CatalogAdminService {
       id: parsed.id,
       slug: parsed.slug,
       sku: parsed.sku,
+      barcode: parsed.barcode,
       name: parsed.name,
+      productType: parsed.productType,
+      unitType: parsed.unitType,
       price: parsed.price,
+      purchasePrice: parsed.purchasePrice,
       compareAtPrice: parsed.compareAtPrice,
       currency: parsed.currency,
+      vatRate: parsed.vatRate,
+      stockTrackingEnabled: parsed.stockTrackingEnabled,
+      preferredSalesWarehouseId: parsed.preferredSalesWarehouseId,
+      preferredPurchaseWarehouseId: parsed.preferredPurchaseWarehouseId,
       imageUrl: parsed.imageUrl,
       imageUrls: parsed.imageUrls,
       categoryId: parsed.categoryId,
@@ -434,7 +492,15 @@ export class CatalogAdminService {
         : {}),
     };
 
-    const updated = await this.repository.updateProduct(payload);
+    const normalizedProductType = parsed.productType ?? existingProduct?.productType;
+    const normalizedStockTracking = normalizedProductType === "SERVICE"
+      ? false
+      : (parsed.stockTrackingEnabled ?? undefined);
+
+    const updated = await this.repository.updateProduct({
+      ...payload,
+      stockTrackingEnabled: normalizedStockTracking,
+    });
 
     if (parsed.stock !== undefined || parsed.sku !== undefined) {
       await inventoryService.syncProductInventoryState({

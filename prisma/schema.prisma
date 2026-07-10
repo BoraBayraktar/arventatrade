@@ -31,11 +31,19 @@ model Product {
   slug            String              @unique
   name            String
   description     String
+  barcode         String?
+  unitType        ProductUnitType     @default(PIECE)
+  productType     ProductType         @default(PHYSICAL)
   price           Decimal             @db.Decimal(10, 2)
+  purchasePrice   Decimal?            @db.Decimal(10, 2)
   currency        String              @default("TRY")
+  vatRate         Int                 @default(20)
+  stockTrackingEnabled Boolean        @default(true)
   imageUrl        String
   imageUrls       String[]            @default([])
   categoryId      String?
+  preferredSalesWarehouseId String?
+  preferredPurchaseWarehouseId String?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   deleted         Boolean             @default(false)
@@ -48,12 +56,17 @@ model Product {
   category        Category?           @relation(fields: [categoryId], references: [id])
   inventoryItem   InventoryItem?
   interaction     ProductInteraction?
+  preferredSalesWarehouse Warehouse?  @relation("PreferredSalesWarehouseProducts", fields: [preferredSalesWarehouseId], references: [id])
+  preferredPurchaseWarehouse Warehouse? @relation("PreferredPurchaseWarehouseProducts", fields: [preferredPurchaseWarehouseId], references: [id])
   reviews         ProductReview[]
   questions       ProductQuestion[]
   storefrontItems StorefrontItem[]
 
   @@index([categoryId])
+  @@index([barcode])
   @@index([deleted])
+  @@index([preferredSalesWarehouseId])
+  @@index([preferredPurchaseWarehouseId])
   @@index([stock])
 }
 
@@ -229,15 +242,28 @@ model Warehouse {
   id                 String              @id @default(cuid())
   code               String              @unique
   name               String
+  description        String?
+  address            String?
+  contactName        String?
+  contactPhone       String?
+  priority           Int                 @default(100)
   isActive           Boolean             @default(true)
   isDefault          Boolean             @default(false)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   inventoryLevels    InventoryLevel[]
+  inventoryAlerts    InventoryAlert[]
+  incomingInventoryTransactions InventoryTransactionLine[] @relation("InventoryTransactionLineToWarehouse")
   inventoryMovements InventoryMovement[]
+  outgoingInventoryTransactions InventoryTransactionLine[] @relation("InventoryTransactionLineFromWarehouse")
+  stockCounts        StockCount[]
+  stockCountLines    StockCountLine[]
+  preferredPurchaseProducts Product[]    @relation("PreferredPurchaseWarehouseProducts")
+  preferredSalesProducts Product[]       @relation("PreferredSalesWarehouseProducts")
   stockReservations  StockReservation[]
 
   @@index([isActive, isDefault])
+  @@index([priority])
 }
 
 model InventoryItem {
@@ -246,9 +272,12 @@ model InventoryItem {
   skuSnapshot        String
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+  inventoryAlerts    InventoryAlert[]
+  inventoryTransactionLines InventoryTransactionLine[]
   product            Product             @relation(fields: [productId], references: [id])
   inventoryLevels    InventoryLevel[]
   inventoryMovements InventoryMovement[]
+  stockCountLines    StockCountLine[]
   stockReservations  StockReservation[]
 
   @@index([productId])
@@ -300,21 +329,116 @@ model InventoryMovement {
   warehouseId     String
   orderId         String?
   reservationId   String?
+  transactionId   String?
   type            InventoryMovementType
   quantity        Int
   note            String?
   metadata        Json?
   createdAt       DateTime              @default(now())
+  createdAlerts   InventoryAlert[]      @relation("InventoryAlertCreatedMovement")
+  resolvedAlerts  InventoryAlert[]      @relation("InventoryAlertResolvedMovement")
   inventoryItem   InventoryItem         @relation(fields: [inventoryItemId], references: [id])
+  transaction     InventoryTransaction? @relation(fields: [transactionId], references: [id])
   warehouse       Warehouse             @relation(fields: [warehouseId], references: [id])
   order           Order?                @relation(fields: [orderId], references: [id])
   reservation     StockReservation?     @relation(fields: [reservationId], references: [id])
 
   @@index([inventoryItemId, createdAt])
+  @@index([transactionId])
   @@index([warehouseId, createdAt])
   @@index([orderId])
   @@index([reservationId])
   @@index([type, createdAt])
+}
+
+model StockCount {
+  id             String            @id @default(cuid())
+  countNumber    String            @unique
+  warehouseId    String?
+  status         StockCountStatus  @default(DRAFT)
+  countedAt      DateTime
+  note           String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  warehouse      Warehouse?        @relation(fields: [warehouseId], references: [id])
+  lines          StockCountLine[]
+
+  @@index([status, countedAt])
+  @@index([warehouseId])
+}
+
+model StockCountLine {
+  id               String      @id @default(cuid())
+  stockCountId     String
+  inventoryItemId  String
+  warehouseId      String
+  systemOnHand     Int
+  countedOnHand    Int?
+  note             String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  stockCount       StockCount  @relation(fields: [stockCountId], references: [id])
+  inventoryItem    InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  warehouse        Warehouse   @relation(fields: [warehouseId], references: [id])
+
+  @@unique([stockCountId, inventoryItemId, warehouseId])
+  @@index([warehouseId])
+  @@index([inventoryItemId])
+}
+
+model InventoryAlert {
+  id                 String                @id @default(cuid())
+  inventoryItemId    String
+  warehouseId        String
+  type               InventoryAlertType
+  status             InventoryAlertStatus  @default(ACTIVE)
+  message            String
+  createdMovementId  String?
+  resolvedMovementId String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  inventoryItem      InventoryItem         @relation(fields: [inventoryItemId], references: [id])
+  warehouse          Warehouse             @relation(fields: [warehouseId], references: [id])
+  createdMovement    InventoryMovement?    @relation("InventoryAlertCreatedMovement", fields: [createdMovementId], references: [id])
+  resolvedMovement   InventoryMovement?    @relation("InventoryAlertResolvedMovement", fields: [resolvedMovementId], references: [id])
+
+  @@index([status, type, createdAt])
+  @@index([warehouseId])
+  @@index([inventoryItemId])
+}
+
+model InventoryTransaction {
+  id                String                     @id @default(cuid())
+  transactionNumber String                     @unique
+  type              InventoryTransactionType
+  reference         String?
+  note              String?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  lines             InventoryTransactionLine[]
+  movements         InventoryMovement[]
+
+  @@index([type, createdAt])
+}
+
+model InventoryTransactionLine {
+  id                   String               @id @default(cuid())
+  transactionId        String
+  inventoryItemId      String
+  fromWarehouseId      String?
+  toWarehouseId        String?
+  quantity             Int
+  note                 String?
+  createdAt            DateTime             @default(now())
+  inventoryItem        InventoryItem        @relation(fields: [inventoryItemId], references: [id])
+  inventoryTransaction InventoryTransaction @relation(fields: [transactionId], references: [id])
+  fromWarehouse        Warehouse?           @relation("InventoryTransactionLineFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse          Warehouse?           @relation("InventoryTransactionLineToWarehouse", fields: [toWarehouseId], references: [id])
+
+  @@index([transactionId])
+  @@index([inventoryItemId])
+  @@index([fromWarehouseId])
+  @@index([toWarehouseId])
 }
 
 model IntegrationSyncJob {
@@ -488,12 +612,58 @@ enum InventoryMovementType {
   INITIAL_LOAD
   MANUAL_ADJUSTMENT
   PURCHASE_RECEIPT
+  COUNT_ADJUSTMENT
+  TRANSFER_OUT
+  TRANSFER_IN
   RESERVATION_HOLD
   RESERVATION_RELEASE
   ORDER_COMMIT
   ORDER_CANCEL_RESTOCK
   RETURN_RESTOCK
   DAMAGE_WRITE_OFF
+}
+
+enum InventoryTransactionType {
+  MANUAL_ADJUSTMENT
+  STOCK_IN
+  STOCK_OUT
+  TRANSFER
+  STOCK_COUNT
+}
+
+enum StockCountStatus {
+  DRAFT
+  COUNTED
+  APPLIED
+}
+
+enum InventoryAlertType {
+  LOW_STOCK
+  OUT_OF_STOCK
+}
+
+enum InventoryAlertStatus {
+  ACTIVE
+  RESOLVED
+}
+
+enum ProductType {
+  PHYSICAL
+  SERVICE
+  RAW_MATERIAL
+  SEMI_FINISHED
+}
+
+enum ProductUnitType {
+  PIECE
+  KILOGRAM
+  GRAM
+  LITER
+  MILLILITER
+  METER
+  CENTIMETER
+  BOX
+  PACK
 }
 
 enum StockReservationStatus {
@@ -539,6 +709,8 @@ enum PaymentStatusChangeSource {
 
 enum UserNotificationType {
   PRODUCT_QUESTION_CREATED
+  INVENTORY_ALERT_CREATED
+  STOCK_COUNT_APPLIED
 }
 
 enum UserNotificationChannel {

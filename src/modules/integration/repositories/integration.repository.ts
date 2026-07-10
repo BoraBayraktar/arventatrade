@@ -12,8 +12,9 @@ function buildIdempotencyKey(args: {
   jobType: string;
   entityType: string;
   entityId: string;
+  suffix?: string;
 }) {
-  return `${args.channel}:${args.jobType}:${args.entityType}:${args.entityId}`;
+  return `${args.channel}:${args.jobType}:${args.entityType}:${args.entityId}${args.suffix ? `:${args.suffix}` : ""}`;
 }
 
 function toJsonInput(value: Prisma.JsonValue | null | undefined) {
@@ -61,6 +62,7 @@ export class IntegrationRepository {
         jobType: input.jobType,
         entityType: input.entityType,
         entityId,
+        suffix: input.idempotencySuffix,
       });
 
       const existing = await prisma.integrationSyncJob.findUnique({
@@ -280,5 +282,33 @@ export class IntegrationRepository {
         payload: cleanedPayload,
       },
     });
+  }
+
+  async listRecentStockSyncJobs(limit: number) {
+    return prisma.integrationSyncJob.findMany({
+      where: {
+        deleted: false,
+        jobType: "STOCK_SYNC",
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: limit,
+    });
+  }
+
+  async countStockSyncJobsByStatus() {
+    const grouped = await prisma.integrationSyncJob.groupBy({
+      by: ["status"],
+      where: {
+        deleted: false,
+        jobType: "STOCK_SYNC",
+      },
+      _count: {
+        _all: true,
+      },
+    });
+
+    return Object.fromEntries(grouped.map((item) => [item.status, item._count._all])) as Record<string, number>;
   }
 }

@@ -8,10 +8,12 @@
 
 .loginShell {
   min-height: 100vh;
-  padding: 1rem;
+  max-width: 1536px;
+  margin: 0 auto;
+  padding: 0.5rem;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1rem;
+  gap: 0.75rem;
   align-items: stretch;
   background:
     radial-gradient(1200px 420px at 85% -10%, rgba(90, 90, 255, 0.14), transparent 55%),
@@ -23,7 +25,7 @@
   display: grid;
   align-items: center;
   justify-items: center;
-  min-height: 58vh;
+  min-height: 52vh;
 }
 
 .loginCard {
@@ -45,13 +47,13 @@
 }
 
 .loginVisualPane {
-  min-height: 300px;
+  min-height: 240px;
 }
 
 .loginVisualFrame {
   position: relative;
   height: 100%;
-  min-height: 280px;
+  min-height: 240px;
   overflow: hidden;
   border-radius: 1.1rem;
   border: 1px solid var(--border);
@@ -68,9 +70,9 @@
 
 .loginVisualTitle {
   position: absolute;
-  top: 1.25rem;
-  left: 1.25rem;
-  right: 1.25rem;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
   z-index: 2;
 }
 
@@ -118,43 +120,43 @@
 }
 
 .slideCardTop {
-  top: 29%;
+  top: 32%;
   left: 9%;
   width: 56%;
-  height: 36%;
+  height: 30%;
   background: linear-gradient(140deg, rgba(118, 112, 255, 0.9), rgba(70, 65, 207, 0.95));
 }
 
 .slideCardBottom {
-  bottom: 11%;
+  bottom: 13%;
   right: 8%;
   width: 48%;
-  height: 31%;
+  height: 24%;
   background: linear-gradient(140deg, rgba(255, 255, 255, 0.96), rgba(236, 239, 255, 0.96));
 }
 
 .slideCardAlt {
-  top: 22%;
+  top: 24%;
   right: 10%;
   width: 50%;
-  height: 40%;
+  height: 34%;
   background: linear-gradient(140deg, rgba(84, 77, 238, 0.9), rgba(45, 40, 176, 0.94));
 }
 
 .slideCardSoft {
-  bottom: 14%;
+  bottom: 16%;
   left: 8%;
   width: 54%;
-  height: 29%;
+  height: 22%;
   background: linear-gradient(140deg, rgba(255, 255, 255, 0.95), rgba(240, 243, 255, 0.94));
 }
 
 .slidePill {
   position: absolute;
   right: 16%;
-  top: 18%;
-  width: 122px;
-  height: 20px;
+  top: 19%;
+  width: 110px;
+  height: 16px;
   border-radius: 999px;
   background: rgba(38, 42, 102, 0.12);
 }
@@ -162,9 +164,9 @@
 .slidePillAlt {
   position: absolute;
   left: 16%;
-  bottom: 16%;
-  width: 136px;
-  height: 20px;
+  bottom: 18%;
+  width: 124px;
+  height: 16px;
   border-radius: 999px;
   background: rgba(38, 42, 102, 0.12);
 }
@@ -248,6 +250,172 @@
   font-weight: 600;
 }
 
+.authPanel {
+  width: min(100%, 560px);
+  border: 1px solid rgba(27, 43, 63, 0.1);
+  border-radius: 1.75rem;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 1.25rem;
+  box-shadow: 0 24px 64px rgba(16, 29, 48, 0.12);
+  backdrop-filter: blur(12px);
+}
+
+.authPanelTop {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+}
+
+.authPanelBadge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  background: #edf4ff;
+  color: #27466b;
+  padding: 0.48rem 0.78rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.authPanelForm {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.authSocialStack {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.authSocialDivider {
+  margin: 0;
+  color: #687b92;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.authSocialGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.authSocialButton {
+  display: grid;
+  justify-items: start;
+  gap: 0.22rem;
+  border: 1px solid #d6e1f3;
+  border-radius: 1rem;
+  background: #f8fbff;
+  padding: 0.85rem 0.9rem;
+  color: #27466b;
+  text-align: left;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.authSocialButton small {
+  color: #6f8198;
+  font-size: 0.72rem;
+}
+
+.authField {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.authCheckboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #526a85;
+  font-size: 0.92rem;
+}
+
+.authCheckboxLabel input {
+  height: 1rem;
+  width: 1rem;
+}
+
+.authFieldHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.authInlineLink {
+  color: #24599f;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.authInlineLink:hover {
+  text-decoration: underline;
+}
+
+.authInputWrap {
+  position: relative;
+}
+
+.authInputIcon {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  z-index: 1;
+  height: 1rem;
+  width: 1rem;
+  transform: translateY(-50%);
+  color: #627b97;
+}
+
+.authInput,
+.authInputWithButton {
+  min-height: 3.2rem;
+  border-radius: 1rem;
+  border-color: #d6e1f3;
+  background: rgba(255, 255, 255, 0.96);
+  padding-left: 2.7rem;
+}
+
+.authInputWithButton {
+  padding-right: 3rem;
+}
+
+.authToggle {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  display: inline-flex;
+  height: 2.2rem;
+  width: 2.2rem;
+  transform: translateY(-50%);
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #526a85;
+  cursor: pointer;
+}
+
+.authPrimaryButton {
+  display: inline-flex;
+  min-height: 3.25rem;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 1rem;
+  background: linear-gradient(118deg, #163e6f 0%, #1f5f9c 56%, #0f7c72 100%);
+  box-shadow: 0 16px 32px rgba(24, 74, 126, 0.22);
+}
+
 .muted {
   color: #526a85;
   margin-top: 0.25rem;
@@ -319,9 +487,9 @@
 
 @media (min-width: 768px) {
   .loginShell {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 1.4rem;
-    padding: 1.5rem;
+    grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
+    gap: 0.75rem;
+    padding: 0.5rem;
   }
 
   .loginVisualPane {
@@ -329,7 +497,7 @@
   }
 
   .loginVisualFrame {
-    min-height: calc(100vh - 3rem);
+    min-height: min(760px, calc(100vh - 3rem));
   }
 
   .card {
@@ -351,10 +519,10 @@
 
 @media (min-width: 1200px) {
   .loginShell {
-    padding: 1.75rem;
+    padding: 0.5rem;
   }
 
   .loginVisualFrame {
-    min-height: calc(100vh - 3.5rem);
+    min-height: min(800px, calc(100vh - 3.5rem));
   }
 }

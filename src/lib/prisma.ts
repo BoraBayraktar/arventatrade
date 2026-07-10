@@ -16,8 +16,25 @@ function hasRequiredDelegates(client: PrismaClient | undefined): client is Prism
   }
 
   // In dev, schema/client can change while global cache still holds an older instance.
-  const delegateCheck = client as PrismaClient & { productReview?: unknown; productQuestion?: unknown };
-  return typeof delegateCheck.productReview !== "undefined" && typeof delegateCheck.productQuestion !== "undefined";
+  const delegateCheck = client as PrismaClient & {
+    productReview?: unknown;
+    productQuestion?: unknown;
+    inventoryAlert?: unknown;
+    stockCount?: unknown;
+    stockCountLine?: unknown;
+    inventoryTransaction?: unknown;
+    integrationSyncJob?: unknown;
+  };
+
+  return (
+    typeof delegateCheck.productReview !== "undefined"
+    && typeof delegateCheck.productQuestion !== "undefined"
+    && typeof delegateCheck.inventoryAlert !== "undefined"
+    && typeof delegateCheck.stockCount !== "undefined"
+    && typeof delegateCheck.stockCountLine !== "undefined"
+    && typeof delegateCheck.inventoryTransaction !== "undefined"
+    && typeof delegateCheck.integrationSyncJob !== "undefined"
+  );
 }
 
 export const prisma =

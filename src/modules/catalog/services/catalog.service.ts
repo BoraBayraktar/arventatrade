@@ -86,6 +86,12 @@ function mapProduct(product: {
   imageUrl: string;
   imageUrls: string[];
   category: { slug: string; name: string } | null;
+  inventoryItem?: {
+    inventoryLevels: Array<{
+      onHand: number;
+      reserved: number;
+    }>;
+  } | null;
 }): ProductCard {
   const { cleanDescription, features } = decodeProductDescriptionWithFeatures(product.description);
   const price = product.price.toNumber();
@@ -93,6 +99,10 @@ function mapProduct(product: {
   const discountRate = compareAtPrice && compareAtPrice > price
     ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
     : null;
+  const inventoryLevels = product.inventoryItem?.inventoryLevels ?? [];
+  const aggregateStock = inventoryLevels.length > 0
+    ? inventoryLevels.reduce((sum, level) => sum + Math.max(0, level.onHand - level.reserved), 0)
+    : product.stock;
 
   return {
     id: product.id,
@@ -103,8 +113,8 @@ function mapProduct(product: {
     price,
     compareAtPrice,
     discountRate,
-    stock: product.stock,
-    inStock: product.stock > 0,
+    stock: aggregateStock,
+    inStock: aggregateStock > 0,
     currency: product.currency,
     imageUrl: product.imageUrl,
     imageUrls: product.imageUrls ?? [],
@@ -203,6 +213,26 @@ function mapQuestion(question: {
   };
 }
 
+function productMatchesStockFilters(item: ProductCard, filters: {
+  inStockOnly: boolean;
+  outOfStockOnly: boolean;
+  lowStockOnly: boolean;
+}) {
+  if (filters.inStockOnly && item.stock <= 0) {
+    return false;
+  }
+
+  if (filters.outOfStockOnly && item.stock > 0) {
+    return false;
+  }
+
+  if (filters.lowStockOnly && !(item.stock > 0 && item.stock <= 5)) {
+    return false;
+  }
+
+  return true;
+}
+
 export class CatalogService {
   constructor(private readonly repository: CatalogRepository) {}
 
@@ -241,6 +271,7 @@ export class CatalogService {
     const parsed = productListQuerySchema.parse(query);
     const featureFilters = formatFeatureFiltersForUrl(parsed.featureFilters);
     const hasFeatureFilters = featureFilters.length > 0;
+    const hasAggregateStockFilters = parsed.inStockOnly || parsed.outOfStockOnly || parsed.lowStockOnly;
     const categoryIds = await this.resolveCategoryIds(parsed.categorySlug);
     const cacheKey = [
       "catalog:list",
@@ -269,9 +300,9 @@ export class CatalogService {
     const repositoryBaseArgs = {
       search: parsed.search,
       categoryIds,
-      inStockOnly: parsed.inStockOnly,
-      outOfStockOnly: parsed.outOfStockOnly,
-      lowStockOnly: parsed.lowStockOnly,
+      inStockOnly: hasAggregateStockFilters ? false : parsed.inStockOnly,
+      outOfStockOnly: hasAggregateStockFilters ? false : parsed.outOfStockOnly,
+      lowStockOnly: hasAggregateStockFilters ? false : parsed.lowStockOnly,
       newOnly: parsed.newOnly,
       discountedOnly: parsed.discountedOnly,
       minPrice: parsed.minPrice,
@@ -279,7 +310,7 @@ export class CatalogService {
       sort: parsed.sort,
     };
 
-    if (hasFeatureFilters) {
+    if (hasFeatureFilters || hasAggregateStockFilters) {
       const poolSize = Math.max(parsed.pageSize * 20, 240);
       const pool = await this.repository.findMany({
         ...repositoryBaseArgs,
@@ -288,7 +319,17 @@ export class CatalogService {
       });
 
       const mappedPool = pool.map(mapProduct);
-      const filteredItems = mappedPool.filter((item) => productMatchesFeatureFilters(item.features, featureFilters));
+      const filteredItems = mappedPool.filter((item) => (
+        productMatchesStockFilters(item, {
+          inStockOnly: parsed.inStockOnly,
+          outOfStockOnly: parsed.outOfStockOnly,
+          lowStockOnly: parsed.lowStockOnly,
+        })
+        && (
+          !hasFeatureFilters
+          || productMatchesFeatureFilters(item.features, featureFilters)
+        )
+      ));
       const pagedItems = filteredItems.slice(skip, skip + parsed.pageSize);
       const total = filteredItems.length;
 
@@ -298,7 +339,7 @@ export class CatalogService {
         pageSize: parsed.pageSize,
         total,
         totalPages: Math.max(1, Math.ceil(total / parsed.pageSize)),
-        featureFacets: parsed.includeFacets ? buildFeatureFacets(mappedPool) : [],
+        featureFacets: parsed.includeFacets ? buildFeatureFacets(filteredItems) : [],
       };
 
       await redisCache.set(cacheKey, result, 120);

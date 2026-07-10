@@ -6,14 +6,18 @@ import { z } from "zod";
 
 import { redisCache } from "@/lib/redis";
 import { AUTH_TOKEN_TTL_SECONDS } from "@/lib/auth";
+import { logError, logInfo } from "@/lib/observability";
 import type {
   AuthUser,
+  ForgotPasswordInput,
   IdentitySession,
   LoginInput,
   LoginResult,
   RegisterInput,
+  ResetPasswordInput,
 } from "@/modules/identity/contracts/identity.contract";
 import { IdentityRepository } from "@/modules/identity/repositories/identity.repository";
+import { NotificationEmailRepository } from "@/modules/system/repositories/notification-email.repository";
 
 const loginSchema = z.object({
   email: z.string().trim().email(),
@@ -23,6 +27,16 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   email: z.string().trim().email(),
   name: z.string().trim().min(2),
+  password: z.string().min(6),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email(),
+  locale: z.enum(["tr", "en"]).optional(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().trim().min(24),
   password: z.string().min(6),
 });
 
@@ -39,6 +53,14 @@ function getSessionCacheKey(sid: string) {
   return `identity:session:${sid}`;
 }
 
+function getPasswordResetCacheKey(token: string) {
+  return `identity:password-reset:${token}`;
+}
+
+function getPasswordResetRateLimitKey(email: string) {
+  return `identity:password-reset-rate:${email.toLowerCase()}`;
+}
+
 async function signSessionToken(user: AuthUser, sid: string) {
   return new SignJWT({ sid })
     .setProtectedHeader({ alg: "HS256" })
@@ -49,7 +71,10 @@ async function signSessionToken(user: AuthUser, sid: string) {
 }
 
 export class IdentityService {
-  constructor(private readonly repository: IdentityRepository) {}
+  constructor(
+    private readonly repository: IdentityRepository,
+    private readonly emailRepository: NotificationEmailRepository,
+  ) {}
 
   async register(input: RegisterInput): Promise<LoginResult> {
     const parsed = registerSchema.parse(input);
@@ -188,6 +213,83 @@ export class IdentityService {
       return;
     }
   }
+
+  async requestPasswordReset(input: ForgotPasswordInput) {
+    const parsed = forgotPasswordSchema.parse(input);
+    const email = parsed.email.toLowerCase();
+    const rateLimitKey = getPasswordResetRateLimitKey(email);
+    const existingRequest = await redisCache.get<string>(rateLimitKey);
+
+    if (existingRequest) {
+      return { ok: true };
+    }
+
+    const account = await this.repository.findByEmail(email);
+    await redisCache.set(rateLimitKey, "1", 60);
+
+    if (!account) {
+      return { ok: true };
+    }
+
+    const token = `${randomUUID()}${randomUUID().replace(/-/g, "")}`;
+    const locale = parsed.locale ?? "tr";
+    const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+    const resetUrl = `${appUrl}/${locale}/reset-password?token=${encodeURIComponent(token)}`;
+
+    await redisCache.set(
+      getPasswordResetCacheKey(token),
+      { userId: account.id, email: account.email },
+      60 * 30,
+    );
+
+    const subject = locale === "tr" ? "2BEM sifre sifirlama baglantisi" : "2BEM password reset link";
+    const text = locale === "tr"
+      ? `Merhaba ${account.name},\n\nSifrenizi sifirlamak icin asagidaki baglantiyi kullanin:\n${resetUrl}\n\nBu baglanti 30 dakika boyunca gecerlidir.\nEger bu islemi siz baslatmadiysaniz bu e-postayi yok sayabilirsiniz.`
+      : `Hello ${account.name},\n\nUse the link below to reset your password:\n${resetUrl}\n\nThis link is valid for 30 minutes.\nIf you did not request this, you can ignore this email.`;
+
+    try {
+      await this.emailRepository.send({
+        to: account.email,
+        subject,
+        text,
+      });
+      logInfo("Password reset email queued", {
+        scope: "identity.password-reset",
+        userId: account.id,
+      });
+    } catch (error) {
+      logError("Password reset email failed", {
+        scope: "identity.password-reset",
+        userId: account.id,
+        error: error instanceof Error ? error.message : "UNKNOWN",
+      });
+    }
+
+    return { ok: true };
+  }
+
+  async resetPassword(input: ResetPasswordInput) {
+    const parsed = resetPasswordSchema.parse(input);
+    const payload = await redisCache.get<{ userId: string; email: string }>(getPasswordResetCacheKey(parsed.token));
+
+    if (!payload?.userId) {
+      throw new Error("PASSWORD_RESET_TOKEN_INVALID");
+    }
+
+    const passwordHash = await hash(parsed.password, 10);
+    await this.repository.updatePasswordById(payload.userId, passwordHash);
+    await redisCache.del(getPasswordResetCacheKey(parsed.token));
+
+    logInfo("Password reset completed", {
+      scope: "identity.password-reset",
+      userId: payload.userId,
+    });
+
+    return { ok: true };
+  }
 }
 
-export const identityService = new IdentityService(new IdentityRepository());
+export const identityService = new IdentityService(
+  new IdentityRepository(),
+  new NotificationEmailRepository(),
+);

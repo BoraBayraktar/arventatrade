@@ -1,6 +1,6 @@
 {
 	"common": {
-		"brand": "ArventaTrade",
+		"brand": "2BEM",
 		"language": "Language",
 		"favorites": "My Favorites",
 		"adminPanel": "Admin",
@@ -11,22 +11,57 @@
 	},
 	"auth": {
 		"loginTitle": "Sign In To Your Account",
-		"loginSubtitle": "Sign in to manage shopping, favorites, and your orders.",
+		"loginSubtitle": "Securely manage your orders, favorites, and account from one place.",
 		"registerTitle": "Create New Account",
-		"registerSubtitle": "Register in minutes and start shopping.",
+		"registerSubtitle": "Create your account in minutes and start your 2BEM experience.",
 		"email": "E-mail",
 		"name": "Full Name",
 		"password": "Password",
+		"confirmPassword": "Confirm Password",
 		"loginButton": "Sign In",
 		"registerButton": "Sign Up",
 		"invalidCredentials": "E-mail or password is incorrect.",
 		"registerFailed": "Registration failed.",
 		"emailExists": "This e-mail is already registered.",
 		"noAccount": "Don't have an account?",
-		"haveAccount": "Already have an account?"
+		"haveAccount": "Already have an account?",
+		"forgotPassword": "Forgot password?",
+		"rememberMe": "Remember me",
+		"socialDivider": "Or use alternative sign-in methods",
+		"socialGoogle": "Continue with Google",
+		"socialApple": "Continue with Apple",
+		"socialComingSoon": "Coming soon",
+		"passwordStrengthWeak": "Password strength: Weak",
+		"passwordStrengthMedium": "Password strength: Medium",
+		"passwordStrengthStrong": "Password strength: Strong",
+		"backToLogin": "Back to login",
+		"heroEyebrow": "Fast and secure account access",
+		"loginHeroTitle": "Manage your order flow with one secure sign-in.",
+		"loginHeroBody": "Access your favorites, order history, and fast shopping flow instantly with your 2BEM account.",
+		"registerHeroTitle": "Open your new account and speed up the flow.",
+		"registerHeroBody": "Register in minutes and keep product discovery, orders, and favorites together in a single account experience.",
+		"featureFast": "Fast sign-in and fluid mobile experience",
+		"featureSafe": "Secure session and account protection",
+		"featureOrders": "Orders and favorites in one flow",
+		"forgotPasswordTitle": "Reset your password",
+		"forgotPasswordSubtitle": "Enter your registered e-mail address and we will send you a secure reset link.",
+		"forgotPasswordButton": "Send reset link",
+		"forgotPasswordSuccess": "If this e-mail is registered, a password reset link has been sent.",
+		"forgotPasswordFailure": "Password reset request could not be sent.",
+		"forgotPasswordHeroTitle": "Regain access to your account.",
+		"forgotPasswordHeroBody": "The password reset link stays valid for 30 minutes and provides one-time secure access.",
+		"resetPasswordTitle": "Set your new password",
+		"resetPasswordSubtitle": "Choose a strong password and return to your account with confidence.",
+		"resetPasswordButton": "Update password",
+		"resetPasswordSuccess": "Your password has been updated. Redirecting to login.",
+		"resetPasswordFailure": "Password could not be updated.",
+		"resetPasswordInvalidToken": "The password reset link is invalid or expired.",
+		"resetPasswordMismatch": "Password fields do not match.",
+		"resetPasswordHeroTitle": "Protect your account with a new password.",
+		"resetPasswordHeroBody": "Your new password should be at least 6 characters and avoid predictable combinations you used before."
 	},
 	"home": {
-		"title": "ArventaTrade Product Showcase",
+		"title": "2BEM Product Showcase",
 		"subtitle": "Phase one focuses on a fast, mobile-friendly and service-driven product discovery experience.",
 		"cta": "Explore Products",
 		"eyebrow": "Next-generation ecommerce storefront experience",
@@ -157,7 +192,7 @@
 	"admin": {
 		"title": "Backoffice Dashboard",
 		"loginTitle": "Admin Login",
-		"loginSubtitle": "Authentication and role foundation are ready for Phase 2.",
+		"loginSubtitle": "Securely access inventory, product, order, and integration operations from one control center.",
 		"email": "E-mail",
 		"password": "Password",
 		"loginButton": "Sign In",
@@ -173,11 +208,70 @@
 		"questionManager": "Product Question Moderation",
 		"orderManager": "Order Management",
 		"integrationManager": "Integration Management",
+		"integrationSubtitle": "Monitor product, price, and stock sync jobs; manage manual dispatch and queue operations in drawer forms.",
+		"integrationCreateJob": "Create job",
+		"integrationProcessQueue": "Process queue",
+		"integrationDeadLetters": "Dead letters",
+		"integrationJobs": "Integration jobs",
+		"integrationChannel": "Channel",
+		"integrationJobType": "Job type",
+		"integrationStatus": "Status",
+		"integrationEntityId": "Entity id",
+		"integrationActions": "Actions",
+		"integrationRetry": "Retry",
+		"integrationForceFail": "Force failure",
+		"integrationOpenCreateDrawer": "New integration job",
+		"integrationOpenProcessDrawer": "Run queue",
+		"integrationDrawerCreateTitle": "Create integration job",
+		"integrationDrawerProcessTitle": "Process integration queue",
+		"integrationDrawerDescription": "Manage job creation and queue execution through structured drawer forms.",
+		"integrationEntityIds": "Entity ids",
+		"integrationEntityIdsHint": "Enter multiple product ids line by line or separated by commas.",
+		"integrationStockSyncHint": "For stock sync jobs, it is recommended to provide reference, trigger, and idempotency suffix fields.",
+		"integrationGenericSyncHint": "For product and price sync jobs, target products and retry limit are usually sufficient.",
+		"integrationMaxAttempts": "Maximum attempts",
+		"integrationIdempotencySuffix": "Idempotency suffix",
+		"integrationReference": "Reference",
+		"integrationTrigger": "Trigger",
+		"integrationTriggerPreset": "Trigger preset",
+		"integrationStockSyncReferenceHint": "Example: order number, stock count number, or manual operation reference.",
+		"integrationStockSyncTriggerHint": "Example: ORDER_COMMIT, STOCK_COUNT, MANUAL_ADJUSTMENT.",
+		"integrationTriggerManualDispatch": "Manual dispatch",
+		"integrationTriggerManualAdjustment": "Manual stock adjustment",
+		"integrationTriggerOrderCommit": "Order stock commit",
+		"integrationTriggerStockCount": "Stock count apply",
+		"integrationTriggerTransfer": "Warehouse transfer",
+		"integrationTriggerPurchaseReceipt": "Stock in",
+		"integrationTriggerPriceUpdate": "Price update",
+		"integrationTriggerProductUpdate": "Product update",
+		"integrationQueueLimit": "Processing limit",
+		"integrationFilterSearch": "Search entity or idempotency",
+		"integrationSummaryPending": "Pending jobs",
+		"integrationSummaryProcessing": "Processing jobs",
+		"integrationSummarySuccess": "Successful jobs",
+		"integrationSummaryFailed": "Failed jobs",
+		"integrationSummaryDeadLetter": "Dead-letter jobs",
+		"integrationEmptyJobs": "No integration records to display.",
+		"integrationNextAttemptAt": "Next attempt",
+		"integrationLastError": "Last error",
+		"integrationCreatedAt": "Created at",
+		"integrationValidationEntityIds": "Enter at least one valid entity id.",
+		"integrationValidationQueueLimit": "Queue limit must be between 1 and 100.",
 		"userManager": "User Management",
 		"createProduct": "Add New Product",
 		"productList": "Product List",
 		"slug": "Slug",
+		"sku": "SKU",
+		"barcode": "Barcode",
 		"description": "Description",
+		"productType": "Product type",
+		"unitType": "Unit",
+		"purchasePrice": "Purchase price",
+		"vatRate": "VAT rate",
+		"stockTrackingEnabled": "Stock tracking enabled",
+		"preferredPurchaseWarehouse": "Default purchase warehouse",
+		"preferredSalesWarehouse": "Default sales warehouse",
+		"stock": "Stock",
 		"imageUrl": "Image URL",
 		"additionalImageUrls": "Additional Images",
 		"additionalImageUrlsHint": "Enter one URL per line. The first field is the main image, these are shown as extra gallery images.",
@@ -189,6 +283,8 @@
 		"save": "Save",
 		"create": "Create",
 		"edit": "Edit",
+		"active": "Active",
+		"passive": "Passive",
 		"delete": "Delete",
 		"cancel": "Cancel",
 		"emptyProducts": "No products to display.",
@@ -196,6 +292,8 @@
 		"operationFailed": "Operation failed. Please try again.",
 		"validationRequired": "Please fill all required fields.",
 		"validationPrice": "Price must be greater than 0.",
+		"validationStock": "Stock must be an integer greater than or equal to 0.",
+		"validationCompareAtPrice": "Compare-at price must be greater than the sale price.",
 		"validationImageUrl": "Please enter a valid image URL.",
 		"validationImageUrls": "All additional image URLs must be valid.",
 		"validationImageUrlsLimit": "You can add up to 6 images in total."
@@ -301,18 +399,30 @@
 		,"inventoryLastRestockedAt": "Last Restocked At"
 		,"inventoryMovementTitle": "Inventory Movements"
 		,"inventoryMovementType": "Movement Type"
+		,"inventoryMovementReference": "Reference"
+		,"inventoryMovementCounterpartyWarehouse": "Counterparty warehouse"
 		,"inventoryMovementQuantity": "Quantity"
 		,"inventoryMovementWarehouse": "Warehouse"
 		,"inventoryMovementReservation": "Reservation"
 		,"inventoryMovementInitialLoad": "Initial stock load"
 		,"inventoryMovementManualAdjustment": "Manual stock adjustment"
 		,"inventoryMovementPurchaseReceipt": "Purchase receipt"
+		,"inventoryMovementTransferOut": "Transfer out"
+		,"inventoryMovementTransferIn": "Transfer in"
 		,"inventoryMovementReservationHold": "Reservation hold"
 		,"inventoryMovementReservationRelease": "Reservation release"
 		,"inventoryMovementOrderCommit": "Order commit"
 		,"inventoryMovementOrderCancelRestock": "Cancellation restock"
 		,"inventoryMovementReturnRestock": "Refund restock"
 		,"inventoryMovementDamageWriteOff": "Damage write-off"
+		,"inventoryTransactionsTitle": "Inventory transactions"
+		,"inventoryTransactionsDescription": "Review document-based inventory transaction records."
+		,"inventoryTransactionNumber": "Transaction number"
+		,"inventoryTransactionType": "Transaction type"
+		,"inventoryTransactionCreatedAt": "Transaction date"
+		,"inventoryTransactionLines": "Transaction lines"
+		,"inventoryTransactionStartDate": "Start date"
+		,"inventoryTransactionEndDate": "End date"
 		,"inventoryMovementRestockNone": "Not restocked"
 		,"inventoryMovementRestockPartial": "Partially restocked"
 		,"inventoryMovementRestockDone": "Restocked"
@@ -328,6 +438,8 @@
 		,"inventoryOnHandStock": "On-hand"
 		,"inventoryReservedStock": "Reserved"
 		,"inventoryAvailableStock": "Available"
+		,"inventoryReorderPoint": "Reorder point"
+		,"inventorySafetyStock": "Safety stock"
 		,"inventoryLastMovementAt": "Last movement"
 		,"emptyInventory": "No inventory records to display."
 		,"inventoryStockFilter": "Stock filter"
@@ -352,10 +464,111 @@
 		,"inventoryExportCsv": "Export CSV"
 		,"inventoryMovementHistoryFilter": "Movement filter"
 		,"inventoryAdjustStock": "Adjust stock"
+		,"inventoryStockIn": "Stock in"
+		,"inventoryStockOut": "Stock out"
 		,"inventoryTargetOnHandStock": "Target on-hand"
+		,"inventoryTargetReorderPoint": "Target reorder point"
+		,"inventoryTargetSafetyStock": "Target safety stock"
 		,"inventoryAdjustmentNote": "Adjustment note"
 		,"inventoryApplyAdjustment": "Apply"
 		,"inventoryAdjustmentSaved": "Stock adjustment saved."
 		,"inventoryAdjustmentFailed": "Stock adjustment failed."
+		,"inventoryMovementQuantityLabel": "Movement quantity"
+		,"inventoryStockInSaved": "Stock in saved."
+		,"inventoryStockInFailed": "Stock in failed."
+		,"inventoryStockOutSaved": "Stock out saved."
+		,"inventoryStockOutFailed": "Stock out failed."
+		,"inventoryTransferStock": "Warehouse transfer"
+		,"inventoryTransferQuantity": "Transfer quantity"
+		,"inventoryTransferTargetWarehouse": "Target warehouse"
+		,"inventoryTransferNote": "Transfer note"
+		,"inventoryApplyTransfer": "Apply transfer"
+		,"inventoryTransferSaved": "Inventory transfer saved."
+		,"inventoryTransferFailed": "Inventory transfer failed."
+		,"inventoryWarehousesTitle": "Warehouses"
+		,"inventoryWarehousesDescription": "Manage warehouse definitions in a drawer form."
+		,"inventoryCreateWarehouse": "Create warehouse"
+		,"inventoryEditWarehouse": "Edit warehouse"
+		,"inventoryWarehouseCode": "Warehouse code"
+		,"inventoryWarehouseName": "Warehouse name"
+		,"inventoryWarehouseDescription": "Description"
+		,"inventoryWarehouseAddress": "Address"
+		,"inventoryWarehouseContactName": "Contact name"
+		,"inventoryWarehouseContactPhone": "Contact phone"
+		,"inventoryWarehousePriority": "Priority"
+		,"inventoryWarehouseStatus": "Status"
+		,"inventoryWarehouseLevelCount": "Linked stock levels"
+		,"inventorySaveWarehouse": "Save warehouse"
+		,"inventoryWarehouseSaved": "Warehouse saved."
+		,"inventoryWarehouseSaveFailed": "Warehouse save failed."
+		,"inventoryCriticalStockTitle": "Critical stock panel"
+		,"inventoryCriticalStockDescription": "Track warehouse inventory rows at critical level and active alerts."
+		,"inventoryActiveAlerts": "Active alerts"
+		,"inventoryReportsTitle": "Inventory reports"
+		,"inventoryReportsDescription": "Track warehouse distribution, stock valuation, movement summary, and 30-day trend at a glance."
+		,"inventorySectionsTitle": "Quick navigation"
+		,"inventorySectionReports": "Reports"
+		,"inventorySectionSync": "Sync"
+		,"inventorySectionCritical": "Critical stock"
+		,"inventorySectionCounts": "Counts"
+		,"inventorySectionWarehouses": "Warehouses"
+		,"inventorySectionTransactions": "Transactions"
+		,"inventorySectionInventoryList": "Inventory list"
+		,"inventoryIntegrationTitle": "Stock sync status"
+		,"inventoryIntegrationDescription": "Monitor outbound channel stock sync jobs, dead letters, and latest dispatches."
+		,"inventorySyncPending": "Pending sync"
+		,"inventorySyncProcessing": "Processing sync"
+		,"inventorySyncFailed": "Failed sync"
+		,"inventorySyncDeadLetter": "Dead letter"
+		,"inventorySyncSuccess": "Successful sync"
+		,"inventorySyncRecentJobs": "Recent sync jobs"
+		,"inventorySyncLastError": "Last error"
+		,"inventoryTotalOnHandUnits": "Total on-hand units"
+		,"inventoryTotalCostValue": "Inventory cost value"
+		,"inventoryTotalSalesValue": "Estimated sales value"
+		,"inventoryTotalPotentialProfit": "Potential profit"
+		,"inventoryWarehouseCount": "Warehouse count"
+		,"inventoryLowStockRows": "Critical rows"
+		,"inventoryOutOfStockRows": "Out-of-stock rows"
+		,"inventoryWarehousePerformance": "Warehouse performance"
+		,"inventoryLowStockReport": "Low stock report"
+		,"inventoryMovementSummaryTitle": "Movement summary"
+		,"inventoryTrendTitle": "30-day inventory trend"
+		,"inventoryCostValue": "Cost value"
+		,"inventorySalesValue": "Sales value"
+		,"inventoryPotentialProfit": "Potential profit"
+		,"inventoryMovementCount": "Movement count"
+		,"inventoryTotalQuantityLabel": "Total quantity"
+		,"inventoryTrendStockIn": "In"
+		,"inventoryTrendStockOut": "Out"
+		,"inventoryTrendNet": "Net"
+		,"inventoryStockCountTitle": "Stock counts"
+		,"inventoryStockCountDescription": "Create count slips in a drawer form, enter counted rows, and apply variances."
+		,"inventoryCreateStockCount": "Create stock count"
+		,"inventoryStockCountWarehouseScope": "Count warehouse"
+		,"inventoryStockCountDate": "Count date"
+		,"inventoryStockCountNote": "Count note"
+		,"inventoryStockCountSearch": "Filter products"
+		,"inventoryStockCountCreateAction": "Create count"
+		,"inventoryStockCountSaved": "Stock count created."
+		,"inventoryStockCountSaveFailed": "Stock count could not be created."
+		,"inventoryStockCountApply": "Apply count"
+		,"inventoryStockCountApplied": "Stock count applied."
+		,"inventoryStockCountApplyFailed": "Stock count could not be applied."
+		,"inventoryStockCountLineCount": "Line count"
+		,"inventoryStockCountVarianceCount": "Variance rows"
+		,"inventoryStockCountCountedOnHand": "Counted stock"
+		,"inventoryStockCountDifference": "Difference"
+		,"inventoryStockCountEditLine": "Save line"
+		,"inventoryStockCountLineSaved": "Count line saved."
+		,"inventoryStockCountLineSaveFailed": "Count line could not be saved."
+		,"inventoryStockCountStatusDraft": "Draft"
+		,"inventoryStockCountStatusCounted": "Counted"
+		,"inventoryStockCountStatusApplied": "Applied"
+		,"inventoryAlertTypeLowStock": "Low stock"
+		,"inventoryAlertTypeOutOfStock": "Out of stock"
+		,"inventoryAlertMessage": "Alert message"
+		,"inventoryAlertCreatedAt": "Alert time"
+		,"inventoryNoAlerts": "No active critical stock alerts."
 	}
 }

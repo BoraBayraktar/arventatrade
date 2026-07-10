@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowRight, Eye, EyeOff, Globe, LockKeyhole, Mail, Shield, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import styles from "@/ui/admin/admin.module.css";
@@ -20,6 +21,12 @@ type LoginFormProps = {
     title: string;
     subtitle: string;
     loading: string;
+    forgotPassword: string;
+    rememberMe: string;
+    socialDivider: string;
+    socialGoogle: string;
+    socialApple: string;
+    socialComingSoon: string;
   };
 };
 
@@ -27,6 +34,8 @@ export function LoginForm({ locale, redirectTo, labels }: LoginFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -41,7 +50,7 @@ export function LoginForm({ locale, redirectTo, labels }: LoginFormProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       });
 
       if (!response.ok) {
@@ -63,40 +72,83 @@ export function LoginForm({ locale, redirectTo, labels }: LoginFormProps) {
   }
 
   return (
-    <Card className={styles.loginCard}>
-      <CardHeader>
-        <CardTitle className={styles.loginTitle}>{labels.title}</CardTitle>
-        <CardDescription className={styles.loginSubtitle}>{labels.subtitle}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className={styles.form} onSubmit={handleSubmit}>
-          <div className="grid gap-2">
-            <Label>{labels.email}</Label>
+    <div className={styles.authPanel}>
+      <div className={styles.authPanelTop}>
+        <div className={styles.authPanelBadge}>
+          <Shield className="h-4 w-4" />
+          <span>2BEM Admin</span>
+        </div>
+        <h1 className={styles.loginTitle}>{labels.title}</h1>
+        <p className={styles.loginSubtitle}>{labels.subtitle}</p>
+      </div>
+
+      <form className={styles.authPanelForm} onSubmit={handleSubmit}>
+        <div className={styles.authSocialStack}>
+          <p className={styles.authSocialDivider}>{labels.socialDivider}</p>
+          <div className={styles.authSocialGrid}>
+            <button type="button" className={styles.authSocialButton} disabled>
+              <Globe className="h-4 w-4" />
+              <span>{labels.socialGoogle}</span>
+              <small>{labels.socialComingSoon}</small>
+            </button>
+            <button type="button" className={styles.authSocialButton} disabled>
+              <Sparkles className="h-4 w-4" />
+              <span>{labels.socialApple}</span>
+              <small>{labels.socialComingSoon}</small>
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.authField}>
+          <Label htmlFor="admin-login-email">{labels.email}</Label>
+          <div className={styles.authInputWrap}>
+            <Mail className={styles.authInputIcon} />
             <Input
+              id="admin-login-email"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
+              className={styles.authInput}
             />
           </div>
+        </div>
 
-          <div className="grid gap-2">
-            <Label>{labels.password}</Label>
+        <div className={styles.authField}>
+          <div className={styles.authFieldHead}>
+            <Label htmlFor="admin-login-password">{labels.password}</Label>
+            <Link href={`/${locale}/forgot-password`} className={styles.authInlineLink}>
+              {labels.forgotPassword}
+            </Link>
+          </div>
+          <div className={styles.authInputWrap}>
+            <LockKeyhole className={styles.authInputIcon} />
             <Input
-              type="password"
+              id="admin-login-password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
+              className={styles.authInputWithButton}
             />
+            <button type="button" className={styles.authToggle} onClick={() => setShowPassword((current) => !current)}>
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
+        </div>
 
-          {error ? <p className={styles.error}>{error}</p> : null}
+        <label className={styles.authCheckboxLabel}>
+          <input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} />
+          <span>{labels.rememberMe}</span>
+        </label>
 
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? labels.loading : labels.submit}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        {error ? <p className={styles.error}>{error}</p> : null}
+
+        <Button type="submit" disabled={loading} className={styles.authPrimaryButton}>
+          <span>{loading ? labels.loading : labels.submit}</span>
+          <ArrowRight className="h-4 w-4" />
+        </Button>
+      </form>
+    </div>
   );
 }

@@ -1,4 +1,7 @@
-export type UserNotificationType = "PRODUCT_QUESTION_CREATED";
+export type UserNotificationType =
+  | "PRODUCT_QUESTION_CREATED"
+  | "INVENTORY_ALERT_CREATED"
+  | "STOCK_COUNT_APPLIED";
 
 export type UserNotificationChannel = "IN_APP" | "EMAIL";
 

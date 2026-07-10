@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ArventaTrade",
-  description: "ArventaTrade e-ticaret vitrin ve backoffice uygulaması",
+  title: "2BEM",
+  description: "2BEM e-ticaret vitrin ve backoffice uygulamasi",
 };
 
 export default function RootLayout({

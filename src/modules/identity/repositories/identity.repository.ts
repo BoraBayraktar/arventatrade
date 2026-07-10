@@ -182,4 +182,18 @@ export class IdentityRepository {
       },
     });
   }
+
+  async updatePasswordById(id: string, passwordHash: string) {
+    return prisma.user.update({
+      where: {
+        id,
+      },
+      data: {
+        passwordHash,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
 }

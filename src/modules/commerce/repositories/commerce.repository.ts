@@ -3,12 +3,19 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AdminOrderListQuery, CommerceLineQuote } from "@/modules/commerce/contracts/commerce.contract";
 
-type CheckoutLine = {
-  productId: string;
-  quantity: number;
-};
-
 export class CommerceRepository {
+  private toAvailableStock(onHand: number, reserved: number) {
+    return Math.max(0, onHand - reserved);
+  }
+
+  private sumAvailableStock(levels: Array<{ onHand: number; reserved: number }>, fallbackStock: number) {
+    if (levels.length === 0) {
+      return fallbackStock;
+    }
+
+    return levels.reduce((sum, level) => sum + this.toAvailableStock(level.onHand, level.reserved), 0);
+  }
+
   private async getOrCreateDefaultWarehouse(tx: Prisma.TransactionClient) {
     const defaultWarehouse = await tx.warehouse.findFirst({
       where: {
@@ -155,9 +162,9 @@ export class CommerceRepository {
         return left.isDefault ? -1 : 1;
       }
 
-      const leftAvailable = Math.max(0, left.onHand - left.reserved);
-      const rightAvailable = Math.max(0, right.onHand - right.reserved);
-      return rightAvailable - leftAvailable;
+      const rightAvailable = this.toAvailableStock(right.onHand, right.reserved);
+      const normalizedLeftAvailable = this.toAvailableStock(left.onHand, left.reserved);
+      return rightAvailable - normalizedLeftAvailable;
     });
 
     return {
@@ -210,7 +217,10 @@ export class CommerceRepository {
 
       for (const line of args.lines) {
         const state = await this.ensureInventoryState(tx, line.productId);
-        const availableStock = state.levels.reduce((sum, level) => sum + Math.max(0, level.onHand - level.reserved), 0);
+        const availableStock = state.levels.reduce(
+          (sum, level) => sum + this.toAvailableStock(level.onHand, level.reserved),
+          0,
+        );
 
         if (availableStock < line.quantity) {
           throw new Error(`INSUFFICIENT_STOCK:${line.productId}`);
@@ -223,7 +233,7 @@ export class CommerceRepository {
             break;
           }
 
-          const levelAvailable = Math.max(0, level.onHand - level.reserved);
+          const levelAvailable = this.toAvailableStock(level.onHand, level.reserved);
           if (levelAvailable <= 0) {
             continue;
           }
@@ -838,9 +848,7 @@ export class CommerceRepository {
         }
 
         const inventoryLevels = product.inventoryItem?.inventoryLevels ?? [];
-        const availableStock = inventoryLevels.length > 0
-          ? inventoryLevels.reduce((sum, level) => sum + Math.max(0, level.onHand - level.reserved), 0)
-          : product.stock;
+        const availableStock = this.sumAvailableStock(inventoryLevels, product.stock);
 
         await tx.product.update({
           where: {
