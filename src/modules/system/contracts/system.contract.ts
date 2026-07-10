@@ -1,6 +1,12 @@
+export type DependencyHealth = {
+  status: "ok" | "degraded";
+  durationMs: number;
+  errorCode?: string;
+};
+
 export type ReadinessResult = {
   status: "ready" | "not-ready";
-  database: "ok" | "degraded";
-  redis: "ok" | "degraded";
+  database: DependencyHealth;
+  redis: DependencyHealth;
   timestamp: string;
 };

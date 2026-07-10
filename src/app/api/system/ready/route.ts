@@ -28,6 +28,12 @@ export async function GET(request: Request) {
   logError("Readiness endpoint failed", {
     scope: "readiness",
     requestId,
+    databaseStatus: readiness.database.status,
+    databaseDurationMs: readiness.database.durationMs,
+    databaseErrorCode: readiness.database.errorCode,
+    redisStatus: readiness.redis.status,
+    redisDurationMs: readiness.redis.durationMs,
+    redisErrorCode: readiness.redis.errorCode,
   });
 
   return NextResponse.json(

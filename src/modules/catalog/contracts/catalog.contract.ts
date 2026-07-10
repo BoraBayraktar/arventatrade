@@ -61,6 +61,8 @@ export type ProductListQuery = {
   featureFilters?: string[];
   page?: number;
   pageSize?: number;
+  includeFacets?: boolean;
+  includeTotal?: boolean;
 };
 
 export type ProductCard = {

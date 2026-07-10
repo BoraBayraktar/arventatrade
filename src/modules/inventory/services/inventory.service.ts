@@ -90,7 +90,7 @@ export class InventoryService {
           isDefaultWarehouse: false,
           hasReservations: false,
           lastMovementType: inventoryMovements[0]?.type ?? null,
-          recentMovements: inventoryMovements.slice(0, 3).map((movement) => ({
+          recentMovements: inventoryMovements.slice(0, 30).map((movement) => ({
             type: movement.type,
             quantity: movement.quantity,
             note: movement.note,
@@ -106,7 +106,7 @@ export class InventoryService {
         const lastWarehouseMovement = inventoryMovements.find((movement) => movement.warehouseId === level.warehouse.id);
         const recentWarehouseMovements = inventoryMovements
           .filter((movement) => movement.warehouseId === level.warehouse.id)
-          .slice(0, 3)
+          .slice(0, 30)
           .map((movement) => ({
             type: movement.type,
             quantity: movement.quantity,

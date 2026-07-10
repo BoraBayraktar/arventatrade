@@ -58,7 +58,7 @@ export default async function LocaleHomePage({
 
   const dictionary = getDictionary(locale as Locale);
   const [products, storefront] = await Promise.all([
-    catalogService.listProducts({ page: 1, pageSize: 8 }),
+    catalogService.listProducts({ page: 1, pageSize: 8, includeFacets: false, includeTotal: false }),
     storefrontService.getHomeSections(locale as Locale),
   ]);
   const storefrontItems = [...storefront.campaigns, ...storefront.features];

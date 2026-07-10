@@ -36,6 +36,8 @@ const productListQuerySchema = z.object({
   featureFilters: z.array(z.string().trim().min(1)).default([]),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(24).default(12),
+  includeFacets: z.boolean().default(true),
+  includeTotal: z.boolean().default(true),
 }).superRefine((value, ctx) => {
   if (typeof value.minPrice === "number" && typeof value.maxPrice === "number" && value.minPrice > value.maxPrice) {
     ctx.addIssue({
@@ -296,7 +298,7 @@ export class CatalogService {
         pageSize: parsed.pageSize,
         total,
         totalPages: Math.max(1, Math.ceil(total / parsed.pageSize)),
-        featureFacets: buildFeatureFacets(mappedPool),
+        featureFacets: parsed.includeFacets ? buildFeatureFacets(mappedPool) : [],
       };
 
       await redisCache.set(cacheKey, result, 120);
@@ -309,31 +311,40 @@ export class CatalogService {
         skip,
         take: parsed.pageSize,
       }),
-      this.repository.count({
-        search: repositoryBaseArgs.search,
-        categoryIds: repositoryBaseArgs.categoryIds,
-        inStockOnly: repositoryBaseArgs.inStockOnly,
-        outOfStockOnly: repositoryBaseArgs.outOfStockOnly,
-        lowStockOnly: repositoryBaseArgs.lowStockOnly,
-        newOnly: repositoryBaseArgs.newOnly,
-        discountedOnly: repositoryBaseArgs.discountedOnly,
-        minPrice: repositoryBaseArgs.minPrice,
-        maxPrice: repositoryBaseArgs.maxPrice,
-      }),
-      this.repository.findMany({
-        ...repositoryBaseArgs,
-        skip: 0,
-        take: 240,
-      }),
+      parsed.includeTotal
+        ? this.repository.count({
+            search: repositoryBaseArgs.search,
+            categoryIds: repositoryBaseArgs.categoryIds,
+            inStockOnly: repositoryBaseArgs.inStockOnly,
+            outOfStockOnly: repositoryBaseArgs.outOfStockOnly,
+            lowStockOnly: repositoryBaseArgs.lowStockOnly,
+            newOnly: repositoryBaseArgs.newOnly,
+            discountedOnly: repositoryBaseArgs.discountedOnly,
+            minPrice: repositoryBaseArgs.minPrice,
+            maxPrice: repositoryBaseArgs.maxPrice,
+          })
+        : Promise.resolve(skip + parsed.pageSize + 1),
+      parsed.includeFacets
+        ? this.repository.findMany({
+            ...repositoryBaseArgs,
+            skip: 0,
+            take: 240,
+          })
+        : Promise.resolve([]),
     ]);
+
+    const resolvedTotal = parsed.includeTotal ? total : items.length === parsed.pageSize ? skip + items.length + 1 : skip + items.length;
+    const resolvedTotalPages = parsed.includeTotal
+      ? Math.max(1, Math.ceil(resolvedTotal / parsed.pageSize))
+      : Math.max(parsed.page, items.length === parsed.pageSize ? parsed.page + 1 : parsed.page);
 
     const result: ProductListResult = {
       items: items.map(mapProduct),
       page: parsed.page,
       pageSize: parsed.pageSize,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / parsed.pageSize)),
-      featureFacets: buildFeatureFacets(facetRows.map(mapProduct)),
+      total: resolvedTotal,
+      totalPages: resolvedTotalPages,
+      featureFacets: parsed.includeFacets ? buildFeatureFacets(facetRows.map(mapProduct)) : [],
     };
 
     await redisCache.set(cacheKey, result, 120);

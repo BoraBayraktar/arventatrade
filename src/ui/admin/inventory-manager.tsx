@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Download, Maximize2, Minimize2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -27,6 +28,9 @@ type Labels = {
   stockStatus: string;
   movementType: string;
   lastMovementAt: string;
+  detail: string;
+  viewDetails: string;
+  drawerInfo: string;
   inStock: string;
   lowStock: string;
   outOfStock: string;
@@ -45,6 +49,12 @@ type Labels = {
   withoutReservations: string;
   recentMovements: string;
   noRecentMovements: string;
+  viewAllHistory: string;
+  movementDateRange: string;
+  movementAllTime: string;
+  movementLast24Hours: string;
+  movementLast7Days: string;
+  movementLast30Days: string;
   exportCsv: string;
   movementHistoryFilter: string;
   adjustStock: string;
@@ -100,10 +110,7 @@ function statusClass(status: AdminInventoryListResult["items"][number]["stockSta
   return "bg-emerald-100 text-emerald-700";
 }
 
-function movementTypeLabel(
-  movementType: string | null,
-  labels: Labels,
-) {
+function movementTypeLabel(movementType: string | null, labels: Labels) {
   if (!movementType) {
     return labels.notSpecified;
   }
@@ -171,6 +178,8 @@ function movementTypeClass(movementType: string | null) {
   return "bg-neutral-100 text-neutral-600";
 }
 
+type DrawerMode = "view" | "edit";
+
 type Props = {
   locale: Locale;
   result: AdminInventoryListResult;
@@ -187,11 +196,15 @@ type Props = {
 export function InventoryManager({ locale, result, query, labels }: Props) {
   const router = useRouter();
   const [pendingRowKey, setPendingRowKey] = useState<string | null>(null);
-  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
-  const [rowMovementFilters, setRowMovementFilters] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [draftTargets, setDraftTargets] = useState<Record<string, number>>({});
-  const [draftNotes, setDraftNotes] = useState<Record<string, string>>({});
+  const [drawerItem, setDrawerItem] = useState<AdminInventoryListResult["items"][number] | null>(null);
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>("view");
+  const [drawerFullscreen, setDrawerFullscreen] = useState(false);
+  const [drawerMovementFilter, setDrawerMovementFilter] = useState("all");
+  const [drawerDateRange, setDrawerDateRange] = useState("all");
+  const [drawerMovementPage, setDrawerMovementPage] = useState(1);
+  const [drawerTargetOnHand, setDrawerTargetOnHand] = useState("");
+  const [drawerNote, setDrawerNote] = useState("");
 
   const warehouseOptions = useMemo(() => {
     const codes = new Set<string>();
@@ -236,6 +249,40 @@ export function InventoryManager({ locale, result, query, labels }: Props) {
     ],
   );
 
+  const drawerMovements = useMemo(() => {
+    if (!drawerItem) {
+      return [];
+    }
+
+    const now = Date.now();
+    const rangeStart = drawerDateRange === "24h"
+      ? now - (24 * 60 * 60 * 1000)
+      : drawerDateRange === "7d"
+        ? now - (7 * 24 * 60 * 60 * 1000)
+        : drawerDateRange === "30d"
+          ? now - (30 * 24 * 60 * 60 * 1000)
+          : null;
+
+    return drawerItem.recentMovements.filter((movement) => {
+      if (rangeStart && new Date(movement.createdAt).getTime() < rangeStart) {
+        return false;
+      }
+
+      if (drawerMovementFilter === "all") {
+        return true;
+      }
+
+      return movement.type === drawerMovementFilter;
+    });
+  }, [drawerDateRange, drawerItem, drawerMovementFilter]);
+
+  const drawerMovementPageSize = 5;
+  const drawerMovementTotalPages = Math.max(1, Math.ceil(drawerMovements.length / drawerMovementPageSize));
+  const drawerMovementItems = drawerMovements.slice(
+    (drawerMovementPage - 1) * drawerMovementPageSize,
+    drawerMovementPage * drawerMovementPageSize,
+  );
+
   function getPageHref(page: number) {
     const params = new URLSearchParams();
     if (query.search) {
@@ -265,6 +312,53 @@ export function InventoryManager({ locale, result, query, labels }: Props) {
 
   function getRowKey(item: AdminInventoryListResult["items"][number]) {
     return `${item.productId}:${item.warehouseCode ?? "NONE"}`;
+  }
+
+  function openDrawer(item: AdminInventoryListResult["items"][number], mode: DrawerMode) {
+    setDrawerItem(item);
+    setDrawerMode(mode);
+    setDrawerFullscreen(false);
+    setDrawerMovementFilter("all");
+    setDrawerDateRange("all");
+    setDrawerMovementPage(1);
+    setDrawerTargetOnHand(String(item.onHandStock));
+    setDrawerNote("");
+    setFeedback(null);
+  }
+
+  function closeDrawer() {
+    if (pendingRowKey) {
+      return;
+    }
+
+    setDrawerItem(null);
+    setDrawerMode("view");
+    setDrawerFullscreen(false);
+    setDrawerMovementFilter("all");
+    setDrawerDateRange("all");
+    setDrawerMovementPage(1);
+    setDrawerTargetOnHand("");
+    setDrawerNote("");
+  }
+
+  function viewAllHistoryInList() {
+    if (!drawerItem) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set("search", drawerItem.sku);
+
+    if (drawerItem.warehouseCode) {
+      params.set("warehouseFilter", drawerItem.warehouseCode);
+    }
+
+    if (drawerMovementFilter !== "all") {
+      params.set("movementTypeFilter", drawerMovementFilter);
+    }
+
+    router.push(`/${locale}/admin/inventory?${params.toString()}`);
+    closeDrawer();
   }
 
   function exportVisibleRowsCsv() {
@@ -337,26 +431,33 @@ export function InventoryManager({ locale, result, query, labels }: Props) {
     URL.revokeObjectURL(url);
   }
 
-  async function applyAdjustment(item: AdminInventoryListResult["items"][number]) {
-    const rowKey = getRowKey(item);
+  async function applyAdjustmentFromDrawer() {
+    if (!drawerItem) {
+      return;
+    }
+
+    const targetOnHandStock = Number(drawerTargetOnHand);
+    if (!Number.isInteger(targetOnHandStock) || targetOnHandStock < 0) {
+      setFeedback({ type: "error", message: labels.adjustmentFailed });
+      return;
+    }
+
+    const rowKey = getRowKey(drawerItem);
     setPendingRowKey(rowKey);
     setFeedback(null);
 
     try {
-      const targetOnHandStock = draftTargets[rowKey] ?? item.onHandStock;
-      const note = draftNotes[rowKey]?.trim() || "Inventory manager manual adjustment";
-
       const response = await fetch("/api/admin/inventory/adjust", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          productId: item.productId,
-          sku: item.sku,
-          warehouseCode: item.warehouseCode ?? undefined,
+          productId: drawerItem.productId,
+          sku: drawerItem.sku,
+          warehouseCode: drawerItem.warehouseCode ?? undefined,
           targetOnHandStock,
-          note,
+          note: drawerNote.trim() || "Inventory manager manual adjustment",
         }),
       });
 
@@ -367,6 +468,7 @@ export function InventoryManager({ locale, result, query, labels }: Props) {
       }
 
       setFeedback({ type: "success", message: labels.adjustmentSaved });
+      closeDrawer();
       router.refresh();
     } catch {
       setFeedback({ type: "error", message: labels.adjustmentFailed });
@@ -411,7 +513,7 @@ export function InventoryManager({ locale, result, query, labels }: Props) {
       </div>
 
       <form className="border-b border-neutral-200 bg-white/90 p-5">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto_auto]">
           <input
             type="search"
             name="search"
@@ -464,9 +566,11 @@ export function InventoryManager({ locale, result, query, labels }: Props) {
           <button
             type="button"
             onClick={exportVisibleRowsCsv}
-            className="h-11 rounded-xl border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 sm:col-span-2 xl:col-span-1"
+            aria-label={labels.exportCsv}
+            title={labels.exportCsv}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-neutral-300 bg-white text-neutral-700 transition hover:bg-neutral-100"
           >
-            {labels.exportCsv}
+            <Download className="h-5 w-5" />
           </button>
         </div>
       </form>
@@ -478,7 +582,7 @@ export function InventoryManager({ locale, result, query, labels }: Props) {
       ) : null}
 
       <div className="overflow-hidden rounded-b-3xl">
-        <div className="hidden grid-cols-[1.2fr_110px_90px_90px_90px_120px_160px_140px_240px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+        <div className="hidden grid-cols-[1.2fr_130px_90px_90px_90px_120px_160px_140px_120px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
           <span>{labels.product}</span>
           <span>{labels.warehouse}</span>
           <span>{labels.onHandStock}</span>
@@ -487,7 +591,7 @@ export function InventoryManager({ locale, result, query, labels }: Props) {
           <span>{labels.stockStatus}</span>
           <span>{labels.movementType}</span>
           <span>{labels.lastMovementAt}</span>
-          <span>{labels.adjustStock}</span>
+          <span>{labels.detail}</span>
         </div>
 
         {result.items.length === 0 ? (
@@ -496,137 +600,41 @@ export function InventoryManager({ locale, result, query, labels }: Props) {
           <div className="divide-y divide-neutral-200">
             {result.items.map((item) => {
               const rowKey = getRowKey(item);
-              const isExpanded = expandedRowKey === rowKey;
-              const activeMovementFilter = rowMovementFilters[rowKey] ?? "all";
-              const filteredMovements = item.recentMovements.filter((movement) => activeMovementFilter === "all" || movement.type === activeMovementFilter);
 
               return (
-                <div key={rowKey}>
-                  <article className="grid gap-3 p-4 transition hover:bg-neutral-50 lg:grid-cols-[1.2fr_110px_90px_90px_90px_120px_160px_140px_240px] lg:items-center">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-neutral-950">{item.name}</p>
-                      <p className="mt-1 truncate text-xs text-neutral-500">/{item.slug} · {labels.sku}: {item.sku}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setExpandedRowKey((prev) => (prev === rowKey ? null : rowKey));
-                          }}
-                          className="rounded-md border border-neutral-300 px-2 py-1 text-[11px] font-medium text-neutral-700 transition hover:bg-neutral-100"
-                        >
-                          {labels.recentMovements}
-                        </button>
-                      </div>
-                      <p className="mt-1 text-xs text-neutral-500 lg:hidden">
-                        {labels.movementType}: <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${movementTypeClass(item.lastMovementType)}`}>{movementTypeLabel(item.lastMovementType, labels)}</span>
-                      </p>
-                    </div>
-                    <p className="text-sm text-neutral-700">
-                      {item.warehouseCode ?? labels.notSpecified}
-                      {item.isDefaultWarehouse ? (
-                        <span className="ml-2 inline-flex rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] font-semibold text-neutral-700">{labels.defaultWarehouse}</span>
-                      ) : null}
-                    </p>
-                    <p className="text-sm text-neutral-700">{item.onHandStock}</p>
-                    <p className="text-sm text-neutral-700">{item.reservedStock}</p>
-                    <p className="text-sm font-semibold text-neutral-950">{item.availableStock}</p>
-                    <p>
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusClass(item.stockStatus)}`}>
-                        {statusLabel(item.stockStatus, labels)}
-                      </span>
-                    </p>
-                    <p className="hidden lg:block">
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${movementTypeClass(item.lastMovementType)}`}>
-                        {movementTypeLabel(item.lastMovementType, labels)}
-                      </span>
-                    </p>
-                    <p className="text-sm text-neutral-500">{formatDate(item.lastMovementAt, locale, labels.notSpecified)}</p>
-                    <div className="grid gap-2 md:grid-cols-[110px_1fr_auto]">
-                      <input
-                        type="number"
-                        min={0}
-                        defaultValue={item.onHandStock}
-                        onChange={(event) => {
-                          const value = Number(event.target.value);
-                          setDraftTargets((prev) => ({
-                            ...prev,
-                            [rowKey]: Number.isFinite(value) && value >= 0 ? value : item.onHandStock,
-                          }));
-                        }}
-                        className="h-10 rounded-md border border-neutral-300 px-2 text-sm"
-                        aria-label={labels.targetOnHandStock}
-                      />
-                      <input
-                        type="text"
-                        placeholder={labels.adjustmentNote}
-                        defaultValue={draftNotes[rowKey] ?? ""}
-                        onChange={(event) => {
-                          setDraftNotes((prev) => ({
-                            ...prev,
-                            [rowKey]: event.target.value,
-                          }));
-                        }}
-                        className="h-10 rounded-md border border-neutral-300 px-2 text-sm"
-                        aria-label={labels.adjustmentNote}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void applyAdjustment(item);
-                        }}
-                        disabled={pendingRowKey === rowKey}
-                        className="h-10 rounded-md border border-neutral-300 px-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {pendingRowKey === rowKey ? "..." : labels.applyAdjustment}
-                      </button>
-                    </div>
-                  </article>
-
-                  {isExpanded ? (
-                    <div className="border-t border-dashed border-neutral-200 bg-neutral-50/80 px-4 pb-4 pt-3">
-                      <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <label className="text-xs font-medium text-neutral-600">{labels.movementHistoryFilter}</label>
-                        <select
-                          value={activeMovementFilter}
-                          onChange={(event) => {
-                            setRowMovementFilters((prev) => ({
-                              ...prev,
-                              [rowKey]: event.target.value,
-                            }));
-                          }}
-                          className="h-8 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700"
-                        >
-                          {movementTypeOptions.map((option) => (
-                            <option key={`history-${option.value}`} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {filteredMovements.length === 0 ? (
-                        <p className="text-xs text-neutral-500">{labels.noRecentMovements}</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {filteredMovements.map((movement, index) => (
-                            <li key={`${rowKey}:${movement.createdAt}:${index}`} className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-700 md:flex-row md:items-center md:justify-between md:gap-3">
-                              <div className="flex items-center gap-2">
-                                <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${movementTypeClass(movement.type)}`}>
-                                  {movementTypeLabel(movement.type, labels)}
-                                </span>
-                                <span className={movement.quantity >= 0 ? "font-semibold text-emerald-700" : "font-semibold text-rose-700"}>
-                                  {movement.quantity >= 0 ? `+${movement.quantity}` : movement.quantity}
-                                </span>
-                              </div>
-                              <span className="text-neutral-500">{formatDate(movement.createdAt, locale, labels.notSpecified)}</span>
-                              <span className="text-neutral-600">{movement.note ?? labels.notSpecified}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
+                <article key={rowKey} className="grid gap-3 p-4 transition hover:bg-neutral-50 lg:grid-cols-[1.2fr_130px_90px_90px_90px_120px_160px_140px_120px] lg:items-center">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-neutral-950">{item.name}</p>
+                    <p className="mt-1 truncate text-xs text-neutral-500">/{item.slug} · {labels.sku}: {item.sku}</p>
+                  </div>
+                  <p className="text-sm text-neutral-700">
+                    {item.warehouseCode ?? labels.notSpecified}
+                    {item.isDefaultWarehouse ? (
+                      <span className="ml-2 inline-flex rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] font-semibold text-neutral-700">{labels.defaultWarehouse}</span>
+                    ) : null}
+                  </p>
+                  <p className="text-sm text-neutral-700">{item.onHandStock}</p>
+                  <p className="text-sm text-neutral-700">{item.reservedStock}</p>
+                  <p className="text-sm font-semibold text-neutral-950">{item.availableStock}</p>
+                  <p>
+                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusClass(item.stockStatus)}`}>
+                      {statusLabel(item.stockStatus, labels)}
+                    </span>
+                  </p>
+                  <p>
+                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${movementTypeClass(item.lastMovementType)}`}>
+                      {movementTypeLabel(item.lastMovementType, labels)}
+                    </span>
+                  </p>
+                  <p className="text-sm text-neutral-500">{formatDate(item.lastMovementAt, locale, labels.notSpecified)}</p>
+                  <button
+                    type="button"
+                    onClick={() => openDrawer(item, "view")}
+                    className="h-9 rounded-md border border-neutral-300 px-2 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
+                  >
+                    {labels.viewDetails}
+                  </button>
+                </article>
               );
             })}
           </div>
@@ -646,6 +654,229 @@ export function InventoryManager({ locale, result, query, labels }: Props) {
           </Link>
         ) : <span />}
       </div>
+
+      {drawerItem ? (
+        <div className="fixed inset-0 z-50">
+          <button type="button" aria-label={labels.adjustStock} className="absolute inset-0 bg-black/30" onClick={closeDrawer} />
+          <aside className={`absolute right-0 top-0 flex h-full w-full flex-col overflow-y-auto border-l border-neutral-200 bg-white shadow-2xl ${drawerFullscreen ? "max-w-none" : "max-w-2xl"}`}>
+            <div className="flex items-start justify-between border-b border-neutral-200 p-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.title}</p>
+                <h3 className="mt-1 text-xl font-semibold tracking-tight">{labels.detail}</h3>
+                <p className="mt-1 text-sm text-neutral-500">{labels.drawerInfo}</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setDrawerFullscreen((prev) => !prev)}
+                  disabled={Boolean(pendingRowKey)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-neutral-200 text-neutral-700 transition hover:bg-neutral-100"
+                  aria-label={locale === "tr" ? (drawerFullscreen ? "Daralt" : "Tam ekran") : (drawerFullscreen ? "Collapse" : "Fullscreen")}
+                  title={locale === "tr" ? (drawerFullscreen ? "Daralt" : "Tam ekran") : (drawerFullscreen ? "Collapse" : "Fullscreen")}
+                >
+                  {drawerFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={closeDrawer}
+                  disabled={Boolean(pendingRowKey)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-neutral-200 text-neutral-700 transition hover:bg-neutral-100"
+                  aria-label={locale === "tr" ? "Kapat" : "Close"}
+                  title={locale === "tr" ? "Kapat" : "Close"}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-5 p-5">
+              <section className="rounded-xl border border-neutral-200 p-4">
+                <h4 className="text-base font-semibold text-neutral-950">{drawerItem.name}</h4>
+                <p className="mt-1 text-sm text-neutral-500">/{drawerItem.slug} • {labels.sku}: {drawerItem.sku}</p>
+                <p className="mt-1 text-sm text-neutral-500">
+                  {labels.warehouse}: {drawerItem.warehouseCode ?? labels.notSpecified}
+                </p>
+              </section>
+
+              <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <article className="rounded-xl border border-neutral-200 p-3">
+                  <p className="text-xs text-neutral-500">{labels.onHandStock}</p>
+                  <p className="mt-1 text-lg font-semibold text-neutral-900">{drawerItem.onHandStock}</p>
+                </article>
+                <article className="rounded-xl border border-neutral-200 p-3">
+                  <p className="text-xs text-neutral-500">{labels.reservedStock}</p>
+                  <p className="mt-1 text-lg font-semibold text-cyan-700">{drawerItem.reservedStock}</p>
+                </article>
+                <article className="rounded-xl border border-neutral-200 p-3">
+                  <p className="text-xs text-neutral-500">{labels.availableStock}</p>
+                  <p className="mt-1 text-lg font-semibold text-neutral-900">{drawerItem.availableStock}</p>
+                </article>
+                <article className="rounded-xl border border-neutral-200 p-3">
+                  <p className="text-xs text-neutral-500">{labels.stockStatus}</p>
+                  <p className="mt-1">
+                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusClass(drawerItem.stockStatus)}`}>
+                      {statusLabel(drawerItem.stockStatus, labels)}
+                    </span>
+                  </p>
+                </article>
+              </section>
+
+              <section className="rounded-xl border border-neutral-200 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h4 className="text-sm font-semibold text-neutral-900">{labels.recentMovements}</h4>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-xs font-medium text-neutral-600">{labels.movementDateRange}</label>
+                    <select
+                      value={drawerDateRange}
+                      onChange={(event) => {
+                        setDrawerDateRange(event.target.value);
+                        setDrawerMovementPage(1);
+                      }}
+                      className="h-9 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700"
+                    >
+                      <option value="all">{labels.movementAllTime}</option>
+                      <option value="24h">{labels.movementLast24Hours}</option>
+                      <option value="7d">{labels.movementLast7Days}</option>
+                      <option value="30d">{labels.movementLast30Days}</option>
+                    </select>
+                    <select
+                      value={drawerMovementFilter}
+                      onChange={(event) => {
+                        setDrawerMovementFilter(event.target.value);
+                        setDrawerMovementPage(1);
+                      }}
+                      className="h-9 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700"
+                    >
+                      {movementTypeOptions.map((option) => (
+                        <option key={`drawer-${option.value}`} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={viewAllHistoryInList}
+                    className="text-xs font-medium text-neutral-700 underline decoration-neutral-300 underline-offset-4 transition hover:text-neutral-900"
+                  >
+                    {labels.viewAllHistory}
+                  </button>
+                  <p className="text-xs text-neutral-500">{labels.page} {drawerMovementPage}/{drawerMovementTotalPages}</p>
+                </div>
+
+                {drawerMovementItems.length === 0 ? (
+                  <p className="text-xs text-neutral-500">{labels.noRecentMovements}</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {drawerMovementItems.map((movement, index) => (
+                      <li key={`${movement.createdAt}:${index}`} className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${movementTypeClass(movement.type)}`}>
+                            {movementTypeLabel(movement.type, labels)}
+                          </span>
+                          <span className={movement.quantity >= 0 ? "font-semibold text-emerald-700" : "font-semibold text-rose-700"}>
+                            {movement.quantity >= 0 ? `+${movement.quantity}` : movement.quantity}
+                          </span>
+                        </div>
+                        <span className="text-neutral-500">{formatDate(movement.createdAt, locale, labels.notSpecified)}</span>
+                        <span className="text-neutral-600">{movement.note ?? labels.notSpecified}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {drawerMovementTotalPages > 1 ? (
+                  <div className="mt-3 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDrawerMovementPage((prev) => Math.max(1, prev - 1))}
+                      disabled={drawerMovementPage <= 1}
+                      className="h-8 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {labels.prev}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDrawerMovementPage((prev) => Math.min(drawerMovementTotalPages, prev + 1))}
+                      disabled={drawerMovementPage >= drawerMovementTotalPages}
+                      className="h-8 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {labels.next}
+                    </button>
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="rounded-xl border border-neutral-200 p-4">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-semibold text-neutral-900">{labels.adjustStock}</h4>
+                  {drawerMode === "view" ? (
+                    <button
+                      type="button"
+                      onClick={() => setDrawerMode("edit")}
+                      className="h-9 rounded-md border border-neutral-300 px-3 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
+                    >
+                      {labels.adjustStock}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDrawerMode("view")}
+                      className="h-9 rounded-md border border-neutral-300 px-3 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
+                    >
+                      {locale === "tr" ? "Görüntüle" : "View"}
+                    </button>
+                  )}
+                </div>
+
+                {drawerMode === "edit" ? (
+                  <form
+                    className="grid gap-3"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void applyAdjustmentFromDrawer();
+                    }}
+                  >
+                    <div className="grid gap-1">
+                      <label className="text-xs font-medium text-neutral-600">{labels.targetOnHandStock}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={drawerTargetOnHand}
+                        onChange={(event) => setDrawerTargetOnHand(event.target.value)}
+                        className="h-10 rounded-md border border-neutral-300 px-2 text-sm"
+                        required
+                      />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-xs font-medium text-neutral-600">{labels.adjustmentNote}</label>
+                      <textarea
+                        value={drawerNote}
+                        onChange={(event) => setDrawerNote(event.target.value)}
+                        placeholder={labels.adjustmentNote}
+                        rows={3}
+                        className="rounded-md border border-neutral-300 px-2 py-2 text-sm"
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={Boolean(pendingRowKey)}
+                        className="h-10 rounded-md border border-neutral-300 bg-neutral-900 px-3 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {pendingRowKey ? "..." : labels.applyAdjustment}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <p className="text-xs text-neutral-500">{labels.drawerInfo}</p>
+                )}
+              </section>
+            </div>
+          </aside>
+        </div>
+      ) : null}
     </section>
   );
 }

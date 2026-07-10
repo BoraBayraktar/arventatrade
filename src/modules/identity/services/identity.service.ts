@@ -144,7 +144,28 @@ export class IdentityService {
         return cachedSession.user;
       }
 
-      return null;
+      const account = await this.repository.findById(userId);
+      if (!account) {
+        return null;
+      }
+
+      const user: AuthUser = {
+        id: account.id,
+        email: account.email,
+        name: account.name,
+        role: account.role,
+      };
+
+      await redisCache.set(
+        getSessionCacheKey(sid),
+        {
+          sid,
+          user,
+        },
+        AUTH_TOKEN_TTL_SECONDS,
+      );
+
+      return user;
     } catch {
       return null;
     }

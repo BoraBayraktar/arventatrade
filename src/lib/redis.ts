@@ -3,6 +3,12 @@ import { createClient, type RedisClientType } from "redis";
 import { logError } from "@/lib/observability";
 
 type CacheValue = string;
+const DEFAULT_REDIS_CONNECT_TIMEOUT_MS = 1000;
+
+function getRedisConnectTimeoutMs() {
+  const value = Number(process.env.REDIS_CONNECT_TIMEOUT_MS ?? DEFAULT_REDIS_CONNECT_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_REDIS_CONNECT_TIMEOUT_MS;
+}
 
 class RedisCache {
   private client: RedisClientType | null = null;
@@ -24,7 +30,12 @@ class RedisCache {
     this.initializing = true;
 
     try {
-      const client = createClient({ url: process.env.REDIS_URL });
+      const client = createClient({
+        url: process.env.REDIS_URL,
+        socket: {
+          connectTimeout: getRedisConnectTimeoutMs(),
+        },
+      });
       client.on("error", (error) => {
         logError("Redis connection error", { scope: "redis", error: String(error) });
       });

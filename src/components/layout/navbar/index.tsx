@@ -30,6 +30,8 @@ export async function Navbar({ locale, dictionary }: NavbarProps) {
 				categorySlug: category.slug,
 				page: 1,
 				pageSize: 4,
+				includeFacets: false,
+				includeTotal: false,
 			});
 
 			const subcategories = categories
