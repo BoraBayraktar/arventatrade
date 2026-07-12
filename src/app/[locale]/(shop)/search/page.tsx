@@ -82,7 +82,7 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
 
   const categoryMap = new Map(categories.map((item) => [item.slug, item.name]));
   const categoryName = query.category ? categoryMap.get(query.category) : undefined;
-  const resultsText = products.total > 1 ? "results" : "result";
+  const resultsText = products.total > 1 ? "sonuç" : "sonuç";
 
   return (
     <section className="w-full py-5">
@@ -97,7 +97,6 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
       <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start">
         <aside className={`${surfaceStyles.panel} h-fit p-4 md:p-5 lg:sticky lg:top-24`}>
           <CatalogFilters
-            locale={locale}
             categories={categories.map((item) => ({ id: item.id, slug: item.slug, name: item.name }))}
             initialSearch={query.q}
             initialCategory={query.category}
@@ -116,9 +115,9 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
               allCategories: dictionary.catalog.allCategories,
               filter: dictionary.catalog.filter,
               clear: dictionary.admin.cancel,
-              activeFilters: locale === "tr" ? "Aktif Filtreler" : "Active Filters",
-              quickCategories: locale === "tr" ? "Hizli Kategoriler" : "Quick Categories",
-              searchLabel: locale === "tr" ? "Arama" : "Search",
+              activeFilters: "Aktif Filtreler",
+              quickCategories: "Hızlı Kategoriler",
+              searchLabel: "Arama",
               categoryLabel: dictionary.catalog.category,
               sortLabel: dictionary.commerce.sortBy,
               sortLatest: dictionary.commerce.latest,

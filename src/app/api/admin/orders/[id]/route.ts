@@ -39,7 +39,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       entityId: id,
       action: "STATUS_UPDATE",
       actorUserId: user.id,
-      summary: `Order status updated: ${updated.status} / ${updated.paymentStatus}`,
+      summary: `Sipariş durumu güncellendi: ${updated.status} / ${updated.paymentStatus}`,
     });
     return NextResponse.json({ item: updated });
   } catch (error) {
@@ -69,7 +69,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
       entityId: id,
       action: "DELETE",
       actorUserId: user.id,
-      summary: "Order soft-deleted",
+      summary: "Sipariş silindi",
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

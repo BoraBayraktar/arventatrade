@@ -4,8 +4,34 @@ import { prisma } from "@/lib/prisma";
 import type { AdminOrderListQuery, CommerceLineQuote } from "@/modules/commerce/contracts/commerce.contract";
 
 export class CommerceRepository {
+  private readonly serializableRetryCount = 3;
+
   private toAvailableStock(onHand: number, reserved: number) {
     return Math.max(0, onHand - reserved);
+  }
+
+  private async runSerializableTransaction<T>(
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 1; attempt <= this.serializableRetryCount; attempt += 1) {
+      try {
+        return await prisma.$transaction(operation, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError
+          && error.code === "P2034"
+          && attempt < this.serializableRetryCount
+        ) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new Error("SERIALIZABLE_TRANSACTION_FAILED");
   }
 
   private sumAvailableStock(levels: Array<{ onHand: number; reserved: number }>, fallbackStock: number) {
@@ -143,7 +169,7 @@ export class CommerceRepository {
             warehouseId: defaultWarehouse.id,
             type: "INITIAL_LOAD",
             quantity: product.stock,
-            note: "Lazy inventory initialization during checkout",
+            note: "Sipariş akışında legacy stok özetinden envanter başlatıldı",
           },
         });
       }
@@ -172,6 +198,58 @@ export class CommerceRepository {
       inventoryItemId,
       levels,
     };
+  }
+
+  private async recalculateProductStockSummary(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    inventoryItemId: string,
+  ) {
+    const levels = await tx.inventoryLevel.findMany({
+      where: {
+        inventoryItemId,
+        warehouse: {
+          isActive: true,
+        },
+      },
+      select: {
+        onHand: true,
+        reserved: true,
+      },
+    });
+
+    const availableStock = levels.reduce(
+      (sum, level) => sum + this.toAvailableStock(level.onHand, level.reserved),
+      0,
+    );
+
+    await tx.product.update({
+      where: {
+        id: productId,
+      },
+      data: {
+        stock: availableStock,
+      },
+    });
+  }
+
+  private async getActiveLevelSnapshot(
+    tx: Prisma.TransactionClient,
+    inventoryItemId: string,
+    warehouseId: string,
+  ) {
+    return tx.inventoryLevel.findUnique({
+      where: {
+        inventoryItemId_warehouseId: {
+          inventoryItemId,
+          warehouseId,
+        },
+      },
+      select: {
+        onHand: true,
+        reserved: true,
+      },
+    });
   }
 
   async listActiveProductsByIds(productIds: string[]) {
@@ -205,7 +283,7 @@ export class CommerceRepository {
     promotionCode: string | null;
     currency: string;
   }) {
-    return prisma.$transaction(async (tx) => {
+    return this.runSerializableTransaction(async (tx) => {
       const holds: Array<{
         productId: string;
         inventoryItemId: string;
@@ -213,8 +291,6 @@ export class CommerceRepository {
         reservationId: string;
         quantity: number;
       }> = [];
-      const availableAfterCommitByProduct = new Map<string, number>();
-
       for (const line of args.lines) {
         const state = await this.ensureInventoryState(tx, line.productId);
         const availableStock = state.levels.reduce(
@@ -233,7 +309,15 @@ export class CommerceRepository {
             break;
           }
 
-          const levelAvailable = this.toAvailableStock(level.onHand, level.reserved);
+          const currentLevel = await this.getActiveLevelSnapshot(
+            tx,
+            state.inventoryItemId,
+            level.warehouseId,
+          );
+          const levelAvailable = this.toAvailableStock(
+            currentLevel?.onHand ?? level.onHand,
+            currentLevel?.reserved ?? level.reserved,
+          );
           if (levelAvailable <= 0) {
             continue;
           }
@@ -289,8 +373,6 @@ export class CommerceRepository {
         if (remainingQuantity > 0) {
           throw new Error(`INSUFFICIENT_STOCK:${line.productId}`);
         }
-
-        availableAfterCommitByProduct.set(line.productId, availableStock - line.quantity);
       }
 
       const order = await tx.order.create({
@@ -358,6 +440,16 @@ export class CommerceRepository {
           },
         });
 
+        const committedLevel = await this.getActiveLevelSnapshot(
+          tx,
+          hold.inventoryItemId,
+          hold.warehouseId,
+        );
+
+        if (!committedLevel || committedLevel.onHand < hold.quantity || committedLevel.reserved < hold.quantity) {
+          throw new Error(`STALE_RESERVATION_LEVEL:${hold.productId}:${hold.warehouseId}:${hold.quantity}`);
+        }
+
         await tx.stockReservation.update({
           where: {
             id: hold.reservationId,
@@ -381,16 +473,13 @@ export class CommerceRepository {
         });
 
       }
+      const touchedProductStates = new Map<string, string>();
+      for (const hold of holds) {
+        touchedProductStates.set(hold.productId, hold.inventoryItemId);
+      }
 
-      for (const [productId, availableAfterCommit] of availableAfterCommitByProduct.entries()) {
-        await tx.product.update({
-          where: {
-            id: productId,
-          },
-          data: {
-            stock: availableAfterCommit,
-          },
-        });
+      for (const [productId, inventoryItemId] of touchedProductStates.entries()) {
+        await this.recalculateProductStockSummary(tx, productId, inventoryItemId);
       }
 
       return {
@@ -735,7 +824,7 @@ export class CommerceRepository {
     movementType: "ORDER_CANCEL_RESTOCK" | "RETURN_RESTOCK";
     note: string;
   }) {
-    await prisma.$transaction(async (tx) => {
+    await this.runSerializableTransaction(async (tx) => {
       const order = await tx.order.findFirst({
         where: {
           id: args.id,
@@ -779,6 +868,16 @@ export class CommerceRepository {
       const reservationsToRestock = order.stockReservations.filter((reservation) => reservation.status === "COMMITTED" && reservation.inventoryMovements.length === 0);
 
       for (const reservation of reservationsToRestock) {
+        const currentLevel = await this.getActiveLevelSnapshot(
+          tx,
+          reservation.inventoryItemId,
+          reservation.warehouseId,
+        );
+
+        if (!currentLevel) {
+          throw new Error(`RESTOCK_LEVEL_NOT_FOUND:${reservation.inventoryItemId}:${reservation.warehouseId}`);
+        }
+
         await tx.inventoryLevel.update({
           where: {
             inventoryItemId_warehouseId: {
@@ -824,40 +923,19 @@ export class CommerceRepository {
             deleted: false,
           },
           select: {
-            stock: true,
             inventoryItem: {
               select: {
-                inventoryLevels: {
-                  where: {
-                    warehouse: {
-                      isActive: true,
-                    },
-                  },
-                  select: {
-                    onHand: true,
-                    reserved: true,
-                  },
-                },
+                id: true,
               },
             },
           },
         });
 
-        if (!product) {
+        if (!product?.inventoryItem?.id) {
           continue;
         }
 
-        const inventoryLevels = product.inventoryItem?.inventoryLevels ?? [];
-        const availableStock = this.sumAvailableStock(inventoryLevels, product.stock);
-
-        await tx.product.update({
-          where: {
-            id: productId,
-          },
-          data: {
-            stock: availableStock,
-          },
-        });
+        await this.recalculateProductStockSummary(tx, productId, product.inventoryItem.id);
       }
     });
   }

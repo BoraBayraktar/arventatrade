@@ -92,8 +92,14 @@ export function AdminPanelShell({
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const notificationRef = useRef<HTMLDivElement | null>(null);
+  const loadingNotificationsRef = useRef(false);
 
   async function loadNotifications() {
+    if (loadingNotificationsRef.current) {
+      return;
+    }
+
+    loadingNotificationsRef.current = true;
     setLoadingNotifications(true);
     try {
       const response = await fetch("/api/admin/notifications?page=1&pageSize=8", { cache: "no-store" });
@@ -108,22 +114,56 @@ export function AdminPanelShell({
       setNotifications(payload.items ?? []);
       setUnreadCount(payload.unreadCount ?? 0);
     } finally {
+      loadingNotificationsRef.current = false;
       setLoadingNotifications(false);
     }
   }
 
   useEffect(() => {
+    if (document.visibilityState !== "visible") {
+      return undefined;
+    }
+
     const initialTimer = window.setTimeout(() => {
       void loadNotifications();
     }, 0);
 
-    const interval = window.setInterval(() => {
-      void loadNotifications();
-    }, 30000);
+    let interval: number | null = null;
+
+    const startInterval = () => {
+      if (interval !== null) {
+        window.clearInterval(interval);
+      }
+
+      interval = window.setInterval(() => {
+        if (document.visibilityState === "visible") {
+          void loadNotifications();
+        }
+      }, 90000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadNotifications();
+        startInterval();
+        return;
+      }
+
+      if (interval !== null) {
+        window.clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    startInterval();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.clearTimeout(initialTimer);
-      window.clearInterval(interval);
+      if (interval !== null) {
+        window.clearInterval(interval);
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 

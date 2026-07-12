@@ -44,10 +44,8 @@ type Labels = {
   title: string;
   createTitle: string;
   edit: string;
-  trTitle: string;
-  enTitle: string;
-  trDescription: string;
-  enDescription: string;
+  itemTitle: string;
+  itemDescription: string;
   section: string;
   variant: string;
   targetType: string;
@@ -89,7 +87,6 @@ type Props = {
   categoryOptions: CategoryOption[];
   labels: Labels;
   canDelete: boolean;
-  locale: string;
 };
 
 type FormState = {
@@ -161,7 +158,7 @@ function formatWindowDate(value: string | null, locale: string) {
     return null;
   }
 
-  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "tr-TR", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
@@ -178,7 +175,7 @@ function getVariantLabel(variant: StorefrontItem["variant"], labels: Labels) {
   return labels.variantDefault;
 }
 
-export function StorefrontManager({ items, productOptions, categoryOptions, labels, canDelete, locale }: Props) {
+export function StorefrontManager({ items, productOptions, categoryOptions, labels, canDelete }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -192,7 +189,7 @@ export function StorefrontManager({ items, productOptions, categoryOptions, labe
   const activeSubmit = drawerMode === "edit" ? labels.save : labels.create;
 
   function validate(form: FormState) {
-    if (!form.titleTr.trim() || !form.titleEn.trim() || !form.descriptionTr.trim() || !form.descriptionEn.trim()) {
+    if (!form.titleTr.trim() || !form.descriptionTr.trim()) {
       return labels.validationRequired;
     }
 
@@ -224,9 +221,9 @@ export function StorefrontManager({ items, productOptions, categoryOptions, labe
       productId: form.targetType === "PRODUCT" ? form.productId : null,
       categoryId: form.targetType === "CATEGORY" ? form.categoryId : null,
       titleTr: form.titleTr,
-      titleEn: form.titleEn,
+      titleEn: form.titleTr,
       descriptionTr: form.descriptionTr,
-      descriptionEn: form.descriptionEn,
+      descriptionEn: form.descriptionTr,
       sortOrder: Number(form.sortOrder),
       startsAt: fromDateTimeLocalInput(form.startsAt),
       endsAt: fromDateTimeLocalInput(form.endsAt),
@@ -259,9 +256,9 @@ export function StorefrontManager({ items, productOptions, categoryOptions, labe
       productId: item.productId ?? "",
       categoryId: item.categoryId ?? "",
       titleTr: item.titleTr,
-      titleEn: item.titleEn,
+      titleEn: item.titleTr,
       descriptionTr: item.descriptionTr,
-      descriptionEn: item.descriptionEn,
+      descriptionEn: item.descriptionTr,
       sortOrder: String(item.sortOrder),
       startsAt: toDateTimeLocalInput(item.startsAt),
       endsAt: toDateTimeLocalInput(item.endsAt),
@@ -356,17 +353,17 @@ export function StorefrontManager({ items, productOptions, categoryOptions, labe
                   <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
                     {getSectionLabel(item.section, labels)} / {getVariantLabel(item.variant, labels)}
                   </p>
-                  <h3 className="mt-2 font-medium text-neutral-950">{locale === "en" ? item.titleEn : item.titleTr}</h3>
+                  <h3 className="mt-2 font-medium text-neutral-950">{item.titleTr}</h3>
                   <p className="mt-1 text-xs font-medium text-neutral-500">
                     {item.targetType === "CATEGORY" ? labels.targetCategory : labels.targetProduct}: {item.categoryName ?? item.productName ?? labels.selectProduct}
                   </p>
                   <p className="mt-1 text-xs text-neutral-500">
-                    {labels.startAt}: {formatWindowDate(item.startsAt, locale) ?? labels.noDateWindow} • {labels.endAt}: {formatWindowDate(item.endsAt, locale) ?? labels.noDateWindow}
+                    {labels.startAt}: {formatWindowDate(item.startsAt, "tr") ?? labels.noDateWindow} • {labels.endAt}: {formatWindowDate(item.endsAt, "tr") ?? labels.noDateWindow}
                   </p>
                 </div>
                 <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-500">#{item.sortOrder}</span>
               </div>
-              <p className="mt-3 line-clamp-3 text-sm leading-6 text-neutral-500">{locale === "en" ? item.descriptionEn : item.descriptionTr}</p>
+              <p className="mt-3 line-clamp-3 text-sm leading-6 text-neutral-500">{item.descriptionTr}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button type="button" size="sm" variant="secondary" disabled={loading} onClick={() => openEditDrawer(item)}>
                   {labels.edit}
@@ -458,23 +455,15 @@ export function StorefrontManager({ items, productOptions, categoryOptions, labe
               </div>
 
               <div className="grid gap-2 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label>{labels.trTitle}</Label>
+                <div className="grid gap-2 md:col-span-2">
+                  <Label>{labels.itemTitle}</Label>
                   <Input value={activeForm.titleTr} onChange={(event) => patchActiveField("titleTr", event.target.value)} />
-                </div>
-                <div className="grid gap-2">
-                  <Label>{labels.enTitle}</Label>
-                  <Input value={activeForm.titleEn} onChange={(event) => patchActiveField("titleEn", event.target.value)} />
                 </div>
               </div>
 
               <div className="grid gap-2">
-                <Label>{labels.trDescription}</Label>
+                <Label>{labels.itemDescription}</Label>
                 <Textarea value={activeForm.descriptionTr} onChange={(event) => patchActiveField("descriptionTr", event.target.value)} />
-              </div>
-              <div className="grid gap-2">
-                <Label>{labels.enDescription}</Label>
-                <Textarea value={activeForm.descriptionEn} onChange={(event) => patchActiveField("descriptionEn", event.target.value)} />
               </div>
               <div className="grid gap-2">
                 <Label>{labels.order}</Label>

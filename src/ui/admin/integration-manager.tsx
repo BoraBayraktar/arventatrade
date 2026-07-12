@@ -160,7 +160,7 @@ function defaultTriggerForJobType(jobType: JobType) {
 
 function formatDate(value: string, locale: string) {
   const date = new Date(value);
-  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "tr-TR", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
@@ -573,7 +573,7 @@ export function IntegrationManager({
                   onClick={() => setDrawerFullscreen((prev) => !prev)}
                   disabled={busy}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-neutral-200 text-neutral-700 transition hover:bg-neutral-100"
-                  aria-label={drawerFullscreen ? "Collapse" : "Fullscreen"}
+                  aria-label={drawerFullscreen ? "Daralt" : "Tam ekran"}
                 >
                   {drawerFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>

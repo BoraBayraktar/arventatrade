@@ -11,6 +11,11 @@ const stockInSchema = z.object({
   warehouseCode: z.string().trim().min(1).max(32),
   quantity: z.coerce.number().int().min(1),
   note: z.string().trim().min(3).max(280).optional(),
+  sourceDocumentNumber: z.string().trim().min(1).max(120).optional(),
+  sourceDocumentDate: z.string().datetime().optional(),
+  sourceDocumentSupplier: z.string().trim().min(2).max(160).optional(),
+  sourceDocumentReference: z.string().trim().min(1).max(160).optional(),
+  unitCost: z.coerce.number().nonnegative().optional().nullable(),
 });
 
 export async function POST(request: Request) {
@@ -25,6 +30,11 @@ export async function POST(request: Request) {
       quantity: payload.quantity,
       type: "PURCHASE_RECEIPT",
       note: payload.note ?? "Inventory manager stock in",
+      sourceDocumentNumber: payload.sourceDocumentNumber,
+      sourceDocumentDate: payload.sourceDocumentDate,
+      sourceDocumentSupplier: payload.sourceDocumentSupplier,
+      sourceDocumentReference: payload.sourceDocumentReference,
+      unitCost: payload.unitCost ?? null,
     });
 
     await auditLogService.record({
@@ -32,10 +42,12 @@ export async function POST(request: Request) {
       entityId: payload.productId,
       action: "UPDATE",
       actorUserId: user.id,
-      summary: `Stock in applied for ${payload.sku}`,
+      summary: `Stok girişi uygulandı: ${payload.sku}`,
       metadata: {
         warehouseCode: payload.warehouseCode,
         quantity: payload.quantity,
+        sourceDocumentNumber: payload.sourceDocumentNumber ?? null,
+        sourceDocumentSupplier: payload.sourceDocumentSupplier ?? null,
       },
     });
 
@@ -46,17 +58,21 @@ export async function POST(request: Request) {
     }
 
     if (error instanceof ZodError) {
-      return NextResponse.json({ message: error.issues[0]?.message ?? "Validation failed" }, { status: 400 });
+      return NextResponse.json({ message: error.issues[0]?.message ?? "Doğrulama hatası oluştu." }, { status: 400 });
     }
 
     if (error instanceof Error && error.message.startsWith("WAREHOUSE_NOT_FOUND:")) {
-      return NextResponse.json({ message: "Warehouse not found" }, { status: 404 });
+      return NextResponse.json({ message: "Depo bulunamadı." }, { status: 404 });
     }
 
     if (error instanceof Error && error.message.startsWith("PRODUCT_NOT_FOUND:")) {
-      return NextResponse.json({ message: "Product not found" }, { status: 404 });
+      return NextResponse.json({ message: "Ürün bulunamadı." }, { status: 404 });
     }
 
-    return NextResponse.json({ message: "Unexpected error" }, { status: 500 });
+    if (error instanceof Error && error.message.includes("PurchaseReceipt_receiptNumber_key")) {
+      return NextResponse.json({ message: "Bu satın alma belge numarası zaten kullanılıyor." }, { status: 409 });
+    }
+
+    return NextResponse.json({ message: "Beklenmeyen bir hata oluştu." }, { status: 500 });
   }
 }

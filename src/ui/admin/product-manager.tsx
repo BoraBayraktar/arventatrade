@@ -244,7 +244,7 @@ function getGalleryImages(form: ProductForm) {
 }
 
 function formatPrice(price: number, currency: string, locale: Locale) {
-  return new Intl.NumberFormat(locale === "tr" ? "tr-TR" : "en-US", {
+  return new Intl.NumberFormat(locale === "tr" ? "tr-TR" : "tr-TR", {
     style: "currency",
     currency,
   }).format(price);
@@ -798,8 +798,8 @@ export function ProductManager({
                   variant="ghost"
                   onClick={() => setDrawerFullscreen((prev) => !prev)}
                   disabled={loading}
-                  aria-label={locale === "tr" ? (drawerFullscreen ? "Daralt" : "Tam ekran") : (drawerFullscreen ? "Collapse" : "Fullscreen")}
-                  title={locale === "tr" ? (drawerFullscreen ? "Daralt" : "Tam ekran") : (drawerFullscreen ? "Collapse" : "Fullscreen")}
+                  aria-label={drawerFullscreen ? "Daralt" : "Tam ekran"}
+                  title={drawerFullscreen ? "Daralt" : "Tam ekran"}
                 >
                   {drawerFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
                 </Button>
@@ -809,59 +809,197 @@ export function ProductManager({
               </div>
             </div>
 
-            <form className="grid gap-4 p-5" onSubmit={submitProduct}>
-              <div className="grid gap-2">
-                <Label>{labels.slug}</Label>
-                <Input value={activeForm.slug} onChange={(event) => patchActiveField("slug", event.target.value)} required />
-              </div>
-              <div className="grid gap-2">
-                <Label>{labels.sku}</Label>
-                <Input value={activeForm.sku} onChange={(event) => patchActiveField("sku", event.target.value)} required />
-              </div>
-              <div className="grid gap-2">
-                <Label>{labels.barcode}</Label>
-                <Input value={activeForm.barcode} onChange={(event) => patchActiveField("barcode", event.target.value)} />
-              </div>
-              <div className="grid gap-2">
-                <Label>{labels.name}</Label>
-                <Input value={activeForm.name} onChange={(event) => patchActiveField("name", event.target.value)} required />
-              </div>
-              <div className="grid gap-2 md:grid-cols-2">
+            <form className="grid gap-5 p-5" onSubmit={submitProduct}>
+              <section className="grid gap-4 rounded-2xl border border-neutral-200 bg-white p-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Ürün Kartı</p>
+                  <h4 className="mt-1 text-base font-semibold text-neutral-950">Temel ürün bilgileri</h4>
+                  <p className="mt-1 text-sm text-neutral-500">Ürünün kimlik, tür ve vitrin bilgisini bu alandan yönetin.</p>
+                </div>
+
                 <div className="grid gap-2">
-                  <Label>{labels.productType}</Label>
-                  <Select value={activeForm.productType} onValueChange={(value) => patchActiveField("productType", value)}>
+                  <Label>{labels.name}</Label>
+                  <Input value={activeForm.name} onChange={(event) => patchActiveField("name", event.target.value)} required />
+                </div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Label>{labels.slug}</Label>
+                    <Input value={activeForm.slug} onChange={(event) => patchActiveField("slug", event.target.value)} required />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>{labels.sku}</Label>
+                    <Input value={activeForm.sku} onChange={(event) => patchActiveField("sku", event.target.value)} required />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>{labels.barcode}</Label>
+                    <Input value={activeForm.barcode} onChange={(event) => patchActiveField("barcode", event.target.value)} />
+                  </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label>{labels.productType}</Label>
+                    <Select value={activeForm.productType} onValueChange={(value) => patchActiveField("productType", value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRODUCT_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.tr}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>{labels.unitType}</Label>
+                    <Select value={activeForm.unitType} onValueChange={(value) => patchActiveField("unitType", value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {UNIT_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.tr}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label>{labels.category}</Label>
+                  <Select value={activeForm.categoryId || NONE_VALUE} onValueChange={(value) => patchActiveField("categoryId", value === NONE_VALUE ? "" : value)}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder={labels.notSpecified} />
                     </SelectTrigger>
                     <SelectContent>
-                      {PRODUCT_TYPE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {locale === "tr" ? option.tr : option.en}
+                      <SelectItem value={NONE_VALUE}>{labels.notSpecified}</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label>{labels.unitType}</Label>
-                  <Select value={activeForm.unitType} onValueChange={(value) => patchActiveField("unitType", value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {UNIT_TYPE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {locale === "tr" ? option.tr : option.en}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>{labels.description}</Label>
+                  <Textarea value={activeForm.description} onChange={(event) => patchActiveField("description", event.target.value)} required />
                 </div>
-              </div>
-              <div className="grid gap-2">
-                <Label>{labels.description}</Label>
-                <Textarea value={activeForm.description} onChange={(event) => patchActiveField("description", event.target.value)} required />
-              </div>
+              </section>
+
+              <section className="grid gap-4 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Stok Kartı</p>
+                    <h4 className="mt-1 text-base font-semibold text-neutral-950">Stok ve satın alma ayarları</h4>
+                    <p className="mt-1 text-sm text-neutral-600">Paraşüt benzeri stok takibi, depo tercihi ve maliyet alanlarını birlikte yönetin.</p>
+                  </div>
+                  <div className="rounded-xl border border-emerald-200 bg-white/80 px-3 py-2 text-xs text-neutral-600 shadow-sm">
+                    <p className="font-semibold text-neutral-900">Stok durumu</p>
+                    <p className="mt-1">{isStockManaged ? "Takip aktif" : "Takip kapalı"}</p>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-white/80 p-3 text-sm text-neutral-700">
+                  <input
+                    type="checkbox"
+                    checked={activeForm.productType === "SERVICE" ? false : activeForm.stockTrackingEnabled}
+                    onChange={(event) => patchActiveForm((prev) => ({ ...prev, stockTrackingEnabled: event.target.checked }))}
+                    disabled={activeForm.productType === "SERVICE"}
+                  />
+                  <span>{labels.stockTrackingEnabled}</span>
+                </label>
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-xl border border-neutral-200 bg-white p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">{labels.stock}</p>
+                    <div className="mt-2 grid gap-2">
+                      <Label>{labels.stock}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={activeForm.stock}
+                        onChange={(event) => patchActiveField("stock", event.target.value)}
+                        required={isStockManaged}
+                        disabled={!isStockManaged}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-neutral-200 bg-white p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">{labels.purchasePrice}</p>
+                    <div className="mt-2 grid gap-2">
+                      <Label>{labels.purchasePrice}</Label>
+                      <Input type="number" min="0" step="0.01" value={activeForm.purchasePrice} onChange={(event) => patchActiveField("purchasePrice", event.target.value)} />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-neutral-200 bg-white p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">{labels.vatRate}</p>
+                    <div className="mt-2 grid gap-2">
+                      <Label>{labels.vatRate}</Label>
+                      <Input type="number" min="0" max="100" step="1" value={activeForm.vatRate} onChange={(event) => patchActiveField("vatRate", event.target.value)} required />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-neutral-200 bg-white p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">{labels.compareAtPrice}</p>
+                    <div className="mt-2 grid gap-2">
+                      <Label>{labels.compareAtPrice}</Label>
+                      <Input type="number" min="0" step="0.01" value={activeForm.compareAtPrice} onChange={(event) => patchActiveField("compareAtPrice", event.target.value)} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-neutral-200 bg-white p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Satın alma deposu</p>
+                    <div className="mt-2 grid gap-2">
+                      <Label>{labels.preferredPurchaseWarehouse}</Label>
+                      <Select
+                        value={activeForm.preferredPurchaseWarehouseId || NONE_VALUE}
+                        onValueChange={(value) => patchActiveField("preferredPurchaseWarehouseId", value === NONE_VALUE ? "" : value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={labels.notSpecified} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NONE_VALUE}>{labels.notSpecified}</SelectItem>
+                          {warehouses.filter((warehouse) => warehouse.isActive).map((warehouse) => (
+                            <SelectItem key={warehouse.id} value={warehouse.id}>
+                              {warehouse.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-neutral-200 bg-white p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Satış deposu</p>
+                    <div className="mt-2 grid gap-2">
+                      <Label>{labels.preferredSalesWarehouse}</Label>
+                      <Select
+                        value={activeForm.preferredSalesWarehouseId || NONE_VALUE}
+                        onValueChange={(value) => patchActiveField("preferredSalesWarehouseId", value === NONE_VALUE ? "" : value)}
+                        disabled={!isStockManaged}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={labels.notSpecified} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NONE_VALUE}>{labels.notSpecified}</SelectItem>
+                          {warehouses.filter((warehouse) => warehouse.isActive).map((warehouse) => (
+                            <SelectItem key={warehouse.id} value={warehouse.id}>
+                              {warehouse.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
               <div className="grid gap-2">
                 <Label>{labels.features}</Label>
                 <div className="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
@@ -876,7 +1014,7 @@ export function ProductManager({
                         <Input
                           value={feature.key}
                           onChange={(event) => patchFeature(index, { key: event.target.value })}
-                          placeholder={locale === "tr" ? "Tip" : "Type"}
+                          placeholder="Tip"
                         />
                       </div>
                       <div className="grid gap-1">
@@ -884,7 +1022,7 @@ export function ProductManager({
                         <Input
                           value={feature.value}
                           onChange={(event) => patchFeature(index, { value: event.target.value })}
-                          placeholder={locale === "tr" ? "Kule Tipi" : "Tower"}
+                          placeholder="Kule Tipi"
                         />
                       </div>
                       <div className="flex flex-wrap items-center gap-2 md:justify-end">
@@ -917,102 +1055,12 @@ export function ProductManager({
                   <Input type="number" min="0" step="0.01" value={activeForm.price} onChange={(event) => patchActiveField("price", event.target.value)} required />
                 </div>
                 <div className="grid gap-2">
-                  <Label>{labels.purchasePrice}</Label>
-                  <Input type="number" min="0" step="0.01" value={activeForm.purchasePrice} onChange={(event) => patchActiveField("purchasePrice", event.target.value)} />
+                  <Label>{labels.imageUrl}</Label>
+                  <Input value={activeForm.imageUrl} onChange={(event) => patchActiveField("imageUrl", event.target.value)} required />
                 </div>
               </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label>{labels.compareAtPrice}</Label>
-                  <Input type="number" min="0" step="0.01" value={activeForm.compareAtPrice} onChange={(event) => patchActiveField("compareAtPrice", event.target.value)} />
-                </div>
-                <div className="grid gap-2">
-                  <Label>{labels.vatRate}</Label>
-                  <Input type="number" min="0" max="100" step="1" value={activeForm.vatRate} onChange={(event) => patchActiveField("vatRate", event.target.value)} required />
-                </div>
-              </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label>{labels.stock}</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={activeForm.stock}
-                    onChange={(event) => patchActiveField("stock", event.target.value)}
-                    required={isStockManaged}
-                    disabled={!isStockManaged}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>{labels.category}</Label>
-                  <Select value={activeForm.categoryId || NONE_VALUE} onValueChange={(value) => patchActiveField("categoryId", value === NONE_VALUE ? "" : value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={labels.notSpecified} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE_VALUE}>{labels.notSpecified}</SelectItem>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label>{labels.preferredPurchaseWarehouse}</Label>
-                  <Select
-                    value={activeForm.preferredPurchaseWarehouseId || NONE_VALUE}
-                    onValueChange={(value) => patchActiveField("preferredPurchaseWarehouseId", value === NONE_VALUE ? "" : value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={labels.notSpecified} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE_VALUE}>{labels.notSpecified}</SelectItem>
-                      {warehouses.filter((warehouse) => warehouse.isActive).map((warehouse) => (
-                        <SelectItem key={warehouse.id} value={warehouse.id}>
-                          {warehouse.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>{labels.preferredSalesWarehouse}</Label>
-                  <Select
-                    value={activeForm.preferredSalesWarehouseId || NONE_VALUE}
-                    onValueChange={(value) => patchActiveField("preferredSalesWarehouseId", value === NONE_VALUE ? "" : value)}
-                    disabled={!isStockManaged}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={labels.notSpecified} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE_VALUE}>{labels.notSpecified}</SelectItem>
-                      {warehouses.filter((warehouse) => warehouse.isActive).map((warehouse) => (
-                        <SelectItem key={warehouse.id} value={warehouse.id}>
-                          {warehouse.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <label className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700">
-                <input
-                  type="checkbox"
-                  checked={activeForm.productType === "SERVICE" ? false : activeForm.stockTrackingEnabled}
-                  onChange={(event) => patchActiveForm((prev) => ({ ...prev, stockTrackingEnabled: event.target.checked }))}
-                  disabled={activeForm.productType === "SERVICE"}
-                />
-                {labels.stockTrackingEnabled}
-              </label>
               <div className="grid gap-2">
-                <p className="text-xs text-neutral-500">{locale === "tr" ? `Toplam görsel adedi: ${getGalleryImages(activeForm).length}/${MAX_PRODUCT_IMAGES}` : `Total image count: ${getGalleryImages(activeForm).length}/${MAX_PRODUCT_IMAGES}`}</p>
+                <p className="text-xs text-neutral-500">{`Toplam görsel adedi: ${getGalleryImages(activeForm).length}/${MAX_PRODUCT_IMAGES}`}</p>
                 <div className="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 md:grid-cols-[1fr_auto] md:items-end">
                   <div className="grid gap-1">
                     <Label>{labels.uploadImages}</Label>
@@ -1037,8 +1085,8 @@ export function ProductManager({
 
                 {getGalleryImages(activeForm).length > 0 ? (
                   <div className="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-                    <p className="text-xs text-neutral-500">{locale === "tr" ? "Bir görseli ana görsel olarak seçin." : "Select one image as the main image."}</p>
-                    <p className="text-xs text-neutral-400">{locale === "tr" ? "Ana görsel, ürün listesi ve detay sayfasında öne çıkan görsel olarak kullanılır." : "The main image is used as the featured image on product listings and detail pages."}</p>
+                    <p className="text-xs text-neutral-500">Bir görseli ana görsel olarak seçin.</p>
+                    <p className="text-xs text-neutral-400">Ana görsel, ürün listesi ve detay sayfasında öne çıkan görsel olarak kullanılır.</p>
                     <div className="grid gap-3 sm:grid-cols-2">
                       {getGalleryImages(activeForm).map((url) => {
                         const isMain = url === activeForm.imageUrl;
@@ -1049,10 +1097,10 @@ export function ProductManager({
                             <img src={url} alt="" className="h-32 w-full object-cover" />
                             <div className="flex items-center justify-between gap-2 p-2">
                               <Button type="button" size="sm" variant={isMain ? "default" : "outline"} onClick={() => setMainImage(url)}>
-                                {isMain ? (locale === "tr" ? "Ana Görsel" : "Main Image") : (locale === "tr" ? "Ana Yap" : "Set Main")}
+                                {isMain ? "Ana Görsel" : "Ana Yap"}
                               </Button>
                               <Button type="button" size="sm" variant="outline" onClick={() => removeImage(url)}>
-                                {locale === "tr" ? "Sil" : "Remove"}
+                                Sil
                               </Button>
                             </div>
                           </div>

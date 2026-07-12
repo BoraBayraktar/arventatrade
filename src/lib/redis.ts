@@ -10,12 +10,41 @@ function getRedisConnectTimeoutMs() {
   return Number.isFinite(value) && value > 0 ? value : DEFAULT_REDIS_CONNECT_TIMEOUT_MS;
 }
 
+function getValidatedRedisUrl() {
+  const rawUrl = process.env.REDIS_URL?.trim();
+  if (!rawUrl) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "redis:" && parsed.protocol !== "rediss:") {
+      throw new Error(`Unsupported protocol: ${parsed.protocol}`);
+    }
+
+    return parsed.toString();
+  } catch (error) {
+    logError("Redis URL is invalid, cache disabled", {
+      scope: "redis",
+      error: String(error),
+    });
+    return null;
+  }
+}
+
 class RedisCache {
   private client: RedisClientType | null = null;
   private initializing = false;
+  private disabled = false;
 
   private async ensureClient() {
-    if (!process.env.REDIS_URL) {
+    if (this.disabled) {
+      return null;
+    }
+
+    const redisUrl = getValidatedRedisUrl();
+    if (!redisUrl) {
+      this.disabled = true;
       return null;
     }
 
@@ -31,7 +60,7 @@ class RedisCache {
 
     try {
       const client = createClient({
-        url: process.env.REDIS_URL,
+        url: redisUrl,
         socket: {
           connectTimeout: getRedisConnectTimeoutMs(),
         },
@@ -44,6 +73,7 @@ class RedisCache {
       return this.client;
     } catch (error) {
       logError("Redis initialization failed", { scope: "redis", error: String(error) });
+      this.disabled = true;
       return null;
     } finally {
       this.initializing = false;

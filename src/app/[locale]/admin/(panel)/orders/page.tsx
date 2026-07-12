@@ -10,7 +10,7 @@ type OrdersPageProps = {
 };
 
 function formatMoney(value: number, currency: string, locale: Locale) {
-  return new Intl.NumberFormat(locale === "tr" ? "tr-TR" : "en-US", {
+  return new Intl.NumberFormat(locale === "tr" ? "tr-TR" : "tr-TR", {
     style: "currency",
     currency,
   }).format(value);
@@ -18,7 +18,7 @@ function formatMoney(value: number, currency: string, locale: Locale) {
 
 function formatDate(value: string, locale: Locale) {
   const date = new Date(value);
-  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "tr-TR", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);

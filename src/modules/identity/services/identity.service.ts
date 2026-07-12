@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { createPrivateKey, randomUUID } from "node:crypto";
 
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, decodeJwt, jwtVerify } from "jose";
 import { compare, hash } from "bcryptjs";
 import { z } from "zod";
 
@@ -15,6 +15,7 @@ import type {
   LoginResult,
   RegisterInput,
   ResetPasswordInput,
+  SocialAuthProfile,
 } from "@/modules/identity/contracts/identity.contract";
 import { IdentityRepository } from "@/modules/identity/repositories/identity.repository";
 import { NotificationEmailRepository } from "@/modules/system/repositories/notification-email.repository";
@@ -70,11 +71,37 @@ async function signSessionToken(user: AuthUser, sid: string) {
     .sign(getJwtSecret());
 }
 
+function getApplePrivateKey() {
+  const raw = process.env.APPLE_OAUTH_PRIVATE_KEY;
+  if (!raw) {
+    return null;
+  }
+
+  return createPrivateKey(raw.replace(/\\n/g, "\n"));
+}
+
 export class IdentityService {
   constructor(
     private readonly repository: IdentityRepository,
     private readonly emailRepository: NotificationEmailRepository,
   ) {}
+
+  private async createSessionForUser(user: AuthUser): Promise<LoginResult> {
+    const sid = randomUUID();
+    const token = await signSessionToken(user, sid);
+
+    const session: IdentitySession = {
+      sid,
+      user,
+    };
+
+    await redisCache.set(getSessionCacheKey(sid), session, AUTH_TOKEN_TTL_SECONDS);
+
+    return {
+      token,
+      user,
+    };
+  }
 
   async register(input: RegisterInput): Promise<LoginResult> {
     const parsed = registerSchema.parse(input);
@@ -98,20 +125,7 @@ export class IdentityService {
       role: created.role,
     };
 
-    const sid = randomUUID();
-    const token = await signSessionToken(user, sid);
-
-    const session: IdentitySession = {
-      sid,
-      user,
-    };
-
-    await redisCache.set(getSessionCacheKey(sid), session, AUTH_TOKEN_TTL_SECONDS);
-
-    return {
-      token,
-      user,
-    };
+    return this.createSessionForUser(user);
   }
 
   async login(input: LoginInput): Promise<LoginResult | null> {
@@ -134,20 +148,7 @@ export class IdentityService {
       role: account.role,
     };
 
-    const sid = randomUUID();
-    const token = await signSessionToken(user, sid);
-
-    const session: IdentitySession = {
-      sid,
-      user,
-    };
-
-    await redisCache.set(getSessionCacheKey(sid), session, AUTH_TOKEN_TTL_SECONDS);
-
-    return {
-      token,
-      user,
-    };
+    return this.createSessionForUser(user);
   }
 
   async getAuthenticatedUser(token?: string): Promise<AuthUser | null> {
@@ -286,6 +287,145 @@ export class IdentityService {
     });
 
     return { ok: true };
+  }
+
+  async loginWithSocialProfile(profile: SocialAuthProfile): Promise<LoginResult> {
+    const linked = await this.repository.findSocialAccount(profile.provider, profile.providerAccountId);
+    if (linked?.user) {
+      return this.createSessionForUser(linked.user);
+    }
+
+    const normalizedEmail = profile.email?.trim().toLowerCase() ?? `${profile.provider}-${profile.providerAccountId}@oauth.local`;
+    const existing = await this.repository.findByEmail(normalizedEmail);
+
+    if (existing) {
+      await this.repository.attachSocialAccountToUser({
+        userId: existing.id,
+        provider: profile.provider,
+        providerAccountId: profile.providerAccountId,
+        providerEmail: profile.email,
+      });
+
+      return this.createSessionForUser({
+        id: existing.id,
+        email: existing.email,
+        name: existing.name,
+        role: existing.role,
+      });
+    }
+
+    const created = await this.repository.createCustomerWithSocialAccount({
+      email: normalizedEmail,
+      name: profile.name?.trim() || (profile.provider === "google" ? "Google User" : "Apple User"),
+      passwordHash: await hash(randomUUID(), 10),
+      provider: profile.provider,
+      providerAccountId: profile.providerAccountId,
+      providerEmail: profile.email,
+    });
+
+    return this.createSessionForUser(created);
+  }
+
+  getGoogleOAuthConfig() {
+    const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+    const appUrl = process.env.APP_URL;
+
+    if (!clientId || !clientSecret || !appUrl) {
+      return null;
+    }
+
+    return {
+      clientId,
+      clientSecret,
+      appUrl,
+      redirectUri: `${appUrl}/api/identity/oauth/google/callback`,
+    };
+  }
+
+  getFacebookOAuthConfig() {
+    const clientId = process.env.FACEBOOK_OAUTH_CLIENT_ID;
+    const clientSecret = process.env.FACEBOOK_OAUTH_CLIENT_SECRET;
+    const appUrl = process.env.APP_URL;
+
+    if (!clientId || !clientSecret || !appUrl) {
+      return null;
+    }
+
+    return {
+      clientId,
+      clientSecret,
+      appUrl,
+      redirectUri: `${appUrl}/api/identity/oauth/facebook/callback`,
+    };
+  }
+
+  getAppleOAuthConfig() {
+    const clientId = process.env.APPLE_OAUTH_CLIENT_ID;
+    const teamId = process.env.APPLE_OAUTH_TEAM_ID;
+    const keyId = process.env.APPLE_OAUTH_KEY_ID;
+    const appUrl = process.env.APP_URL;
+    const privateKey = getApplePrivateKey();
+
+    if (!clientId || !teamId || !keyId || !appUrl || !privateKey) {
+      return null;
+    }
+
+    return {
+      clientId,
+      teamId,
+      keyId,
+      appUrl,
+      redirectUri: `${appUrl}/api/identity/oauth/apple/callback`,
+      privateKey,
+    };
+  }
+
+  async createAppleClientSecret() {
+    const config = this.getAppleOAuthConfig();
+    if (!config) {
+      return null;
+    }
+
+    return new SignJWT({})
+      .setProtectedHeader({ alg: "ES256", kid: config.keyId })
+      .setIssuer(config.teamId)
+      .setAudience("https://appleid.apple.com")
+      .setSubject(config.clientId)
+      .setIssuedAt()
+      .setExpirationTime("1h")
+      .sign(config.privateKey);
+  }
+
+  extractGoogleProfile(idToken: string): SocialAuthProfile {
+    const payload = decodeJwt(idToken);
+
+    return {
+      provider: "google",
+      providerAccountId: String(payload.sub ?? ""),
+      email: typeof payload.email === "string" ? payload.email : null,
+      name: typeof payload.name === "string" ? payload.name : null,
+    };
+  }
+
+  extractAppleProfile(idToken: string): SocialAuthProfile {
+    const payload = decodeJwt(idToken);
+
+    return {
+      provider: "apple",
+      providerAccountId: String(payload.sub ?? ""),
+      email: typeof payload.email === "string" ? payload.email : null,
+      name: typeof payload.name === "string" ? payload.name : null,
+    };
+  }
+
+  createFacebookProfile(payload: { id: string; email?: string; name?: string }): SocialAuthProfile {
+    return {
+      provider: "facebook",
+      providerAccountId: payload.id,
+      email: payload.email ?? null,
+      name: payload.name ?? null,
+    };
   }
 }
 

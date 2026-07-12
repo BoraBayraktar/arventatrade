@@ -25,7 +25,7 @@ export async function PATCH(
       entityId: updated.id,
       action: "UPDATE",
       actorUserId: user.id,
-      summary: `Product updated: ${updated.slug}`,
+      summary: `Ürün güncellendi: ${updated.slug}`,
     });
     return NextResponse.json({ item: updated });
   } catch (error) {
@@ -54,7 +54,7 @@ export async function DELETE(
       entityId: id,
       action: "DELETE",
       actorUserId: user.id,
-      summary: "Product soft-deleted",
+      summary: "Ürün silindi",
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -61,6 +61,10 @@ model Product {
   reviews         ProductReview[]
   questions       ProductQuestion[]
   storefrontItems StorefrontItem[]
+  externalStockEvents ExternalStockEvent[]
+  inventoryIntegrationMappings InventoryIntegrationMapping[]
+  purchaseReceiptLines PurchaseReceiptLine[]
+  inventoryHistoryEvents InventoryHistoryEvent[]
 
   @@index([categoryId])
   @@index([barcode])
@@ -261,6 +265,10 @@ model Warehouse {
   preferredPurchaseProducts Product[]    @relation("PreferredPurchaseWarehouseProducts")
   preferredSalesProducts Product[]       @relation("PreferredSalesWarehouseProducts")
   stockReservations  StockReservation[]
+  externalStockEvents ExternalStockEvent[]
+  inventoryIntegrationMappings InventoryIntegrationMapping[]
+  purchaseReceipts   PurchaseReceipt[]
+  inventoryHistoryEvents InventoryHistoryEvent[]
 
   @@index([isActive, isDefault])
   @@index([priority])
@@ -270,6 +278,9 @@ model InventoryItem {
   id                 String              @id @default(cuid())
   productId          String              @unique
   skuSnapshot        String
+  costingMethod      InventoryCostingMethod @default(AVERAGE_COST)
+  averageUnitCost    Decimal?            @db.Decimal(10, 2)
+  lastPurchaseUnitCost Decimal?          @db.Decimal(10, 2)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   inventoryAlerts    InventoryAlert[]
@@ -412,13 +423,57 @@ model InventoryTransaction {
   transactionNumber String                     @unique
   type              InventoryTransactionType
   reference         String?
+  sourceDocumentType String?
+  sourceDocumentId  String?
+  sourceDocumentNumber String?
+  sourceDocumentUrl String?
+  sourceDocumentDate DateTime?
+  externalReference String?
+  counterpartyName  String?
   note              String?
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
   lines             InventoryTransactionLine[]
   movements         InventoryMovement[]
+  purchaseReceipt   PurchaseReceipt?
 
   @@index([type, createdAt])
+  @@index([sourceDocumentType, sourceDocumentNumber])
+}
+
+model PurchaseReceipt {
+  id              String                @id @default(cuid())
+  receiptNumber   String                @unique
+  supplierName    String
+  receiptDate     DateTime
+  externalReference String?
+  note            String?
+  warehouseId     String
+  transactionId   String                @unique
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  warehouse       Warehouse             @relation(fields: [warehouseId], references: [id])
+  transaction     InventoryTransaction  @relation(fields: [transactionId], references: [id])
+  lines           PurchaseReceiptLine[]
+
+  @@index([warehouseId, receiptDate])
+  @@index([supplierName, receiptDate])
+}
+
+model PurchaseReceiptLine {
+  id                String          @id @default(cuid())
+  purchaseReceiptId String
+  productId         String
+  quantity          Int
+  unitCost          Decimal?        @db.Decimal(10, 2)
+  lineTotal         Decimal?        @db.Decimal(10, 2)
+  note              String?
+  createdAt         DateTime        @default(now())
+  purchaseReceipt   PurchaseReceipt @relation(fields: [purchaseReceiptId], references: [id])
+  product           Product         @relation(fields: [productId], references: [id])
+
+  @@index([purchaseReceiptId])
+  @@index([productId])
 }
 
 model InventoryTransactionLine {
@@ -495,6 +550,63 @@ model IntegrationDeadLetter {
   @@index([entityType, entityId])
 }
 
+model InventoryIntegrationMapping {
+  id                    String              @id @default(cuid())
+  channel               IntegrationChannel
+  externalProductId     String?
+  externalSku           String?
+  externalWarehouseCode String?
+  productId             String
+  warehouseId           String?
+  allowInboundUpdates   Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  deleted               Boolean             @default(false)
+  deletedDate           DateTime?
+  deletedUserId         String?
+  product               Product             @relation(fields: [productId], references: [id])
+  warehouse             Warehouse?          @relation(fields: [warehouseId], references: [id])
+  externalStockEvents   ExternalStockEvent[]
+
+  @@index([channel, deleted])
+  @@index([productId, deleted])
+  @@index([warehouseId, deleted])
+  @@unique([channel, externalProductId, externalWarehouseCode])
+  @@unique([channel, externalSku, externalWarehouseCode])
+}
+
+model ExternalStockEvent {
+  id                    String                     @id @default(cuid())
+  channel               IntegrationChannel
+  eventKey              String                     @unique
+  eventType             ExternalStockEventType
+  direction             ExternalStockEventDirection @default(INBOUND)
+  status                ExternalStockEventStatus   @default(RECEIVED)
+  externalProductId     String?
+  externalSku           String?
+  externalWarehouseCode String?
+  mappingId             String?
+  productId             String?
+  warehouseId           String?
+  quantity              Int
+  reference             String?
+  note                  String?
+  payload               Json?
+  appliedOnHand         Int?
+  appliedAvailable      Int?
+  errorMessage          String?
+  processedAt           DateTime?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  mapping               InventoryIntegrationMapping? @relation(fields: [mappingId], references: [id])
+  product               Product?                   @relation(fields: [productId], references: [id])
+  warehouse             Warehouse?                 @relation(fields: [warehouseId], references: [id])
+
+  @@index([channel, status, createdAt])
+  @@index([mappingId])
+  @@index([productId, warehouseId])
+}
+
 model StorefrontItem {
   id            String                @id @default(cuid())
   section       StorefrontSection
@@ -537,8 +649,51 @@ model User {
   deletedDate   DateTime?
   deletedUserId String?
   notifications UserNotification[]
+  socialAccounts SocialAccount[]
+  inventoryPreference UserInventoryPreference?
+  inventoryExportHistories InventoryExportHistory[]
 
   @@index([deleted])
+}
+
+model InventoryExportHistory {
+  id                   String   @id @default(cuid())
+  actorUserId          String?
+  total                Int      @default(0)
+  search               String?
+  stockStatusFilter    String?
+  reservationFilter    String?
+  warehouseFilter      String?
+  movementTypeFilter   String?
+  createdAt            DateTime @default(now())
+  actor                User?    @relation(fields: [actorUserId], references: [id])
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model UserInventoryPreference {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  compactInventoryList Boolean  @default(false)
+  visibleColumns       Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id])
+}
+
+model SocialAccount {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  providerEmail     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerAccountId])
+  @@index([userId, provider])
 }
 
 model UserNotification {
@@ -574,6 +729,32 @@ model AuditLog {
   @@index([actorUserId, createdAt])
 }
 
+model InventoryHistoryEvent {
+  id                String                    @id @default(cuid())
+  eventType         InventoryHistoryEventType
+  entityType        InventoryHistoryEntityType
+  entityId          String?
+  productId         String?
+  warehouseId       String?
+  transactionId     String?
+  stockCountId      String?
+  purchaseReceiptId String?
+  actorUserId       String?
+  title             String
+  summary           String
+  metadata          Json?
+  createdAt         DateTime                  @default(now())
+  product           Product?                  @relation(fields: [productId], references: [id])
+  warehouse         Warehouse?                @relation(fields: [warehouseId], references: [id])
+
+  @@index([createdAt])
+  @@index([eventType, createdAt])
+  @@index([entityType, createdAt])
+  @@index([productId, createdAt])
+  @@index([warehouseId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
 enum UserRole {
   ADMIN
   EDITOR
@@ -606,6 +787,23 @@ enum IntegrationJobStatus {
   SUCCESS
   FAILED
   DEAD_LETTER
+}
+
+enum ExternalStockEventType {
+  SNAPSHOT_ON_HAND
+  SNAPSHOT_AVAILABLE
+}
+
+enum ExternalStockEventDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum ExternalStockEventStatus {
+  RECEIVED
+  APPLIED
+  FAILED
+  DUPLICATE
 }
 
 enum InventoryMovementType {
@@ -716,4 +914,29 @@ enum UserNotificationType {
 enum UserNotificationChannel {
   IN_APP
   EMAIL
+}
+
+enum InventoryHistoryEventType {
+  STOCK_ADJUSTMENT
+  STOCK_TRANSFER
+  STOCK_IN
+  STOCK_OUT
+  STOCK_COUNT
+  WAREHOUSE_CREATED
+  WAREHOUSE_UPDATED
+  BULK_OPERATION
+}
+
+enum InventoryHistoryEntityType {
+  PRODUCT
+  WAREHOUSE
+  STOCK_COUNT
+  TRANSACTION
+  PURCHASE_RECEIPT
+  BULK_OPERATION
+}
+
+enum InventoryCostingMethod {
+  AVERAGE_COST
+  LAST_PURCHASE_COST
 }

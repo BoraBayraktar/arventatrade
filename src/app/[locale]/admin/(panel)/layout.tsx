@@ -40,7 +40,10 @@ export default async function AdminPanelLayout({
 
   const menuItems: MenuItem[] = [
     { href: `/${locale}/admin/products`, label: dictionary.admin.productManager },
-    { href: `/${locale}/admin/inventory`, label: dictionary.admin.inventoryManager },
+    { href: `/${locale}/admin/inventory`, label: `${dictionary.admin.inventoryManager} / Genel Bakış` },
+    { href: `/${locale}/admin/inventory/transactions`, label: dictionary.admin.inventoryTransactionsTitle },
+    { href: `/${locale}/admin/inventory/counts`, label: dictionary.admin.inventoryStockCountTitle },
+    { href: `/${locale}/admin/inventory/warehouses`, label: dictionary.admin.inventoryWarehousesTitle },
     { href: `/${locale}/admin/product-questions`, label: dictionary.admin.questionManager },
     { href: `/${locale}/admin/categories`, label: dictionary.admin.categoryManager },
     { href: `/${locale}/admin/storefront`, label: dictionary.admin.storefrontManager },

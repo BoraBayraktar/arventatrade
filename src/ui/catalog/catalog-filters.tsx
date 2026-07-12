@@ -30,7 +30,6 @@ type FeatureFacet = {
 };
 
 type Props = {
-  locale: string;
   categories: Category[];
   initialSearch?: string;
   initialCategory?: string;
@@ -73,7 +72,6 @@ type Props = {
 };
 
 export function CatalogFilters({
-  locale,
   categories,
   initialSearch,
   initialCategory,

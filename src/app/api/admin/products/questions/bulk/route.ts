@@ -31,8 +31,8 @@ export async function POST(request: Request) {
       actorUserId: user.id,
       summary:
         payload?.action === "answer"
-          ? `Bulk answer for product questions: ${result.affected}`
-          : `Bulk remove product questions: ${result.affected}`,
+          ? `Ürün sorularına toplu yanıt verildi: ${result.affected}`
+          : `Ürün soruları toplu kaldırıldı: ${result.affected}`,
       metadata: {
         action: payload?.action,
         count: result.affected,

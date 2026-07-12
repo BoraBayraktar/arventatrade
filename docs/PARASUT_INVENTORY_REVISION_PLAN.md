@@ -2,6 +2,11 @@
 
 Bu dokuman, mevcut ArventaTrade stok yonetimini Paraşüt'teki stok ve depo operasyonlarina daha yakin hale getirmek icin fazli bir uygulama plani sunar.
 
+Not:
+
+- Faz 1 analiz ciktisi tamamlandi
+- detayli Faz 1 bosluk matrisi icin `docs/PARASUT_PHASE1_GAP_ANALYSIS.md` dosyasina bakin
+
 ## 1. Amac
 
 Hedef:
@@ -56,6 +61,7 @@ Kapsam:
 - Tum stok okuma/yazma operasyonlarini inventory aggregate uzerinden gecirmek
 - `inventoryService` icinde tek bir stok hesaplama dogrusu tanimlamak
 - `Product.stock` ile inventory toplamlarinin gecis doneminde uyumunu koruyacak senkron strateji belirlemek
+- resmi stok otoritesi ve gecis kurallarini repo dokumani olarak netlestirmek (`docs/INVENTORY_STOCK_AUTHORITY.md`)
 
 Veri modeli:
 
@@ -311,6 +317,35 @@ Kabul kriterleri:
 - Ayni event iki kez islenmez
 - Sync hatalari admin tarafinda izlenebilir
 
+Sprint 2 notu:
+
+- `InventoryIntegrationMapping` ve `ExternalStockEvent` omurgasi inventory modulu icinde kuruldu
+- inbound event uygulamasi yalnizca explicit mapping ve izinli kayitlar uzerinden calisir
+
+Sprint 3 notu:
+
+- stok girisi akisi satin alma belge bilgileriyle genisletildi
+- `PurchaseReceipt` ve `PurchaseReceiptLine` uzerinden belge bazli stok girisi izi eklendi
+- stok hareketleri belge numarasi, tedarikci ve harici referans ile daha kurumsal izlenebilir hale getirildi
+
+Sprint 4 notu:
+
+- belge referanslari artik `InventoryTransaction` ustunde merkezilesti
+- hareket metadata icindeki belge baglamina ek olarak transaction seviyesi belge tarihi, dis referans ve taraf bilgisi saklaniyor
+- transaction liste ve detay ekranlari belge baglamini bu merkezi modelden okuyor
+
+Sprint 5 notu:
+
+- inventory operasyon gecmisi genel `AuditLog` listesinden ayrildi
+- `InventoryHistoryEvent` projection modeli ile inventory'ye ozel kalici gecmis omurgasi kuruldu
+- inventory panelindeki operasyon gecmisi artik bu projection katmanindan okunuyor
+
+Sprint 6 notu:
+
+- raporlamada resmi maliyet yaklasimi `Ağırlıklı ortalama maliyet` olarak netlestirildi
+- `InventoryItem` uzerinde `averageUnitCost` ve `lastPurchaseUnitCost` tutuluyor
+- satin alma girislerinde maliyet kaydi guncelleniyor, raporlar varsayilan olarak ortalama maliyetten besleniyor
+
 Risk:
 
 - Inventory otoritesi ic sistem mi dis sistem mi olacak karari erken verilmelidir
@@ -368,4 +403,3 @@ Ilk sprintte alinabilecek net kapsam:
 Beklenen ciktı:
 
 - Geriye donuk uyumlu ama gelecege hazir bir inventory temeli
-

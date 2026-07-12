@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       entityId: created.id,
       action: "CREATE",
       actorUserId: user.id,
-      summary: `Stock count created: ${created.countNumber}`,
+      summary: `Stok sayımı oluşturuldu: ${created.countNumber}`,
       metadata: {
         warehouseCode: created.warehouseCode,
         lineCount: created.lineCount,

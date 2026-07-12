@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -100,7 +100,7 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
     return new Map(parentCandidates.map((item) => [item.id, item]));
   }, [parentCandidates]);
 
-  const getCategoryBreadcrumb = (categoryId: string) => {
+  const getCategoryBreadcrumb = useCallback((categoryId: string) => {
     const path: string[] = [];
     const visited = new Set<string>();
     let cursor: string | null = categoryId;
@@ -122,9 +122,9 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
     }
 
     return path.join(" > ");
-  };
+  }, [candidateById]);
 
-  const getCategoryDepth = (categoryId: string) => {
+  const getCategoryDepth = useCallback((categoryId: string) => {
     let depth = 0;
     const visited = new Set<string>();
     let cursor: string | null = categoryId;
@@ -146,7 +146,7 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
     }
 
     return depth;
-  };
+  }, [candidateById]);
 
   const getParentBreadcrumb = (category: Category) => {
     if (!category.parentId) {
@@ -188,7 +188,7 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
         label: getCategoryBreadcrumb(item.id),
       }))
       .sort((a, b) => a.label.localeCompare(b.label, "tr"));
-  }, [parentCandidates]);
+  }, [getCategoryBreadcrumb, getCategoryDepth, parentCandidates]);
 
   function patchActiveField(field: keyof CategoryForm, value: string) {
     if (drawerMode === "edit") {

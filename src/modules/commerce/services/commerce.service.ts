@@ -382,7 +382,13 @@ export class CommerceService {
       });
       createdOrderNumber = createdOrder.orderNumber;
     } catch (error) {
-      if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
+      if (
+        error instanceof Error
+        && (
+          error.message.startsWith("INSUFFICIENT_STOCK")
+          || error.message.startsWith("STALE_RESERVATION_LEVEL")
+        )
+      ) {
         throw new CommerceCheckoutError("Insufficient stock for one or more products", 409);
       }
 

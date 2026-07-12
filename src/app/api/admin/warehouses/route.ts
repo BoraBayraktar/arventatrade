@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       entityId: created.id,
       action: "CREATE",
       actorUserId: user.id,
-      summary: `Warehouse created: ${created.code}`,
+      summary: `Depo oluşturuldu: ${created.code}`,
     });
     return NextResponse.json({ item: created }, { status: 201 });
   } catch (error) {

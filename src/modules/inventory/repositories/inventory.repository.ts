@@ -2,10 +2,14 @@ import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import type {
+  AdminInventoryExportHistoryItem,
+  AdminInventoryListPreferences,
   AdminCreateStockCountInput,
   AdminCreateWarehouseInput,
   AdminUpdateStockCountLineInput,
   AdminUpdateWarehouseInput,
+  BulkAssignPreferredWarehouseRowInput,
+  BulkStockCountLineRowInput,
 } from "@/modules/inventory/contracts/inventory.contract";
 
 type SyncInventoryStateArgs = {
@@ -34,11 +38,65 @@ type RecordInventoryMovementArgs = {
   quantity: number;
   type: "PURCHASE_RECEIPT" | "DAMAGE_WRITE_OFF";
   note?: string;
+  sourceDocumentNumber?: string;
+  sourceDocumentDate?: Date;
+  sourceDocumentSupplier?: string;
+  sourceDocumentReference?: string;
+  unitCost?: number | null;
+};
+
+type UpsertInventoryIntegrationMappingArgs = {
+  channel: "TRENDYOL" | "N11";
+  externalProductId?: string | null;
+  externalSku?: string | null;
+  externalWarehouseCode?: string | null;
+  productId: string;
+  warehouseCode?: string | null;
+  allowInboundUpdates: boolean;
+};
+
+type CreateExternalStockEventArgs = {
+  channel: "TRENDYOL" | "N11";
+  eventKey: string;
+  eventType: "SNAPSHOT_ON_HAND" | "SNAPSHOT_AVAILABLE";
+  externalProductId?: string | null;
+  externalSku?: string | null;
+  externalWarehouseCode?: string | null;
+  quantity: number;
+  reference?: string | null;
+  note?: string | null;
+  payload?: Prisma.InputJsonValue;
 };
 
 export class InventoryRepository {
+  private readonly serializableRetryCount = 3;
+
   private toAvailableStock(onHand: number, reserved: number) {
     return Math.max(0, onHand - reserved);
+  }
+
+  private async runSerializableTransaction<T>(
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 1; attempt <= this.serializableRetryCount; attempt += 1) {
+      try {
+        return await prisma.$transaction(operation, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError
+          && error.code === "P2034"
+          && attempt < this.serializableRetryCount
+        ) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new Error("SERIALIZABLE_TRANSACTION_FAILED");
   }
 
   private async createInventoryTransaction(
@@ -46,6 +104,13 @@ export class InventoryRepository {
     args: {
       type: "MANUAL_ADJUSTMENT" | "STOCK_IN" | "STOCK_OUT" | "TRANSFER" | "STOCK_COUNT";
       reference?: string | null;
+      sourceDocumentType?: string | null;
+      sourceDocumentId?: string | null;
+      sourceDocumentNumber?: string | null;
+      sourceDocumentUrl?: string | null;
+      sourceDocumentDate?: Date | null;
+      externalReference?: string | null;
+      counterpartyName?: string | null;
       note?: string | null;
     },
   ) {
@@ -56,6 +121,13 @@ export class InventoryRepository {
         transactionNumber,
         type: args.type,
         reference: args.reference ?? null,
+        sourceDocumentType: args.sourceDocumentType ?? null,
+        sourceDocumentId: args.sourceDocumentId ?? null,
+        sourceDocumentNumber: args.sourceDocumentNumber ?? null,
+        sourceDocumentUrl: args.sourceDocumentUrl ?? null,
+        sourceDocumentDate: args.sourceDocumentDate ?? null,
+        externalReference: args.externalReference ?? null,
+        counterpartyName: args.counterpartyName ?? null,
         note: args.note ?? null,
       },
       select: {
@@ -65,6 +137,7 @@ export class InventoryRepository {
     });
   }
 
+  // Product.stock is a legacy summary. Aggregate truth always comes from active inventory levels.
   private async recalculateProductStock(tx: Prisma.TransactionClient, productId: string, inventoryItemId: string) {
     const activeLevels = await tx.inventoryLevel.findMany({
       where: {
@@ -112,7 +185,23 @@ export class InventoryRepository {
         name: true,
         imageUrl: true,
         currency: true,
+        barcode: true,
+        unitType: true,
+        productType: true,
+        price: true,
+        purchasePrice: true,
+        compareAtPrice: true,
         stock: true,
+        preferredSalesWarehouse: {
+          select: {
+            code: true,
+          },
+        },
+        preferredPurchaseWarehouse: {
+          select: {
+            code: true,
+          },
+        },
         inventoryItem: {
           select: {
             id: true,
@@ -142,25 +231,94 @@ export class InventoryRepository {
                 },
               },
             },
-            inventoryMovements: {
-              orderBy: {
-                createdAt: "desc",
-              },
-              take: 40,
-              select: {
-                warehouseId: true,
-                createdAt: true,
-                type: true,
-                quantity: true,
-                note: true,
-                metadata: true,
-              },
-            },
           },
         },
       },
       orderBy: {
         updatedAt: "desc",
+      },
+    });
+  }
+
+  async listInventoryOverviewMovements(inventoryItemIds: string[], movementTake: number) {
+    if (inventoryItemIds.length === 0) {
+      return [];
+    }
+
+    return prisma.inventoryMovement.findMany({
+      where: {
+        inventoryItemId: {
+          in: inventoryItemIds,
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      select: {
+        inventoryItemId: true,
+        warehouseId: true,
+        createdAt: true,
+        type: true,
+        quantity: true,
+        note: true,
+        metadata: true,
+      },
+      take: Math.max(inventoryItemIds.length * movementTake, movementTake),
+    });
+  }
+
+  async createInventoryExportHistory(input: {
+    actorUserId?: string | null;
+    total: number;
+    filters: AdminInventoryExportHistoryItem["filters"];
+  }) {
+    const exportHistoryDelegate = (prisma as typeof prisma & {
+      inventoryExportHistory: {
+        create: typeof prisma.auditLog.create;
+      };
+    }).inventoryExportHistory;
+
+    if (typeof exportHistoryDelegate === "undefined") {
+      return null;
+    }
+
+    return exportHistoryDelegate.create({
+      data: {
+        actorUserId: input.actorUserId ?? null,
+        total: input.total,
+        search: input.filters.search ?? null,
+        stockStatusFilter: input.filters.stockStatusFilter ?? null,
+        reservationFilter: input.filters.reservationFilter ?? null,
+        warehouseFilter: input.filters.warehouseFilter ?? null,
+        movementTypeFilter: input.filters.movementTypeFilter ?? null,
+      },
+    });
+  }
+
+  async listInventoryExportHistories(limit: number) {
+    const exportHistoryDelegate = (prisma as typeof prisma & {
+      inventoryExportHistory: {
+        findMany: typeof prisma.auditLog.findMany;
+      };
+    }).inventoryExportHistory;
+
+    if (typeof exportHistoryDelegate === "undefined") {
+      return [];
+    }
+
+    return exportHistoryDelegate.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: limit,
+      include: {
+        actor: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
   }
@@ -274,6 +432,15 @@ export class InventoryRepository {
       skip: ((args.page ?? 1) - 1) * (args.pageSize ?? 10),
       take: args.pageSize ?? 10,
       include: {
+        purchaseReceipt: {
+          select: {
+            id: true,
+            receiptNumber: true,
+            receiptDate: true,
+            externalReference: true,
+            supplierName: true,
+          },
+        },
         lines: {
           orderBy: {
             createdAt: "asc",
@@ -379,6 +546,413 @@ export class InventoryRepository {
     });
   }
 
+  async findWarehouseById(id: string) {
+    return prisma.warehouse.findFirst({
+      where: {
+        id,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        isDefault: true,
+      },
+    });
+  }
+
+  async findProductsBySkus(skus: string[]) {
+    return prisma.product.findMany({
+      where: {
+        sku: {
+          in: skus,
+        },
+        deleted: false,
+      },
+      select: {
+        id: true,
+        sku: true,
+      },
+    });
+  }
+
+  async listInventoryIntegrationMappings() {
+    return prisma.inventoryIntegrationMapping.findMany({
+      where: {
+        deleted: false,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+          },
+        },
+        warehouse: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
+        },
+      },
+    });
+  }
+
+  async upsertInventoryIntegrationMapping(args: UpsertInventoryIntegrationMappingArgs) {
+    const warehouse = args.warehouseCode
+      ? await prisma.warehouse.findFirst({
+          where: {
+            code: args.warehouseCode,
+            isActive: true,
+          },
+          select: {
+            id: true,
+          },
+        })
+      : null;
+
+    const existing = await prisma.inventoryIntegrationMapping.findFirst({
+      where: {
+        deleted: false,
+        channel: args.channel,
+        externalProductId: args.externalProductId ?? null,
+        externalSku: args.externalSku ?? null,
+        externalWarehouseCode: args.externalWarehouseCode ?? null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const data = {
+      channel: args.channel,
+      externalProductId: args.externalProductId ?? null,
+      externalSku: args.externalSku ?? null,
+      externalWarehouseCode: args.externalWarehouseCode ?? null,
+      productId: args.productId,
+      warehouseId: warehouse?.id ?? null,
+      allowInboundUpdates: args.allowInboundUpdates,
+      deleted: false,
+      deletedDate: null,
+      deletedUserId: null,
+    };
+
+    return existing
+      ? prisma.inventoryIntegrationMapping.update({
+          where: {
+            id: existing.id,
+          },
+          data,
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+              },
+            },
+            warehouse: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              },
+            },
+          },
+        })
+      : prisma.inventoryIntegrationMapping.create({
+          data,
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+              },
+            },
+            warehouse: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              },
+            },
+          },
+        });
+  }
+
+  async createExternalStockEvent(args: CreateExternalStockEventArgs) {
+    const existing = await prisma.externalStockEvent.findUnique({
+      where: {
+        eventKey: args.eventKey,
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+          },
+        },
+        warehouse: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (existing) {
+      return {
+        event: existing,
+        duplicate: true,
+      };
+    }
+
+    const event = await prisma.externalStockEvent.create({
+      data: {
+        channel: args.channel,
+        eventKey: args.eventKey,
+        eventType: args.eventType,
+        externalProductId: args.externalProductId ?? null,
+        externalSku: args.externalSku ?? null,
+        externalWarehouseCode: args.externalWarehouseCode ?? null,
+        quantity: args.quantity,
+        reference: args.reference ?? null,
+        note: args.note ?? null,
+        payload: args.payload ?? Prisma.JsonNull,
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+          },
+        },
+        warehouse: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    return {
+      event,
+      duplicate: false,
+    };
+  }
+
+  async findInventoryIntegrationMapping(args: {
+    channel: "TRENDYOL" | "N11";
+    externalProductId?: string | null;
+    externalSku?: string | null;
+    externalWarehouseCode?: string | null;
+  }) {
+    return prisma.inventoryIntegrationMapping.findFirst({
+      where: {
+        deleted: false,
+        channel: args.channel,
+        OR: [
+          ...(args.externalProductId
+            ? [{
+                externalProductId: args.externalProductId,
+                externalWarehouseCode: args.externalWarehouseCode ?? null,
+              }]
+            : []),
+          ...(args.externalSku
+            ? [{
+                externalSku: args.externalSku,
+                externalWarehouseCode: args.externalWarehouseCode ?? null,
+              }]
+            : []),
+          ...(args.externalProductId && args.externalWarehouseCode
+            ? [{
+                externalProductId: args.externalProductId,
+              }]
+            : []),
+          ...(args.externalSku && args.externalWarehouseCode
+            ? [{
+                externalSku: args.externalSku,
+              }]
+            : []),
+        ],
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            inventoryItem: {
+              select: {
+                id: true,
+                inventoryLevels: {
+                  where: {
+                    warehouse: {
+                      isActive: true,
+                    },
+                  },
+                  select: {
+                    warehouseId: true,
+                    onHand: true,
+                    reserved: true,
+                    warehouse: {
+                      select: {
+                        id: true,
+                        code: true,
+                        name: true,
+                        isDefault: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        warehouse: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
+        },
+      },
+    });
+  }
+
+  async markExternalStockEventApplied(args: {
+    eventId: string;
+    mappingId: string;
+    productId: string;
+    warehouseId: string;
+    appliedOnHand: number;
+    appliedAvailable: number;
+  }) {
+    return prisma.externalStockEvent.update({
+      where: {
+        id: args.eventId,
+      },
+      data: {
+        status: "APPLIED",
+        mappingId: args.mappingId,
+        productId: args.productId,
+        warehouseId: args.warehouseId,
+        appliedOnHand: args.appliedOnHand,
+        appliedAvailable: args.appliedAvailable,
+        errorMessage: null,
+        processedAt: new Date(),
+      },
+    });
+  }
+
+  async markExternalStockEventFailed(args: {
+    eventId: string;
+    mappingId?: string | null;
+    productId?: string | null;
+    warehouseId?: string | null;
+    errorMessage: string;
+  }) {
+    return prisma.externalStockEvent.update({
+      where: {
+        id: args.eventId,
+      },
+      data: {
+        status: "FAILED",
+        mappingId: args.mappingId ?? null,
+        productId: args.productId ?? null,
+        warehouseId: args.warehouseId ?? null,
+        errorMessage: args.errorMessage,
+        processedAt: new Date(),
+      },
+    });
+  }
+
+  async listRecentExternalStockEvents(limit: number) {
+    return prisma.externalStockEvent.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: limit,
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+          },
+        },
+        warehouse: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
+        },
+      },
+    });
+  }
+
+  async assignPreferredSalesWarehouses(rows: BulkAssignPreferredWarehouseRowInput[]) {
+    return prisma.$transaction(async (tx) => {
+      const skuList = rows.map((row) => row.sku);
+      const warehouseCodes = Array.from(new Set(rows.map((row) => row.preferredSalesWarehouseCode)));
+      const [products, warehouses] = await Promise.all([
+        tx.product.findMany({
+          where: {
+            sku: {
+              in: skuList,
+            },
+            deleted: false,
+          },
+          select: {
+            id: true,
+            sku: true,
+          },
+        }),
+        tx.warehouse.findMany({
+          where: {
+            code: {
+              in: warehouseCodes,
+            },
+            isActive: true,
+          },
+          select: {
+            id: true,
+            code: true,
+          },
+        }),
+      ]);
+
+      const productMap = new Map(products.map((product) => [product.sku, product]));
+      const warehouseMap = new Map(warehouses.map((warehouse) => [warehouse.code, warehouse]));
+
+      for (const row of rows) {
+        const product = productMap.get(row.sku);
+        const warehouse = warehouseMap.get(row.preferredSalesWarehouseCode);
+
+        if (!product || !warehouse) {
+          continue;
+        }
+
+        await tx.product.update({
+          where: {
+            id: product.id,
+          },
+          data: {
+            preferredSalesWarehouseId: warehouse.id,
+          },
+        });
+      }
+    });
+  }
+
   async createWarehouse(input: AdminCreateWarehouseInput) {
     return prisma.$transaction(async (tx) => {
       if (input.isDefault) {
@@ -458,7 +1032,7 @@ export class InventoryRepository {
   }
 
   async syncProductInventoryState(args: SyncInventoryStateArgs) {
-    return prisma.$transaction(async (tx) => {
+    return this.runSerializableTransaction(async (tx) => {
       const product = await tx.product.findFirst({
         where: {
           id: args.productId,
@@ -593,7 +1167,7 @@ export class InventoryRepository {
               warehouseId: warehouse.id,
               type: "INITIAL_LOAD",
               quantity: onHandStock,
-              note: "Inventory foundation lazy initialization from Product.stock",
+              note: "Envanter temeli Product.stock özetinden başlatıldı",
             },
           });
         }
@@ -630,7 +1204,11 @@ export class InventoryRepository {
         if (args.targetOnHandStock !== undefined && delta !== 0) {
           const inventoryTransaction = await this.createInventoryTransaction(tx, {
             type: "MANUAL_ADJUSTMENT",
-            note: args.note ?? "Catalog admin stock synchronization",
+            reference: product.sku,
+            sourceDocumentType: "INVENTORY_ADJUSTMENT",
+            sourceDocumentId: product.id,
+            sourceDocumentNumber: product.sku,
+            note: args.note ?? "Katalog yönetimi stok eşitlemesi",
           });
 
           await tx.inventoryTransactionLine.create({
@@ -639,7 +1217,7 @@ export class InventoryRepository {
               inventoryItemId,
               toWarehouseId: warehouse.id,
               quantity: Math.abs(delta),
-              note: args.note ?? "Catalog admin stock synchronization",
+              note: args.note ?? "Katalog yönetimi stok eşitlemesi",
             },
           });
 
@@ -650,36 +1228,24 @@ export class InventoryRepository {
               transactionId: inventoryTransaction.id,
               type: "MANUAL_ADJUSTMENT",
               quantity: delta,
-              note: args.note ?? "Catalog admin stock synchronization",
+              note: args.note ?? "Katalog yönetimi stok eşitlemesi",
               metadata: {
                 transactionNumber: inventoryTransaction.transactionNumber,
+                sourceDocumentType: "INVENTORY_ADJUSTMENT",
+                sourceDocumentId: product.id,
+                sourceDocumentNumber: product.sku,
               },
             },
           });
         }
       }
 
-      const activeLevels = product.inventoryItem?.inventoryLevels ?? [];
-      const availableStock = activeLevels.length > 0
-        ? activeLevels.reduce((sum, level) => sum + this.toAvailableStock(
-          level.warehouse.id === warehouse.id ? onHandStock : level.onHand,
-          level.reserved,
-        ), 0)
-        : this.toAvailableStock(onHandStock, reservedStock);
-
-      await tx.product.update({
-        where: {
-          id: product.id,
-        },
-        data: {
-          stock: availableStock,
-        },
-      });
+      await this.recalculateProductStock(tx, product.id, inventoryItemId);
     });
   }
 
   async transferProductInventory(args: TransferInventoryArgs) {
-    return prisma.$transaction(async (tx) => {
+    return this.runSerializableTransaction(async (tx) => {
       if (args.fromWarehouseCode === args.toWarehouseCode) {
         throw new Error("WAREHOUSE_TRANSFER_SAME_SOURCE_TARGET");
       }
@@ -829,6 +1395,10 @@ export class InventoryRepository {
       const inventoryTransaction = await this.createInventoryTransaction(tx, {
         type: "TRANSFER",
         reference: transferReference,
+        sourceDocumentType: "WAREHOUSE_TRANSFER",
+        sourceDocumentId: product.id,
+        sourceDocumentNumber: transferReference,
+        sourceDocumentUrl: "/admin/inventory/transactions",
         note: args.note ?? `Transfer ${fromWarehouse.code} -> ${toWarehouse.code}`,
       });
 
@@ -854,6 +1424,9 @@ export class InventoryRepository {
           metadata: {
             transferReference,
             transactionNumber: inventoryTransaction.transactionNumber,
+            sourceDocumentType: "WAREHOUSE_TRANSFER",
+            sourceDocumentId: product.id,
+            sourceDocumentNumber: transferReference,
             fromWarehouseCode: fromWarehouse.code,
             toWarehouseCode: toWarehouse.code,
           },
@@ -871,6 +1444,9 @@ export class InventoryRepository {
           metadata: {
             transferReference,
             transactionNumber: inventoryTransaction.transactionNumber,
+            sourceDocumentType: "WAREHOUSE_TRANSFER",
+            sourceDocumentId: product.id,
+            sourceDocumentNumber: transferReference,
             fromWarehouseCode: fromWarehouse.code,
             toWarehouseCode: toWarehouse.code,
           },
@@ -882,7 +1458,7 @@ export class InventoryRepository {
   }
 
   async recordProductInventoryMovement(args: RecordInventoryMovementArgs) {
-    return prisma.$transaction(async (tx) => {
+    return this.runSerializableTransaction(async (tx) => {
       const product = await tx.product.findFirst({
         where: {
           id: args.productId,
@@ -890,6 +1466,7 @@ export class InventoryRepository {
         },
         select: {
           id: true,
+          purchasePrice: true,
           inventoryItem: {
             select: {
               id: true,
@@ -954,6 +1531,8 @@ export class InventoryRepository {
         },
       });
 
+      const previousOnHand = existingLevel?.onHand ?? 0;
+
       if (args.type === "DAMAGE_WRITE_OFF") {
         const availableStock = this.toAvailableStock(existingLevel?.onHand ?? 0, existingLevel?.reserved ?? 0);
         if (availableStock < args.quantity) {
@@ -992,8 +1571,93 @@ export class InventoryRepository {
 
       const inventoryTransaction = await this.createInventoryTransaction(tx, {
         type: args.type === "PURCHASE_RECEIPT" ? "STOCK_IN" : "STOCK_OUT",
-        note: args.note ?? (args.type === "PURCHASE_RECEIPT" ? "Manual stock entry" : "Manual stock issue"),
+        reference: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentNumber ?? args.sku) : args.sku,
+        sourceDocumentType: args.type === "PURCHASE_RECEIPT" ? "PURCHASE_RECEIPT" : "STOCK_WRITE_OFF",
+        sourceDocumentId: args.type === "PURCHASE_RECEIPT" ? null : product.id,
+        sourceDocumentNumber: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentNumber ?? args.sku) : args.sku,
+        sourceDocumentDate: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentDate ?? null) : null,
+        externalReference: args.sourceDocumentReference ?? null,
+        counterpartyName: args.sourceDocumentSupplier ?? null,
+        note: args.note ?? (args.type === "PURCHASE_RECEIPT" ? "Manuel stok girişi" : "Manuel stok çıkışı"),
       });
+
+      let purchaseReceiptId: string | null = null;
+
+      if (args.type === "PURCHASE_RECEIPT" && args.sourceDocumentNumber && args.sourceDocumentSupplier && args.sourceDocumentDate) {
+        const createdReceipt = await tx.purchaseReceipt.create({
+          data: {
+            receiptNumber: args.sourceDocumentNumber,
+            supplierName: args.sourceDocumentSupplier,
+            receiptDate: args.sourceDocumentDate,
+            externalReference: args.sourceDocumentReference ?? null,
+        note: args.note ?? null,
+            warehouseId: warehouse.id,
+            transactionId: inventoryTransaction.id,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        purchaseReceiptId = createdReceipt.id;
+
+        await tx.inventoryTransaction.update({
+          where: {
+            id: inventoryTransaction.id,
+          },
+          data: {
+            sourceDocumentId: createdReceipt.id,
+          },
+        });
+
+        await tx.purchaseReceiptLine.create({
+          data: {
+            purchaseReceiptId: createdReceipt.id,
+            productId: product.id,
+            quantity: args.quantity,
+            unitCost: args.unitCost ?? null,
+            lineTotal: args.unitCost !== undefined && args.unitCost !== null ? new Prisma.Decimal(args.unitCost).mul(args.quantity) : null,
+            note: args.note ?? null,
+          },
+        });
+
+        if (args.unitCost !== undefined && args.unitCost !== null) {
+          const nextOnHand = previousOnHand + args.quantity;
+          const previousAverage = await tx.inventoryItem.findUnique({
+            where: {
+              id: inventoryItemId,
+            },
+            select: {
+              averageUnitCost: true,
+            },
+          });
+
+          const previousAverageValue = previousAverage?.averageUnitCost?.toNumber() ?? product.purchasePrice?.toNumber() ?? 0;
+          const weightedAverage = nextOnHand <= 0
+            ? args.unitCost
+            : ((previousOnHand * previousAverageValue) + (args.quantity * args.unitCost)) / Math.max(nextOnHand, 1);
+
+          await tx.inventoryItem.update({
+            where: {
+              id: inventoryItemId,
+            },
+            data: {
+              lastPurchaseUnitCost: new Prisma.Decimal(args.unitCost),
+              averageUnitCost: new Prisma.Decimal(Number(weightedAverage.toFixed(2))),
+              costingMethod: "AVERAGE_COST",
+            },
+          });
+
+          await tx.product.update({
+            where: {
+              id: product.id,
+            },
+            data: {
+              purchasePrice: new Prisma.Decimal(args.unitCost),
+            },
+          });
+        }
+      }
 
       await tx.inventoryTransactionLine.create({
         data: {
@@ -1002,7 +1666,7 @@ export class InventoryRepository {
           toWarehouseId: args.type === "PURCHASE_RECEIPT" ? warehouse.id : null,
           fromWarehouseId: args.type === "DAMAGE_WRITE_OFF" ? warehouse.id : null,
           quantity: args.quantity,
-          note: args.note ?? (args.type === "PURCHASE_RECEIPT" ? "Manual stock entry" : "Manual stock issue"),
+        note: args.note ?? (args.type === "PURCHASE_RECEIPT" ? "Manuel stok girişi" : "Manuel stok çıkışı"),
         },
       });
 
@@ -1013,9 +1677,16 @@ export class InventoryRepository {
           transactionId: inventoryTransaction.id,
           type: args.type,
           quantity: args.type === "PURCHASE_RECEIPT" ? args.quantity : -args.quantity,
-          note: args.note ?? (args.type === "PURCHASE_RECEIPT" ? "Manual stock entry" : "Manual stock issue"),
+          note: args.note ?? (args.type === "PURCHASE_RECEIPT" ? "Manuel stok girişi" : "Manuel stok çıkışı"),
           metadata: {
             transactionNumber: inventoryTransaction.transactionNumber,
+            sourceDocumentType: args.type === "PURCHASE_RECEIPT" ? "PURCHASE_RECEIPT" : "STOCK_WRITE_OFF",
+            sourceDocumentId: purchaseReceiptId ?? product.id,
+            sourceDocumentNumber: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentNumber ?? args.sku) : args.sku,
+            sourceDocumentUrl: args.type === "PURCHASE_RECEIPT" && purchaseReceiptId ? null : null,
+            supplierName: args.sourceDocumentSupplier ?? null,
+            externalReference: args.sourceDocumentReference ?? null,
+            unitCost: args.unitCost ?? null,
           },
         },
       });
@@ -1284,8 +1955,122 @@ export class InventoryRepository {
     });
   }
 
-  async applyStockCount(stockCountId: string) {
+  async updateStockCountLinesBulk(stockCountId: string, rows: BulkStockCountLineRowInput[]) {
     return prisma.$transaction(async (tx) => {
+      const stockCount = await tx.stockCount.findUnique({
+        where: {
+          id: stockCountId,
+        },
+        select: {
+          id: true,
+          status: true,
+        },
+      });
+
+      if (!stockCount) {
+        throw new Error(`STOCK_COUNT_NOT_FOUND:${stockCountId}`);
+      }
+
+      if (stockCount.status === "APPLIED") {
+        throw new Error("STOCK_COUNT_ALREADY_APPLIED");
+      }
+
+      const skuList = Array.from(new Set(rows.map((row) => row.sku)));
+      const warehouseCodes = Array.from(new Set(rows.map((row) => row.warehouseCode)));
+
+      const lines = await tx.stockCountLine.findMany({
+        where: {
+          stockCountId,
+          inventoryItem: {
+            skuSnapshot: {
+              in: skuList,
+            },
+          },
+          warehouse: {
+            code: {
+              in: warehouseCodes,
+            },
+          },
+        },
+        include: {
+          inventoryItem: {
+            select: {
+              skuSnapshot: true,
+            },
+          },
+          warehouse: {
+            select: {
+              code: true,
+            },
+          },
+        },
+      });
+
+      const lineMap = new Map(lines.map((line) => [`${line.inventoryItem.skuSnapshot}:${line.warehouse.code}`, line]));
+
+      for (const row of rows) {
+        const line = lineMap.get(`${row.sku}:${row.warehouseCode}`);
+        if (!line) {
+          continue;
+        }
+
+        await tx.stockCountLine.update({
+          where: {
+            id: line.id,
+          },
+          data: {
+            countedOnHand: row.countedOnHand,
+            note: row.note ?? null,
+          },
+        });
+      }
+
+      await tx.stockCount.update({
+        where: {
+          id: stockCountId,
+        },
+        data: {
+          status: "COUNTED",
+        },
+      });
+    });
+  }
+
+  async findStockCountLineTargets(stockCountId: string, rows: Array<{ sku: string; warehouseCode: string }>) {
+    const skuList = Array.from(new Set(rows.map((row) => row.sku)));
+    const warehouseCodes = Array.from(new Set(rows.map((row) => row.warehouseCode)));
+
+    return prisma.stockCountLine.findMany({
+      where: {
+        stockCountId,
+        inventoryItem: {
+          skuSnapshot: {
+            in: skuList,
+          },
+        },
+        warehouse: {
+          code: {
+            in: warehouseCodes,
+          },
+        },
+      },
+      include: {
+        inventoryItem: {
+          select: {
+            skuSnapshot: true,
+          },
+        },
+        warehouse: {
+          select: {
+            code: true,
+          },
+        },
+      },
+    });
+  }
+
+  async applyStockCount(stockCountId: string) {
+    return this.runSerializableTransaction(async (tx) => {
       const stockCount = await tx.stockCount.findUnique({
         where: {
           id: stockCountId,
@@ -1332,12 +2117,46 @@ export class InventoryRepository {
       const transaction = await this.createInventoryTransaction(tx, {
         type: "STOCK_COUNT",
         reference: stockCount.countNumber,
+        sourceDocumentType: "STOCK_COUNT",
+        sourceDocumentId: stockCount.id,
+        sourceDocumentNumber: stockCount.countNumber,
+        sourceDocumentUrl: "/admin/inventory/counts",
+        sourceDocumentDate: stockCount.countedAt,
         note: stockCount.note ?? `Stock count ${stockCount.countNumber}`,
       });
 
       const touchedInventoryItemIds = new Set<string>();
 
       for (const line of linesToApply) {
+        const currentLevel = await tx.inventoryLevel.findUnique({
+          where: {
+            inventoryItemId_warehouseId: {
+              inventoryItemId: line.inventoryItemId,
+              warehouseId: line.warehouseId,
+            },
+          },
+          select: {
+            onHand: true,
+            reserved: true,
+          },
+        });
+
+        if (!currentLevel) {
+          throw new Error(`INVENTORY_LEVEL_NOT_FOUND:${line.inventoryItemId}:${line.warehouseId}`);
+        }
+
+        if (currentLevel.onHand !== line.systemOnHand) {
+          throw new Error(
+            `STOCK_COUNT_STALE_LEVEL:${line.inventoryItem.product.sku}:${line.warehouse.code}:${line.systemOnHand}:${currentLevel.onHand}`,
+          );
+        }
+
+        if (currentLevel.reserved > 0) {
+          throw new Error(
+            `STOCK_COUNT_HAS_ACTIVE_RESERVATIONS:${line.inventoryItem.product.sku}:${line.warehouse.code}:${currentLevel.reserved}`,
+          );
+        }
+
         const countedOnHand = line.countedOnHand ?? line.systemOnHand;
         const delta = countedOnHand - line.systemOnHand;
         touchedInventoryItemIds.add(line.inventoryItemId);
@@ -1376,6 +2195,10 @@ export class InventoryRepository {
               metadata: {
                 transactionNumber: transaction.transactionNumber,
                 stockCountNumber: stockCount.countNumber,
+                sourceDocumentType: "STOCK_COUNT",
+                sourceDocumentId: stockCount.id,
+                sourceDocumentNumber: stockCount.countNumber,
+                sourceDocumentUrl: "/admin/inventory/counts",
                 systemOnHand: line.systemOnHand,
                 countedOnHand,
               },
@@ -1489,9 +2312,9 @@ export class InventoryRepository {
             ? "LOW_STOCK"
             : null;
         const message = nextType === "OUT_OF_STOCK"
-          ? `${level.inventoryItem.product.name} is out of stock in ${level.warehouse.code}`
+          ? `${level.inventoryItem.product.name} ürünü ${level.warehouse.code} deposunda tükendi`
           : nextType === "LOW_STOCK"
-            ? `${level.inventoryItem.product.name} is below critical stock in ${level.warehouse.code}`
+            ? `${level.inventoryItem.product.name} ürünü ${level.warehouse.code} deposunda kritik stok seviyesinin altında`
             : null;
 
         if (!nextType || !message) {
@@ -1607,24 +2430,197 @@ export class InventoryRepository {
     });
   }
 
-  async listInventoryReportMovements(days: number) {
-    const startDate = new Date();
-    startDate.setUTCDate(startDate.getUTCDate() - days + 1);
-    startDate.setUTCHours(0, 0, 0, 0);
+  async listInventoryConsistencyRows() {
+    return prisma.product.findMany({
+      where: {
+        deleted: false,
+        stockTrackingEnabled: true,
+        productType: {
+          not: "SERVICE",
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        stock: true,
+        inventoryItem: {
+          select: {
+            inventoryLevels: {
+              where: {
+                warehouse: {
+                  isActive: true,
+                },
+              },
+              select: {
+                onHand: true,
+                reserved: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+    });
+  }
 
+  async listInventoryReportMovements(args: {
+    startDate: Date;
+    endDate?: Date;
+  }) {
     return prisma.inventoryMovement.findMany({
       where: {
         createdAt: {
-          gte: startDate,
+          gte: args.startDate,
+          ...(args.endDate ? { lte: args.endDate } : {}),
         },
       },
       select: {
         type: true,
         quantity: true,
         createdAt: true,
+        inventoryItem: {
+          select: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                price: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         createdAt: "asc",
+      },
+    });
+  }
+
+  async createInventoryHistoryEvent(input: {
+    eventType:
+      | "STOCK_ADJUSTMENT"
+      | "STOCK_TRANSFER"
+      | "STOCK_IN"
+      | "STOCK_OUT"
+      | "STOCK_COUNT"
+      | "WAREHOUSE_CREATED"
+      | "WAREHOUSE_UPDATED"
+      | "BULK_OPERATION";
+    entityType: "PRODUCT" | "WAREHOUSE" | "STOCK_COUNT" | "TRANSACTION" | "PURCHASE_RECEIPT" | "BULK_OPERATION";
+    entityId?: string | null;
+    productId?: string | null;
+    warehouseId?: string | null;
+    transactionId?: string | null;
+    stockCountId?: string | null;
+    purchaseReceiptId?: string | null;
+    actorUserId?: string | null;
+    title: string;
+    summary: string;
+    metadata?: Record<string, unknown> | null;
+  }) {
+    if (typeof prisma.inventoryHistoryEvent === "undefined") {
+      return null;
+    }
+
+    return prisma.inventoryHistoryEvent.create({
+      data: {
+        eventType: input.eventType,
+        entityType: input.entityType,
+        entityId: input.entityId ?? null,
+        productId: input.productId ?? null,
+        warehouseId: input.warehouseId ?? null,
+        transactionId: input.transactionId ?? null,
+        stockCountId: input.stockCountId ?? null,
+        purchaseReceiptId: input.purchaseReceiptId ?? null,
+        actorUserId: input.actorUserId ?? null,
+        title: input.title,
+        summary: input.summary,
+        metadata: (input.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
+      },
+    });
+  }
+
+  async listInventoryHistoryEvents(limit: number) {
+    if (typeof prisma.inventoryHistoryEvent === "undefined") {
+      return [];
+    }
+
+    return prisma.inventoryHistoryEvent.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: limit,
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+          },
+        },
+        warehouse: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findUsersByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.user.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+  }
+
+  async getUserInventoryPreferences(userId: string) {
+    return prisma.userInventoryPreference.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        compactInventoryList: true,
+        visibleColumns: true,
+      },
+    });
+  }
+
+  async upsertUserInventoryPreferences(userId: string, input: AdminInventoryListPreferences) {
+    return prisma.userInventoryPreference.upsert({
+      where: {
+        userId,
+      },
+      update: {
+        compactInventoryList: input.compactInventoryList,
+        visibleColumns: input.visibleColumns as Prisma.InputJsonValue,
+      },
+      create: {
+        userId,
+        compactInventoryList: input.compactInventoryList,
+        visibleColumns: input.visibleColumns as Prisma.InputJsonValue,
+      },
+      select: {
+        compactInventoryList: true,
+        visibleColumns: true,
       },
     });
   }

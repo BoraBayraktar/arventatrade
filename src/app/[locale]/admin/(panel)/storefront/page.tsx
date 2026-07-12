@@ -40,15 +40,12 @@ export default async function AdminStorefrontPage({
       productOptions={storefrontProductOptions.items}
       categoryOptions={categories}
       canDelete={user.role === "ADMIN"}
-      locale={locale}
       labels={{
         title: dictionary.admin.storefrontManager,
         createTitle: dictionary.admin.createStorefrontItem,
         edit: dictionary.admin.edit,
-        trTitle: dictionary.admin.trTitle,
-        enTitle: dictionary.admin.enTitle,
-        trDescription: dictionary.admin.trDescription,
-        enDescription: dictionary.admin.enDescription,
+        itemTitle: dictionary.admin.trTitle,
+        itemDescription: dictionary.admin.trDescription,
         section: dictionary.admin.section,
         variant: dictionary.admin.variant,
         targetType: dictionary.admin.targetType,

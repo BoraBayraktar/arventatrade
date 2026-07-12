@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       entityId: created.id,
       action: "CREATE",
       actorUserId: user.id,
-      summary: `Category created: ${created.slug}`,
+      summary: `Kategori oluşturuldu: ${created.slug}`,
     });
     return NextResponse.json({ item: created }, { status: 201 });
   } catch (error) {

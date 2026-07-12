@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       entityId: payload.productId,
       action: "UPDATE",
       actorUserId: user.id,
-      summary: `Inventory transfer applied for ${payload.sku}`,
+      summary: `Stok transferi uygulandı: ${payload.sku}`,
       metadata: {
         fromWarehouseCode: payload.fromWarehouseCode,
         toWarehouseCode: payload.toWarehouseCode,

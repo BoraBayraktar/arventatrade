@@ -13,8 +13,10 @@ export type AuditLogItem = {
   id: string;
   entityType: AuditLogEntityType;
   entityId: string | null;
+  entityLabel: string;
   action: AuditLogAction;
   actorUserId: string | null;
+  actorLabel: string | null;
   summary: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
@@ -23,7 +25,10 @@ export type AuditLogItem = {
 export type AuditLogListQuery = {
   search?: string;
   entityType?: AuditLogEntityType;
+  action?: AuditLogAction;
   actorUserId?: string;
+  startDate?: string;
+  endDate?: string;
   page?: number;
   pageSize?: number;
 };

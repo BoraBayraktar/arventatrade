@@ -26,9 +26,9 @@ type CategoryHoverMenuProps = {
 };
 
 export function CategoryHoverMenu({ locale, categories }: CategoryHoverMenuProps) {
-	const allLabel = locale === "tr" ? "Tum" : "All";
-	const subLabel = locale === "tr" ? "Alt Kategoriler" : "Subcategories";
-	const featuredLabel = locale === "tr" ? "One Cikanlar" : "Featured";
+	const allLabel = "Tüm";
+	const subLabel = "Alt Kategoriler";
+	const featuredLabel = "Öne Çıkanlar";
 	const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
 
 	const activeCategory = categories.find((item) => item.id === activeCategoryId) ?? null;

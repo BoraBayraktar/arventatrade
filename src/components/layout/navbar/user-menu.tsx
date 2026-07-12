@@ -20,29 +20,17 @@ type AuthUser = {
 };
 
 export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
-	const labels = locale === "tr"
-		? {
-			login: "Giriş Yap",
-			account: "Hesabım",
-			adminPanel: "Admin Paneli",
-			orders: "Siparişlerim",
-			coupons: "İndirim Kuponlarım",
-			messages: "Mesajlarım",
-			logout: "Çıkış Yap",
-			loginMenu: "Giriş Yap",
-			registerMenu: "Kayıt Ol",
-		}
-		: {
-			login: "Sign In",
-			account: "My Account",
-			adminPanel: "Admin Panel",
-			orders: "My Orders",
-			coupons: "My Coupons",
-			messages: "Messages",
-			logout: "Sign Out",
-			loginMenu: "Sign In",
-			registerMenu: "Sign Up",
-		};
+	const labels = {
+		login: "Giriş Yap",
+		account: "Hesabım",
+		adminPanel: "Admin Paneli",
+		orders: "Siparişlerim",
+		coupons: "İndirim Kuponlarım",
+		messages: "Mesajlarım",
+		logout: "Çıkış Yap",
+		loginMenu: "Giriş Yap",
+		registerMenu: "Kayıt Ol",
+	};
 
 	const [open, setOpen] = useState(false);
 	const rootRef = useRef<HTMLDivElement | null>(null);

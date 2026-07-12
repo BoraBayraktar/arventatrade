@@ -28,7 +28,7 @@ export async function PATCH(
       entityId: id,
       action: "UPDATE",
       actorUserId: user.id,
-      summary: `Product question answered: ${updated.productSlug}`,
+      summary: `Ürün sorusu yanıtlandı: ${updated.productSlug}`,
     });
 
     return NextResponse.json({ item: updated });
@@ -60,7 +60,7 @@ export async function DELETE(
       entityId: id,
       action: "DELETE",
       actorUserId: user.id,
-      summary: "Product question moderated and removed",
+      summary: "Ürün sorusu moderasyon ile kaldırıldı",
     });
 
     return NextResponse.json({ ok: true });

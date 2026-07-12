@@ -314,8 +314,24 @@
   padding: 0.85rem 0.9rem;
   color: #27466b;
   text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  opacity: 1;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.authSocialButton:hover {
+  border-color: #c3d3eb;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(39, 70, 107, 0.1);
+  transform: translateY(-1px);
+}
+
+.authSocialButton:disabled {
   cursor: not-allowed;
   opacity: 0.8;
+  box-shadow: none;
+  transform: none;
 }
 
 .authSocialButton small {

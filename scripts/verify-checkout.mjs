@@ -9,6 +9,44 @@ function assert(condition, message) {
   }
 }
 
+async function readAggregateStock(productId) {
+  const product = await prisma.product.findUnique({
+    where: {
+      id: productId,
+    },
+    select: {
+      stock: true,
+      inventoryItem: {
+        select: {
+          inventoryLevels: {
+            where: {
+              warehouse: {
+                isActive: true,
+              },
+            },
+            select: {
+              onHand: true,
+              reserved: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  assert(product, "Product missing while reading aggregate stock");
+
+  const levels = product.inventoryItem?.inventoryLevels ?? [];
+  const aggregateStock = levels.length > 0
+    ? levels.reduce((sum, level) => sum + Math.max(0, level.onHand - level.reserved), 0)
+    : product.stock;
+
+  return {
+    summaryStock: product.stock,
+    aggregateStock,
+  };
+}
+
 async function main() {
   let product = await prisma.product.findFirst({
     where: {
@@ -110,17 +148,10 @@ async function main() {
     assert(savedOrder.paymentStatus === "PENDING", "Checkout should initialize payment status");
     assert(savedOrder.paymentStatusHistory.length >= 1, "Checkout should persist payment status history");
 
-    const afterCheckout = await prisma.product.findUnique({
-      where: {
-        id: product.id,
-      },
-      select: {
-        stock: true,
-      },
-    });
-
-    assert(afterCheckout, "Product missing after checkout");
-    assert(afterCheckout.stock === initialStock - 1, "Checkout should decrement stock by 1");
+    const afterCheckout = await readAggregateStock(product.id);
+    assert(afterCheckout.summaryStock === initialStock - 1, "Checkout should sync summary stock by 1");
+    assert(afterCheckout.aggregateStock === initialStock - 1, "Checkout should decrement aggregate stock by 1");
+    assert(afterCheckout.summaryStock === afterCheckout.aggregateStock, "Checkout should keep summary and aggregate stock aligned");
 
     const outOfStockResponse = await fetch(`${baseUrl}/api/commerce/checkout`, {
       method: "POST",

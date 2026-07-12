@@ -20,6 +20,9 @@ function hasRequiredDelegates(client: PrismaClient | undefined): client is Prism
     productReview?: unknown;
     productQuestion?: unknown;
     inventoryAlert?: unknown;
+    inventoryHistoryEvent?: unknown;
+    inventoryExportHistory?: unknown;
+    userInventoryPreference?: unknown;
     stockCount?: unknown;
     stockCountLine?: unknown;
     inventoryTransaction?: unknown;
@@ -30,6 +33,9 @@ function hasRequiredDelegates(client: PrismaClient | undefined): client is Prism
     typeof delegateCheck.productReview !== "undefined"
     && typeof delegateCheck.productQuestion !== "undefined"
     && typeof delegateCheck.inventoryAlert !== "undefined"
+    && typeof delegateCheck.inventoryHistoryEvent !== "undefined"
+    && typeof delegateCheck.inventoryExportHistory !== "undefined"
+    && typeof delegateCheck.userInventoryPreference !== "undefined"
     && typeof delegateCheck.stockCount !== "undefined"
     && typeof delegateCheck.stockCountLine !== "undefined"
     && typeof delegateCheck.inventoryTransaction !== "undefined"

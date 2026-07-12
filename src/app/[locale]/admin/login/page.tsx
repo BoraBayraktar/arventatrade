@@ -25,6 +25,15 @@ export default async function AdminLoginPage({
   const cookieStore = await cookies();
   const token = cookieStore.get(AUTH_COOKIE_NAME)?.value ?? cookieStore.get(LEGACY_AUTH_COOKIE_NAME)?.value;
   const user = await identityService.getAuthenticatedUser(token);
+  const socialGoogleHref = identityService.getGoogleOAuthConfig()
+    ? `/api/identity/oauth/google/start?redirectTo=${encodeURIComponent(`/${locale}/admin`)}`
+    : null;
+  const socialAppleHref = identityService.getAppleOAuthConfig()
+    ? `/api/identity/oauth/apple/start?redirectTo=${encodeURIComponent(`/${locale}/admin`)}`
+    : null;
+  const socialFacebookHref = identityService.getFacebookOAuthConfig()
+    ? `/api/identity/oauth/facebook/start?redirectTo=${encodeURIComponent(`/${locale}/admin`)}`
+    : null;
 
   if (user) {
     redirect(`/${locale}/admin`);
@@ -41,6 +50,9 @@ export default async function AdminLoginPage({
         <LoginForm
           locale={locale}
           redirectTo={safeRedirect}
+          socialGoogleHref={socialGoogleHref}
+          socialAppleHref={socialAppleHref}
+          socialFacebookHref={socialFacebookHref}
           labels={{
             title: dictionary.admin.loginTitle,
             subtitle: dictionary.admin.loginSubtitle,
@@ -54,6 +66,7 @@ export default async function AdminLoginPage({
             socialDivider: dictionary.auth.socialDivider,
             socialGoogle: dictionary.auth.socialGoogle,
             socialApple: dictionary.auth.socialApple,
+            socialFacebook: dictionary.auth.socialFacebook,
             socialComingSoon: dictionary.auth.socialComingSoon,
           }}
         />

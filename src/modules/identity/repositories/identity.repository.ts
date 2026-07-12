@@ -196,4 +196,84 @@ export class IdentityRepository {
       },
     });
   }
+
+  async findSocialAccount(provider: string, providerAccountId: string) {
+    return prisma.socialAccount.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider,
+          providerAccountId,
+        },
+      },
+      select: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+          },
+        },
+      },
+    });
+  }
+
+  async createCustomerWithSocialAccount(input: {
+    email: string;
+    name: string;
+    passwordHash: string;
+    provider: string;
+    providerAccountId: string;
+    providerEmail?: string | null;
+  }) {
+    return prisma.user.create({
+      data: {
+        email: input.email,
+        name: input.name,
+        role: "CUSTOMER",
+        passwordHash: input.passwordHash,
+        socialAccounts: {
+          create: {
+            provider: input.provider,
+            providerAccountId: input.providerAccountId,
+            providerEmail: input.providerEmail ?? null,
+          },
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+      },
+    });
+  }
+
+  async attachSocialAccountToUser(input: {
+    userId: string;
+    provider: string;
+    providerAccountId: string;
+    providerEmail?: string | null;
+  }) {
+    return prisma.socialAccount.upsert({
+      where: {
+        provider_providerAccountId: {
+          provider: input.provider,
+          providerAccountId: input.providerAccountId,
+        },
+      },
+      update: {
+        providerEmail: input.providerEmail ?? null,
+      },
+      create: {
+        userId: input.userId,
+        provider: input.provider,
+        providerAccountId: input.providerAccountId,
+        providerEmail: input.providerEmail ?? null,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
 }

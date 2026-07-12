@@ -1,14 +1,13 @@
-import en from "@/i18n/en.json";
 import tr from "@/i18n/tr.json";
 
-export const locales = ["tr", "en"] as const;
+export const locales = ["tr"] as const;
 
 export type Locale = (typeof locales)[number];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Dictionary = Record<string, any>;
 
 const dictionaries: Record<Locale, Dictionary> = {
   tr,
-  en,
 };
 
 export function isLocale(value: string): value is Locale {

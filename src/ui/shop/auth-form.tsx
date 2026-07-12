@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CheckCircle2, Eye, EyeOff, Globe, KeyRound, Mail, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Mail, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 
+import { AppleIcon } from "@/components/icons/apple-icon";
+import { FacebookIcon } from "@/components/icons/facebook-icon";
+import { GoogleIcon } from "@/components/icons/google-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +30,7 @@ type Labels = {
   socialDivider: string;
   socialGoogle: string;
   socialApple: string;
+  socialFacebook: string;
   socialComingSoon: string;
   passwordStrengthWeak: string;
   passwordStrengthMedium: string;
@@ -44,6 +48,9 @@ type Props = {
   mode: "login" | "register";
   redirectTo: string;
   switchHref: string;
+  socialGoogleHref?: string | null;
+  socialAppleHref?: string | null;
+  socialFacebookHref?: string | null;
   labels: Labels;
 };
 
@@ -52,7 +59,16 @@ const heroIcon = {
   register: Sparkles,
 } as const;
 
-export function AuthForm({ locale, mode, redirectTo, switchHref, labels }: Props) {
+export function AuthForm({
+  locale,
+  mode,
+  redirectTo,
+  switchHref,
+  socialGoogleHref,
+  socialAppleHref,
+  socialFacebookHref,
+  labels,
+}: Props) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -171,16 +187,42 @@ export function AuthForm({ locale, mode, redirectTo, switchHref, labels }: Props
             <div className={styles.socialStack}>
               <p className={styles.socialDivider}>{labels.socialDivider}</p>
               <div className={styles.socialGrid}>
-                <button type="button" className={styles.socialButton} disabled>
-                  <Globe className="h-4 w-4" />
-                  <span>{labels.socialGoogle}</span>
-                  <small>{labels.socialComingSoon}</small>
-                </button>
-                <button type="button" className={styles.socialButton} disabled>
-                  <Sparkles className="h-4 w-4" />
-                  <span>{labels.socialApple}</span>
-                  <small>{labels.socialComingSoon}</small>
-                </button>
+                {socialGoogleHref ? (
+                  <Link href={socialGoogleHref} className={styles.socialButton}>
+                    <GoogleIcon className="h-4 w-4" />
+                    <span>{labels.socialGoogle}</span>
+                  </Link>
+                ) : (
+                  <button type="button" className={styles.socialButton} disabled>
+                    <GoogleIcon className="h-4 w-4" />
+                    <span>{labels.socialGoogle}</span>
+                    <small>{labels.socialComingSoon}</small>
+                  </button>
+                )}
+                {socialAppleHref ? (
+                  <Link href={socialAppleHref} className={styles.socialButton}>
+                    <AppleIcon className="h-4 w-4" />
+                    <span>{labels.socialApple}</span>
+                  </Link>
+                ) : (
+                  <button type="button" className={styles.socialButton} disabled>
+                    <AppleIcon className="h-4 w-4" />
+                    <span>{labels.socialApple}</span>
+                    <small>{labels.socialComingSoon}</small>
+                  </button>
+                )}
+                {socialFacebookHref ? (
+                  <Link href={socialFacebookHref} className={styles.socialButton}>
+                    <FacebookIcon className="h-4 w-4" />
+                    <span>{labels.socialFacebook}</span>
+                  </Link>
+                ) : (
+                  <button type="button" className={styles.socialButton} disabled>
+                    <FacebookIcon className="h-4 w-4" />
+                    <span>{labels.socialFacebook}</span>
+                    <small>{labels.socialComingSoon}</small>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -261,7 +303,7 @@ export function AuthForm({ locale, mode, redirectTo, switchHref, labels }: Props
                   type="button"
                   className={styles.visibilityToggle}
                   onClick={() => setShowPassword((current) => !current)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>

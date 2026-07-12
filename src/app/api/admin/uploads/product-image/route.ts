@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       entityType: "PRODUCT",
       action: "UPDATE",
       actorUserId: user.id,
-      summary: `Product image uploaded: ${uploaded.objectKey}`,
+      summary: `Ürün görseli yüklendi: ${uploaded.objectKey}`,
       metadata: {
         bucket: uploaded.bucket,
         objectKey: uploaded.objectKey,

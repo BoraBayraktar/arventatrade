@@ -21,6 +21,15 @@ export default async function ShopLoginPage({
   const cookieStore = await cookies();
   const token = cookieStore.get(AUTH_COOKIE_NAME)?.value ?? cookieStore.get(LEGACY_AUTH_COOKIE_NAME)?.value;
   const user = await identityService.getAuthenticatedUser(token);
+  const socialGoogleHref = identityService.getGoogleOAuthConfig()
+    ? `/api/identity/oauth/google/start?redirectTo=${encodeURIComponent(`/${locale}`)}`
+    : null;
+  const socialAppleHref = identityService.getAppleOAuthConfig()
+    ? `/api/identity/oauth/apple/start?redirectTo=${encodeURIComponent(`/${locale}`)}`
+    : null;
+  const socialFacebookHref = identityService.getFacebookOAuthConfig()
+    ? `/api/identity/oauth/facebook/start?redirectTo=${encodeURIComponent(`/${locale}`)}`
+    : null;
 
   if (user) {
     redirect(`/${locale}`);
@@ -32,6 +41,9 @@ export default async function ShopLoginPage({
       mode="login"
       redirectTo={`/${locale}`}
       switchHref="register"
+      socialGoogleHref={socialGoogleHref}
+      socialAppleHref={socialAppleHref}
+      socialFacebookHref={socialFacebookHref}
       labels={{
         title: dictionary.auth.loginTitle,
         subtitle: dictionary.auth.loginSubtitle,
@@ -49,6 +61,7 @@ export default async function ShopLoginPage({
         socialDivider: dictionary.auth.socialDivider,
         socialGoogle: dictionary.auth.socialGoogle,
         socialApple: dictionary.auth.socialApple,
+        socialFacebook: dictionary.auth.socialFacebook,
         socialComingSoon: dictionary.auth.socialComingSoon,
         passwordStrengthWeak: dictionary.auth.passwordStrengthWeak,
         passwordStrengthMedium: dictionary.auth.passwordStrengthMedium,

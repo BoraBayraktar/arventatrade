@@ -48,6 +48,23 @@ prisma/
 cp .env.example .env
 ```
 
+Sosyal girisleri aktif etmek isterseniz su alanlari da doldurun:
+
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
+- `FACEBOOK_OAUTH_CLIENT_ID`
+- `FACEBOOK_OAUTH_CLIENT_SECRET`
+- `APPLE_OAUTH_CLIENT_ID`
+- `APPLE_OAUTH_TEAM_ID`
+- `APPLE_OAUTH_KEY_ID`
+- `APPLE_OAUTH_PRIVATE_KEY`
+
+Callback URL'leri:
+
+- Google: `http://localhost:3000/api/identity/oauth/google/callback`
+- Facebook: `http://localhost:3000/api/identity/oauth/facebook/callback`
+- Apple: `http://localhost:3000/api/identity/oauth/apple/callback`
+
 2. Altyapi servislerini kaldirin.
 
 ```bash

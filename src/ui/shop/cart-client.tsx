@@ -85,7 +85,7 @@ function writeCart(lines: CartLine[]) {
 }
 
 function formatMoney(amount: number, currency: string, locale: string) {
-	return new Intl.NumberFormat(locale === "tr" ? "tr-TR" : "en-US", {
+	return new Intl.NumberFormat(locale === "tr" ? "tr-TR" : "tr-TR", {
 		style: "currency",
 		currency,
 	}).format(amount);

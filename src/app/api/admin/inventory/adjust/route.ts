@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       entityId: payload.productId,
       action: "UPDATE",
       actorUserId: user.id,
-      summary: `Manual stock adjustment applied for ${payload.sku}`,
+      summary: `Manuel stok düzeltmesi uygulandı: ${payload.sku}`,
       metadata: {
         warehouseCode: payload.warehouseCode ?? null,
         targetOnHandStock: payload.targetOnHandStock,

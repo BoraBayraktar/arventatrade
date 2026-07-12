@@ -22,7 +22,7 @@ export async function PATCH(
       entityId: updated.id,
       action: "UPDATE",
       actorUserId: user.id,
-      summary: `Warehouse updated: ${updated.code}`,
+      summary: `Depo güncellendi: ${updated.code}`,
     });
     return NextResponse.json({ item: updated });
   } catch (error) {

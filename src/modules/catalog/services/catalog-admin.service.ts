@@ -414,6 +414,7 @@ export class CatalogAdminService {
     await inventoryService.syncProductInventoryState({
       productId: created.id,
       sku: created.sku,
+      warehouseId: parsed.preferredPurchaseWarehouseId ?? parsed.preferredSalesWarehouseId ?? undefined,
       targetOnHandStock: parsed.stock,
       note: "Catalog admin initial stock setup",
     });
@@ -506,6 +507,11 @@ export class CatalogAdminService {
       await inventoryService.syncProductInventoryState({
         productId: updated.id,
         sku: parsed.sku ?? updated.sku,
+        warehouseId: parsed.preferredPurchaseWarehouseId
+          ?? parsed.preferredSalesWarehouseId
+          ?? updated.preferredPurchaseWarehouseId
+          ?? updated.preferredSalesWarehouseId
+          ?? undefined,
         ...(parsed.stock !== undefined ? { targetOnHandStock: parsed.stock } : {}),
         note: parsed.stock !== undefined ? "Catalog admin stock update" : undefined,
       });

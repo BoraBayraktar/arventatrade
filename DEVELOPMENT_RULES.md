@@ -1,4 +1,4 @@
-# ArventaTrade Development Rules
+# 2BEM Development Rules
 
 Bu dosya ArventaTrade gelistirme standardi icin tek kaynak (single source of truth) olarak kullanilir.
 Tum yeni gelistirmeler ve refactor islemleri bu kurallara uygun yapilmalidir.
@@ -16,7 +16,7 @@ Tum yeni gelistirmeler ve refactor islemleri bu kurallara uygun yapilmalidir.
 - Key kaynaklari sadece iki dosyadir:
   - src/i18n/tr.json
   - src/i18n/en.json
-- Yeni metin eklendiginde hem tr hem en dosyasina key eklenmesi zorunludur.
+- i18n alt yapısını koru kaldırma ama bundan sonra aksi belirtilene kadar sadece Türkçe dil kullanılacak. 
 
 ## 3) Responsive UI Kurallari
 

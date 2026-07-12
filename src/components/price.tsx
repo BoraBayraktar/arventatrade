@@ -10,9 +10,10 @@ type PriceProps = {
 };
 
 export function Price({ amount, currencyCode, locale, className, currencyCodeClassName }: PriceProps) {
+  void locale;
   return (
     <p suppressHydrationWarning className={className}>
-      {new Intl.NumberFormat(locale === "tr" ? "tr-TR" : "en-US", {
+      {new Intl.NumberFormat("tr-TR", {
         style: "currency",
         currency: currencyCode,
         currencyDisplay: "narrowSymbol",

@@ -31,7 +31,7 @@ export async function PATCH(
       entityId: lineId,
       action: "UPDATE",
       actorUserId: user.id,
-      summary: `Stock count line updated`,
+      summary: "Stok sayım satırı güncellendi",
       metadata: {
         stockCountId: id,
         countedOnHand: payload.countedOnHand,

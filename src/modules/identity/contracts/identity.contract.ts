@@ -28,6 +28,15 @@ export type ResetPasswordInput = {
   password: string;
 };
 
+export type SocialAuthProvider = "google" | "apple" | "facebook";
+
+export type SocialAuthProfile = {
+  provider: SocialAuthProvider;
+  providerAccountId: string;
+  email: string | null;
+  name: string | null;
+};
+
 export type LoginResult = {
   token: string;
   user: AuthUser;

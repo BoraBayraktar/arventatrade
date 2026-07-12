@@ -42,6 +42,39 @@ These are required only if you want product/media uploads to work in production.
 
 These are required only for live notification email delivery.
 
+## Optional social login variables
+
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
+- `FACEBOOK_OAUTH_CLIENT_ID`
+- `FACEBOOK_OAUTH_CLIENT_SECRET`
+- `APPLE_OAUTH_CLIENT_ID`
+- `APPLE_OAUTH_TEAM_ID`
+- `APPLE_OAUTH_KEY_ID`
+- `APPLE_OAUTH_PRIVATE_KEY`
+
+These are required only if you want Google and Apple login to be active.
+
+## OAuth callback URLs
+
+Set `APP_URL` to the exact public base URL of the environment, then use these callback URLs in the provider consoles:
+
+- Google callback: `${APP_URL}/api/identity/oauth/google/callback`
+- Facebook callback: `${APP_URL}/api/identity/oauth/facebook/callback`
+- Apple callback: `${APP_URL}/api/identity/oauth/apple/callback`
+
+Common local values when `APP_URL=http://localhost:3000`:
+
+- Google callback: `http://localhost:3000/api/identity/oauth/google/callback`
+- Facebook callback: `http://localhost:3000/api/identity/oauth/facebook/callback`
+- Apple callback: `http://localhost:3000/api/identity/oauth/apple/callback`
+
+Common production pattern:
+
+- Google callback: `https://your-domain.com/api/identity/oauth/google/callback`
+- Facebook callback: `https://your-domain.com/api/identity/oauth/facebook/callback`
+- Apple callback: `https://your-domain.com/api/identity/oauth/apple/callback`
+
 ## Runtime behavior
 
 - The localized app tree is forced to `nodejs` runtime in [`src/app/[locale]/layout.tsx`](/Users/borabayraktar/Documents/GitHub/arventatrade/src/app/[locale]/layout.tsx:1).

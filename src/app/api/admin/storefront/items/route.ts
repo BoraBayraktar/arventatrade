@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       entityId: item.id,
       action: "CREATE",
       actorUserId: user.id,
-      summary: `Storefront item created: ${item.section}`,
+      summary: `Mağaza içeriği oluşturuldu: ${item.section}`,
     });
     return NextResponse.json({ item }, { status: 201 });
   } catch (error) {

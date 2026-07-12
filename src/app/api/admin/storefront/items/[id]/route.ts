@@ -22,7 +22,7 @@ export async function PATCH(
       entityId: item.id,
       action: "UPDATE",
       actorUserId: user.id,
-      summary: `Storefront item updated: ${item.section}`,
+      summary: `Mağaza içeriği güncellendi: ${item.section}`,
     });
     return NextResponse.json({ item });
   } catch (error) {
@@ -51,7 +51,7 @@ export async function DELETE(
       entityId: id,
       action: "DELETE",
       actorUserId: user.id,
-      summary: "Storefront item soft-deleted",
+      summary: "Mağaza içeriği silindi",
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

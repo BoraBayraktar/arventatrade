@@ -136,7 +136,7 @@ export function PasswordResetForm({ locale, token, labels }: PasswordResetFormPr
                   required
                   className={styles.authInputWithButton}
                 />
-                <button type="button" className={styles.visibilityToggle} onClick={() => setShowPassword((current) => !current)}>
+                <button type="button" className={styles.visibilityToggle} onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}>
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
@@ -165,7 +165,7 @@ export function PasswordResetForm({ locale, token, labels }: PasswordResetFormPr
                   required
                   className={styles.authInputWithButton}
                 />
-                <button type="button" className={styles.visibilityToggle} onClick={() => setShowConfirmPassword((current) => !current)}>
+                <button type="button" className={styles.visibilityToggle} onClick={() => setShowConfirmPassword((current) => !current)} aria-label={showConfirmPassword ? "Şifreyi gizle" : "Şifreyi göster"}>
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>

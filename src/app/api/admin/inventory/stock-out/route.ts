@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       entityId: payload.productId,
       action: "UPDATE",
       actorUserId: user.id,
-      summary: `Stock out applied for ${payload.sku}`,
+      summary: `Stok çıkışı uygulandı: ${payload.sku}`,
       metadata: {
         warehouseCode: payload.warehouseCode,
         quantity: payload.quantity,

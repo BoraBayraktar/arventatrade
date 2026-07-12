@@ -29,7 +29,7 @@ export async function PATCH(
       entityId: updated.id,
       action: "UPDATE",
       actorUserId: user.id,
-      summary: `User updated: ${updated.email}`,
+      summary: `Kullanıcı güncellendi: ${updated.email}`,
     });
 
     return NextResponse.json({ item: updated });
@@ -59,7 +59,7 @@ export async function DELETE(
       entityId: id,
       action: "DELETE",
       actorUserId: user.id,
-      summary: "User soft-deleted",
+      summary: "Kullanıcı silindi",
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

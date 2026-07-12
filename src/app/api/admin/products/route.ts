@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       entityId: created.id,
       action: "CREATE",
       actorUserId: user.id,
-      summary: `Product created: ${created.slug}`,
+      summary: `Ürün oluşturuldu: ${created.slug}`,
     });
     return NextResponse.json({ item: created }, { status: 201 });
   } catch (error) {
