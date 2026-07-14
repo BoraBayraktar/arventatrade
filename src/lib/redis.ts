@@ -16,6 +16,10 @@ function getValidatedRedisUrl() {
     return null;
   }
 
+  if (["undefined", "null", "false", "disabled"].includes(rawUrl.toLocaleLowerCase("en-US"))) {
+    return null;
+  }
+
   try {
     const parsed = new URL(rawUrl);
     if (parsed.protocol !== "redis:" && parsed.protocol !== "rediss:") {

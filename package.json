@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "prebuild": "prisma generate",
-    "build": "next build --webpack",
+    "build": "prisma migrate deploy && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
