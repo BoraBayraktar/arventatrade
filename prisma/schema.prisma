@@ -54,6 +54,7 @@ model Supplier {
   deleted         Boolean   @default(false)
   deletedDate     DateTime?
   deletedUserId   String?
+  paymentRecords  PaymentRecord[]
   primaryProducts Product[]
 
   @@index([deleted, isActive])
@@ -296,6 +297,7 @@ model Order {
   items                OrderItem[]
   inventoryMovements   InventoryMovement[]
   paymentStatusHistory OrderPaymentStatusHistory[]
+  collectionRecords    CollectionRecord[]
   stockReservations    StockReservation[]
   statusHistory        OrderStatusHistory[]
   businessDocuments    BusinessDocument[]
@@ -375,6 +377,48 @@ model OrderPaymentStatusHistory {
 
   @@index([deleted])
   @@index([orderId, createdAt])
+}
+
+model CollectionRecord {
+  id             String                 @id @default(cuid())
+  orderId        String
+  amount         Decimal                @db.Decimal(10, 2)
+  currency       String                 @default("TRY")
+  status         CollectionRecordStatus @default(RECORDED)
+  collectedAt    DateTime
+  note           String?
+  recordedByUserId String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  deleted        Boolean                @default(false)
+  deletedDate    DateTime?
+  deletedUserId  String?
+  order          Order                  @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, collectedAt])
+  @@index([status, collectedAt])
+  @@index([deleted, collectedAt])
+}
+
+model PaymentRecord {
+  id               String              @id @default(cuid())
+  supplierId       String
+  amount           Decimal             @db.Decimal(10, 2)
+  currency         String              @default("TRY")
+  status           PaymentRecordStatus @default(RECORDED)
+  paidAt           DateTime
+  note             String?
+  recordedByUserId String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  deleted          Boolean             @default(false)
+  deletedDate      DateTime?
+  deletedUserId    String?
+  supplier         Supplier            @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId, paidAt])
+  @@index([status, paidAt])
+  @@index([deleted, paidAt])
 }
 
 model BusinessDocument {
@@ -1163,6 +1207,16 @@ enum OrderStatusChangeSource {
 enum PaymentStatusChangeSource {
   SYSTEM
   ADMIN
+}
+
+enum CollectionRecordStatus {
+  RECORDED
+  CANCELLED
+}
+
+enum PaymentRecordStatus {
+  RECORDED
+  CANCELLED
 }
 
 enum BusinessDocumentType {

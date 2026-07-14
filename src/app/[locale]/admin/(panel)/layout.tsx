@@ -72,7 +72,13 @@ export default async function AdminPanelLayout({
       href: `/${locale}/admin/finance`,
       label: dictionary.admin.financeManager,
       children: [
+        { href: `/${locale}/admin/finance`, label: dictionary.admin.financeMenuOverview },
         { href: `/${locale}/admin/finance/payables`, label: dictionary.admin.financeMenuSupplierPayables },
+        { href: `/${locale}/admin/finance/receivables`, label: dictionary.admin.financeMenuCustomerReceivables },
+        { href: `/${locale}/admin/finance/accounts`, label: dictionary.admin.financeMenuAccounts },
+        { href: `/${locale}/admin/finance/collections`, label: dictionary.admin.financeMenuCollections },
+        { href: `/${locale}/admin/finance/payments`, label: dictionary.admin.financeMenuPayments },
+        { href: `/${locale}/admin/finance/reports`, label: dictionary.admin.financeMenuReports },
       ],
     },
     { href: `/${locale}/admin/integrations`, label: dictionary.admin.integrationManager },

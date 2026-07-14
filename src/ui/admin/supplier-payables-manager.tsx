@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import type { AdminSupplierPayableSummary } from "@/modules/finance/contracts/payables.contract";
@@ -76,6 +77,12 @@ export function SupplierPayablesManager({ locale, items, initialSearch, labels }
                 >
                   {labels.viewDetail}
                 </button>
+                <Link
+                  href={`/${locale}/admin/finance/payables/${encodeURIComponent(item.supplierKey)}`}
+                  className="inline-flex h-10 items-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700"
+                >
+                  {labels.viewDetail}
+                </Link>
               </div>
             </div>
           </article>

@@ -62,6 +62,25 @@ function getPasswordResetRateLimitKey(email: string) {
   return `identity:password-reset-rate:${email.toLowerCase()}`;
 }
 
+function resolveAppUrl() {
+  const configured = process.env.APP_URL?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  const vercelProductionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercelProductionUrl) {
+    return vercelProductionUrl.startsWith("http") ? vercelProductionUrl : `https://${vercelProductionUrl}`;
+  }
+
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) {
+    return vercelUrl.startsWith("http") ? vercelUrl : `https://${vercelUrl}`;
+  }
+
+  return null;
+}
+
 async function signSessionToken(user: AuthUser, sid: string) {
   return new SignJWT({ sid })
     .setProtectedHeader({ alg: "HS256" })
@@ -234,7 +253,7 @@ export class IdentityService {
 
     const token = `${randomUUID()}${randomUUID().replace(/-/g, "")}`;
     const locale = parsed.locale ?? "tr";
-    const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+    const appUrl = resolveAppUrl() ?? "http://localhost:3000";
     const resetUrl = `${appUrl}/${locale}/reset-password?token=${encodeURIComponent(token)}`;
 
     await redisCache.set(
@@ -329,7 +348,7 @@ export class IdentityService {
   getGoogleOAuthConfig() {
     const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-    const appUrl = process.env.APP_URL;
+    const appUrl = resolveAppUrl();
 
     if (!clientId || !clientSecret || !appUrl) {
       return null;
@@ -346,7 +365,7 @@ export class IdentityService {
   getFacebookOAuthConfig() {
     const clientId = process.env.FACEBOOK_OAUTH_CLIENT_ID;
     const clientSecret = process.env.FACEBOOK_OAUTH_CLIENT_SECRET;
-    const appUrl = process.env.APP_URL;
+    const appUrl = resolveAppUrl();
 
     if (!clientId || !clientSecret || !appUrl) {
       return null;
@@ -364,7 +383,7 @@ export class IdentityService {
     const clientId = process.env.APPLE_OAUTH_CLIENT_ID;
     const teamId = process.env.APPLE_OAUTH_TEAM_ID;
     const keyId = process.env.APPLE_OAUTH_KEY_ID;
-    const appUrl = process.env.APP_URL;
+    const appUrl = resolveAppUrl();
     const privateKey = getApplePrivateKey();
 
     if (!clientId || !teamId || !keyId || !appUrl || !privateKey) {

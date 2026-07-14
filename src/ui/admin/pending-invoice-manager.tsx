@@ -34,6 +34,9 @@ type Labels = {
   createInvoiceFailed: string;
   queueInvoiceSuccess: string;
   queueInvoiceFailed: string;
+  badgeCreated: string;
+  badgeQueued: string;
+  badgeSent: string;
 };
 
 type Props = {
@@ -43,13 +46,22 @@ type Props = {
   labels: Labels;
 };
 
+type CardStatus = "created" | "queued" | "sent";
+
 export function PendingInvoiceManager({ locale, result, initialSearch, labels }: Props) {
   const router = useRouter();
   const [detail, setDetail] = useState<AdminBusinessDocumentDetail | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [submittingMode, setSubmittingMode] = useState<"create" | "create-and-queue" | null>(null);
+  const [cardStatuses, setCardStatuses] = useState<Record<string, CardStatus>>({});
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  function scheduleRefresh() {
+    window.setTimeout(() => {
+      router.refresh();
+    }, 1400);
+  }
 
   async function openDetail(id: string) {
     const response = await fetch(`/api/admin/documents/${id}`, { cache: "no-store" });
@@ -92,17 +104,30 @@ export function PendingInvoiceManager({ locale, result, initialSearch, labels }:
         if (!queueResponse.ok) {
           const queuePayload = (await queueResponse.json().catch(() => null)) as { message?: string } | null;
           setError(queuePayload?.message ?? labels.queueInvoiceFailed);
-          router.refresh();
+          setCardStatuses((current) => ({
+            ...current,
+            [id]: "created",
+          }));
+          scheduleRefresh();
           return;
         }
 
+        const queuePayload = (await queueResponse.json()) as { item: AdminBusinessDocumentDetail };
+        setCardStatuses((current) => ({
+          ...current,
+          [id]: queuePayload.item.externalSystemStatus === "SENT" ? "sent" : "queued",
+        }));
         setFeedback(labels.queueInvoiceSuccess);
-        router.refresh();
+        scheduleRefresh();
         return;
       }
 
+      setCardStatuses((current) => ({
+        ...current,
+        [id]: "created",
+      }));
       setFeedback(labels.createInvoiceSuccess);
-      router.refresh();
+      scheduleRefresh();
     } catch {
       setError(queueAfterCreate ? labels.queueInvoiceFailed : labels.createInvoiceFailed);
     } finally {
@@ -143,6 +168,23 @@ export function PendingInvoiceManager({ locale, result, initialSearch, labels }:
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">{item.documentType}</span>
                   <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">{item.status}</span>
+                  {cardStatuses[item.id] ? (
+                    <span
+                      className={
+                        cardStatuses[item.id] === "sent"
+                          ? "rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700"
+                          : cardStatuses[item.id] === "queued"
+                            ? "rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700"
+                            : "rounded-full bg-neutral-200 px-3 py-1 text-xs font-semibold text-neutral-700"
+                      }
+                    >
+                      {cardStatuses[item.id] === "sent"
+                        ? labels.badgeSent
+                        : cardStatuses[item.id] === "queued"
+                          ? labels.badgeQueued
+                          : labels.badgeCreated}
+                    </span>
+                  ) : null}
                 </div>
                 <h2 className="mt-3 text-lg font-semibold text-neutral-950">{item.documentNumber}</h2>
                 <p className="mt-1 text-sm text-neutral-600">{item.counterpartyName}</p>

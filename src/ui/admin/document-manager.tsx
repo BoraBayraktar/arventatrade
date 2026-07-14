@@ -39,6 +39,13 @@ type Labels = {
   providerNone: string;
   queueStatusSync: string;
   statusSyncing: string;
+  badgeNotSent: string;
+  badgeQueued: string;
+  badgeSent: string;
+  badgeFailed: string;
+  slaAttention: string;
+  slaCritical: string;
+  slaQueuedStale: string;
 };
 
 type Props = {
@@ -55,6 +62,64 @@ function subscribeNoop() {
 
 function getCurrentDateTimeLocalValue() {
   return new Date().toISOString().slice(0, 16);
+}
+
+function getExternalStatusBadgeClass(status: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED") {
+  switch (status) {
+    case "SENT":
+      return "rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700";
+    case "QUEUED":
+      return "rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700";
+    case "FAILED":
+      return "rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700";
+    default:
+      return "rounded-full bg-neutral-200 px-3 py-1 text-xs font-semibold text-neutral-700";
+  }
+}
+
+function getExternalStatusLabel(
+  status: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED",
+  labels: Pick<Labels, "badgeNotSent" | "badgeQueued" | "badgeSent" | "badgeFailed">,
+) {
+  switch (status) {
+    case "SENT":
+      return labels.badgeSent;
+    case "QUEUED":
+      return labels.badgeQueued;
+    case "FAILED":
+      return labels.badgeFailed;
+    default:
+      return labels.badgeNotSent;
+  }
+}
+
+function getSlaBadge(item: AdminBusinessDocumentListResult["items"][number], labels: Pick<Labels, "slaAttention" | "slaCritical" | "slaQueuedStale">) {
+  const ageHours = (Date.now() - new Date(item.issueDate).getTime()) / (1000 * 60 * 60);
+
+  if (item.externalSystemStatus === "NOT_SENT") {
+    if (ageHours >= 72) {
+      return {
+        className: "rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700",
+        label: labels.slaCritical,
+      };
+    }
+
+    if (ageHours >= 24) {
+      return {
+        className: "rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700",
+        label: labels.slaAttention,
+      };
+    }
+  }
+
+  if (item.externalSystemStatus === "QUEUED" && ageHours >= 24) {
+    return {
+      className: "rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700",
+      label: labels.slaQueuedStale,
+    };
+  }
+
+  return null;
 }
 
 export function DocumentManager({ locale, result, providerOptions, initialSearch, labels }: Props) {
@@ -273,14 +338,24 @@ export function DocumentManager({ locale, result, providerOptions, initialSearch
       <section className="grid gap-3">
         {result.items.length === 0 ? (
           <article className="rounded-3xl border border-neutral-200 bg-white p-5 text-sm text-neutral-500 shadow-sm">{labels.noResults}</article>
-        ) : result.items.map((item) => (
+        ) : result.items.map((item) => {
+          const slaBadge = getSlaBadge(item, labels);
+
+          return (
           <article key={item.id} className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-700">{item.documentType}</span>
                   <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">{item.status}</span>
-                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">{item.externalSystemStatus}</span>
+                  <span className={getExternalStatusBadgeClass(item.externalSystemStatus)}>
+                    {getExternalStatusLabel(item.externalSystemStatus, labels)}
+                  </span>
+                  {slaBadge ? (
+                    <span className={slaBadge.className}>
+                      {slaBadge.label}
+                    </span>
+                  ) : null}
                 </div>
                 <h3 className="mt-3 text-lg font-semibold text-neutral-950">{item.documentNumber}</h3>
                 <p className="mt-1 text-sm text-neutral-600">{item.counterpartyName}</p>
@@ -315,7 +390,7 @@ export function DocumentManager({ locale, result, providerOptions, initialSearch
               </div>
             </div>
           </article>
-        ))}
+        )})}
       </section>
 
       {detail ? (
@@ -339,7 +414,7 @@ export function DocumentManager({ locale, result, providerOptions, initialSearch
               </div>
               <div className="rounded-2xl border border-neutral-200 p-4 text-sm text-neutral-700">
                 <p>{labels.documentStatus}: {detail.status}</p>
-                <p className="mt-2">{labels.externalSystemStatus}: {detail.externalSystemStatus}</p>
+                <p className="mt-2">{labels.externalSystemStatus}: {getExternalStatusLabel(detail.externalSystemStatus, labels)}</p>
                 <p className="mt-2">{labels.externalReference}: {detail.externalReference ?? labels.notSpecified}</p>
               </div>
             </div>

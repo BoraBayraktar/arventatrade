@@ -14,3 +14,5 @@ export type AdminSupplierPayableSummary = {
   lastIssueDate: string | null;
   documents: AdminOperationalPayableDocument[];
 };
+
+export type AdminSupplierPayableDetail = AdminSupplierPayableSummary;

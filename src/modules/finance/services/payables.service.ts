@@ -1,5 +1,9 @@
 import { documentService } from "@/modules/documents/services/document.service";
-import type { AdminSupplierPayableSummary, AdminSupplierPayablesQuery } from "@/modules/finance/contracts/payables.contract";
+import type {
+  AdminSupplierPayableDetail,
+  AdminSupplierPayableSummary,
+  AdminSupplierPayablesQuery,
+} from "@/modules/finance/contracts/payables.contract";
 
 function normalizeSupplierKey(value: string) {
   return value.trim().toLocaleLowerCase("tr-TR");
@@ -46,6 +50,11 @@ export class PayablesService {
         documents: item.documents.sort((left, right) => right.issueDate.localeCompare(left.issueDate)),
       }))
       .sort((left, right) => right.totalAmount - left.totalAmount);
+  }
+
+  async getSupplierPayableByKey(supplierKey: string): Promise<AdminSupplierPayableDetail | null> {
+    const items = await this.listSupplierPayables();
+    return items.find((item) => item.supplierKey === supplierKey) ?? null;
   }
 }
 

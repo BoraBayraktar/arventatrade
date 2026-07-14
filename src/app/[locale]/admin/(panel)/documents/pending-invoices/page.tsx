@@ -62,6 +62,9 @@ export default async function AdminPendingInvoicesPage({
         createInvoiceFailed: dictionary.admin.documentsPendingInvoicesCreateInvoiceFailed,
         queueInvoiceSuccess: dictionary.admin.documentsPendingInvoicesQueueInvoiceSuccess,
         queueInvoiceFailed: dictionary.admin.documentsPendingInvoicesQueueInvoiceFailed,
+        badgeCreated: dictionary.admin.documentsPendingInvoicesBadgeCreated,
+        badgeQueued: dictionary.admin.documentsPendingInvoicesBadgeQueued,
+        badgeSent: dictionary.admin.documentsPendingInvoicesBadgeSent,
       }}
     />
   );

@@ -27,6 +27,8 @@ function hasRequiredDelegates(client: PrismaClient | undefined): client is Prism
     stockCountLine?: unknown;
     inventoryTransaction?: unknown;
     integrationSyncJob?: unknown;
+    collectionRecord?: unknown;
+    paymentRecord?: unknown;
   };
 
   return (
@@ -40,6 +42,8 @@ function hasRequiredDelegates(client: PrismaClient | undefined): client is Prism
     && typeof delegateCheck.stockCountLine !== "undefined"
     && typeof delegateCheck.inventoryTransaction !== "undefined"
     && typeof delegateCheck.integrationSyncJob !== "undefined"
+    && typeof delegateCheck.collectionRecord !== "undefined"
+    && typeof delegateCheck.paymentRecord !== "undefined"
   );
 }
 

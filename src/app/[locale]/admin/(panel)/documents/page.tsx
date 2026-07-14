@@ -75,6 +75,13 @@ export default async function AdminDocumentsPage({
         providerNone: dictionary.admin.documentsProviderNone,
         queueStatusSync: dictionary.admin.documentsQueueStatusSync,
         statusSyncing: dictionary.admin.documentsStatusSyncing,
+        badgeNotSent: dictionary.admin.documentsBadgeNotSent,
+        badgeQueued: dictionary.admin.documentsBadgeQueued,
+        badgeSent: dictionary.admin.documentsBadgeSent,
+        badgeFailed: dictionary.admin.documentsBadgeFailed,
+        slaAttention: dictionary.admin.documentsSlaAttention,
+        slaCritical: dictionary.admin.documentsSlaCritical,
+        slaQueuedStale: dictionary.admin.documentsSlaQueuedStale,
       }}
     />
   );
