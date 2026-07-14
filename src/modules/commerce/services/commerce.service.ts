@@ -4,6 +4,7 @@ import { redisCache } from "@/lib/redis";
 import type {
   AdminOrderDetail,
   AdminOrderDetailItem,
+  AdminOrderDocumentSummaryItem,
   AdminOrderInventoryMovementEntry,
   AdminOrderInventorySummary,
   AdminOrderListItem,
@@ -26,6 +27,7 @@ import { pricingService } from "@/modules/pricing/services/pricing.service";
 
 const lineSchema = z.object({
   productId: z.string().trim().min(1),
+  variantId: z.string().trim().min(1).optional(),
   quantity: z.coerce.number().int().min(1).max(99),
 });
 
@@ -71,17 +73,23 @@ export class CommerceOrderAdminError extends Error {
 }
 
 function normalizeLines(lines: CommerceQuoteInput["lines"]) {
-  const aggregated = new Map<string, number>();
+  const aggregated = new Map<string, { productId: string; variantId?: string; quantity: number }>();
 
   for (const line of lines) {
-    aggregated.set(line.productId, (aggregated.get(line.productId) ?? 0) + line.quantity);
+    const key = `${line.productId}:${line.variantId ?? ""}`;
+    const existing = aggregated.get(key);
+    aggregated.set(key, {
+      productId: line.productId,
+      ...(line.variantId ? { variantId: line.variantId } : {}),
+      quantity: (existing?.quantity ?? 0) + line.quantity,
+    });
   }
 
-  return [...aggregated.entries()].map(([productId, quantity]) => ({ productId, quantity }));
+  return [...aggregated.values()];
 }
 
 function mapQuoteLine(args: {
-  line: { productId: string; quantity: number };
+  line: { productId: string; variantId?: string; quantity: number };
   product: {
     productId: string;
     slug: string;
@@ -92,11 +100,21 @@ function mapQuoteLine(args: {
     unitPrice: number;
     compareAtPrice: number | null;
     availableStock: number;
+    variantId: string | null;
+    variantSlug: string | null;
+    variantSku: string | null;
+    variantTitle: string | null;
+    variantOptionSummary: string | null;
   } | undefined;
 }): CommerceLineQuote {
   if (!args.product) {
     return {
       productId: args.line.productId,
+      variantId: args.line.variantId ?? null,
+      variantSlug: null,
+      variantSku: null,
+      variantTitle: null,
+      variantOptionSummary: null,
       slug: "",
       sku: "",
       name: "Unknown product",
@@ -113,6 +131,11 @@ function mapQuoteLine(args: {
 
   return {
     productId: args.product.productId,
+    variantId: args.product.variantId,
+    variantSlug: args.product.variantSlug,
+    variantSku: args.product.variantSku,
+    variantTitle: args.product.variantTitle,
+    variantOptionSummary: args.product.variantOptionSummary,
     slug: args.product.slug,
     sku: args.product.sku,
     name: args.product.name,
@@ -138,8 +161,13 @@ async function invalidateCatalogCache() {
 function mapOrderDetailItem(item: {
   id: string;
   productId: string | null;
+  productVariantId?: string | null;
   productSlug: string;
   productSku: string;
+  productVariantSlug?: string | null;
+  productVariantSku?: string | null;
+  productVariantTitle?: string | null;
+  productVariantOptionSummary?: string | null;
   productName: string;
   productImageUrl: string;
   quantity: number;
@@ -151,8 +179,13 @@ function mapOrderDetailItem(item: {
   return {
     id: item.id,
     productId: item.productId,
+    productVariantId: item.productVariantId ?? null,
     productSlug: item.productSlug,
     productSku: item.productSku,
+    productVariantSlug: item.productVariantSlug ?? null,
+    productVariantSku: item.productVariantSku ?? null,
+    productVariantTitle: item.productVariantTitle ?? null,
+    productVariantOptionSummary: item.productVariantOptionSummary ?? null,
     productName: item.productName,
     productImageUrl: item.productImageUrl,
     quantity: item.quantity,
@@ -193,8 +226,13 @@ function mapOrderDetail(order: {
   items: Array<{
     id: string;
     productId: string | null;
+    productVariantId?: string | null;
     productSlug: string;
     productSku: string;
+    productVariantSlug?: string | null;
+    productVariantSku?: string | null;
+    productVariantTitle?: string | null;
+    productVariantOptionSummary?: string | null;
     productName: string;
     productImageUrl: string;
     quantity: number;
@@ -240,6 +278,19 @@ function mapOrderDetail(order: {
     changedByUserId: string | null;
     note: string | null;
     createdAt: Date;
+  }>;
+  businessDocuments: Array<{
+    id: string;
+    documentNumber: string;
+    documentType: "PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH";
+    status: "DRAFT" | "LINKED" | "ISSUED" | "CANCELLED";
+    externalSystemStatus: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED";
+    issueDate: Date;
+    totalAmount: { toNumber: () => number } | null;
+    currency: string;
+    inventoryTransaction: {
+      transactionNumber: string;
+    } | null;
   }>;
 }): AdminOrderDetail {
   const statusHistory: AdminOrderStatusHistoryEntry[] = order.statusHistory.map((item) => ({
@@ -300,6 +351,18 @@ function mapOrderDetail(order: {
     lastRestockedAt: restockMovements[0]?.createdAt ?? null,
   };
 
+  const documents: AdminOrderDocumentSummaryItem[] = order.businessDocuments.map((item) => ({
+    id: item.id,
+    documentNumber: item.documentNumber,
+    documentType: item.documentType,
+    status: item.status,
+    externalSystemStatus: item.externalSystemStatus,
+    issueDate: item.issueDate.toISOString(),
+    totalAmount: item.totalAmount?.toNumber() ?? null,
+    currency: item.currency,
+    inventoryTransactionNumber: item.inventoryTransaction?.transactionNumber ?? null,
+  }));
+
   return {
     id: order.id,
     orderNumber: order.orderNumber,
@@ -313,6 +376,7 @@ function mapOrderDetail(order: {
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     items: order.items.map(mapOrderDetailItem),
+    documents,
     inventorySummary,
     inventoryMovements,
     statusHistory,
@@ -327,9 +391,43 @@ export class CommerceService {
     const parsed = quoteSchema.parse(input);
     const normalized = normalizeLines(parsed.lines);
     const products = await inventoryService.getProductAvailability(normalized.map((line) => line.productId));
+    const sellables = await this.repository.listSellableSnapshots(normalized);
     const productMap = new Map(products.map((item) => [item.productId, item]));
+    const sellableMap = new Map(sellables.map((item) => [`${item.productId}:${item.variantId ?? ""}`, item]));
 
-    const lines = normalized.map((line) => mapQuoteLine({ line, product: productMap.get(line.productId) }));
+    const lines = normalized.map((line) => {
+      const availability = productMap.get(line.productId);
+      const sellable = sellableMap.get(`${line.productId}:${line.variantId ?? ""}`);
+
+      if (!availability || !sellable) {
+        return mapQuoteLine({ line, product: undefined });
+      }
+
+      const variantCap = sellable.variantStockOverride;
+      const availableStock = typeof variantCap === "number"
+        ? Math.max(0, Math.min(availability.availableStock, variantCap))
+        : availability.availableStock;
+
+      return mapQuoteLine({
+        line,
+        product: {
+          productId: sellable.productId,
+          slug: sellable.slug,
+          sku: sellable.sku,
+          name: sellable.name,
+          imageUrl: sellable.imageUrl,
+          currency: sellable.currency,
+          unitPrice: sellable.unitPrice,
+          compareAtPrice: sellable.compareAtPrice,
+          availableStock,
+          variantId: sellable.variantId,
+          variantSlug: sellable.variantSlug,
+          variantSku: sellable.variantSku,
+          variantTitle: sellable.variantTitle,
+          variantOptionSummary: sellable.variantOptionSummary,
+        },
+      });
+    });
     const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
     const promotion = await pricingService.evaluatePromotion({
       code: parsed.promotionCode,
@@ -387,9 +485,10 @@ export class CommerceService {
         && (
           error.message.startsWith("INSUFFICIENT_STOCK")
           || error.message.startsWith("STALE_RESERVATION_LEVEL")
+          || error.message === "SERIALIZABLE_TRANSACTION_FAILED"
         )
       ) {
-        throw new CommerceCheckoutError("Insufficient stock for one or more products", 409);
+        throw new CommerceCheckoutError("Stok eşzamanlı değiştiği için sepet yeniden doğrulanmalıdır", 409);
       }
 
       throw error;

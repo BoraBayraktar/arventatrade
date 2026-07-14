@@ -23,9 +23,13 @@ assertIncludes(repository, "listInventoryExportHistories", "Export geçmişi rep
 const service = read("src/modules/inventory/services/inventory.service.ts");
 assertIncludes(service, "recordInventoryExportHistory", "Export geçmişi service yazma metodu bulunamadı.");
 assertIncludes(service, "listInventoryExportHistory", "Export geçmişi service okuma metodu bulunamadı.");
+assertIncludes(service, "scopeLabel: \"Stok listesi CSV dışa aktarımı\"", "Export geçmişi service scope etiketini üretmiyor.");
+assertIncludes(service, "filterCount:", "Export geçmişi service filtre sayısını üretmiyor.");
 
 const route = read("src/app/api/admin/inventory/export/route.ts");
 assertIncludes(route, "recordInventoryExportHistory", "Export route geçmiş kaydı oluşturmuyor.");
+assertIncludes(route, "exportHistoryId", "Export route canlı akışta exportHistoryId dönmüyor.");
+assertIncludes(route, "filterCount", "Export route filtre sayısını geri döndürmüyor.");
 
 const shared = read("src/app/[locale]/admin/(panel)/inventory/_shared.ts");
 assertIncludes(shared, "listInventoryExportHistory()", "Inventory shared context export geçmişini yüklemiyor.");

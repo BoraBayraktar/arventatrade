@@ -13,20 +13,64 @@ function assertIncludes(content, expected, message) {
   }
 }
 
-const schema = read("prisma/schema.prisma");
-assertIncludes(schema, "model InventoryIntegrationMapping", "InventoryIntegrationMapping modeli bulunamadı.");
-assertIncludes(schema, "model ExternalStockEvent", "ExternalStockEvent modeli bulunamadı.");
-assertIncludes(schema, "enum ExternalStockEventStatus", "ExternalStockEventStatus enum'u bulunamadı.");
+const concurrencyDoc = read("docs/INVENTORY_CONCURRENCY_RULES.md");
+assertIncludes(
+  concurrencyDoc,
+  "Checkout commit: düşüm öncesi güncel `onHand` ve `reserved` doğrulanır, stale ise commit reddedilir.",
+  "Concurrency dokümanında checkout commit stale guard matrisi eksik.",
+);
+assertIncludes(
+  concurrencyDoc,
+  "Serializable yarış: servis/API katmanında kullanıcıya yenileme ve tekrar deneme mesajı döner.",
+  "Concurrency dokümanında serializable yarış dönüş kuralı eksik.",
+);
 
-const inventoryService = read("src/modules/inventory/services/inventory.service.ts");
-assertIncludes(inventoryService, "receiveExternalStockEvent", "Harici stok event işleme servisi bulunamadı.");
-assertIncludes(inventoryService, "queueIntegrationSync: false", "Inbound eventlerde dış eşitleme kapatma koruması bulunamadı.");
-assertIncludes(inventoryService, "EXTERNAL_STOCK_MAPPING_NOT_FOUND", "Mapping bulunamadığında hata akışı tanımlı değil.");
+const commerceRepository = read("src/modules/commerce/repositories/commerce.repository.ts");
+assertIncludes(
+  commerceRepository,
+  "const committedLevel = await this.getActiveLevelSnapshot(",
+  "Checkout commit öncesi güncel seviye tekrar okunmuyor.",
+);
+assertIncludes(
+  commerceRepository,
+  "STALE_RESERVATION_LEVEL:",
+  "Checkout stale reservation guard'ı eksik.",
+);
 
-const mappingRoute = read("src/app/api/admin/inventory/integration-mappings/route.ts");
-assertIncludes(mappingRoute, "inventoryService.upsertInventoryIntegrationMapping", "Entegrasyon eşleme route'u eksik.");
+const commerceService = read("src/modules/commerce/services/commerce.service.ts");
+assertIncludes(
+  commerceService,
+  "error.message === \"SERIALIZABLE_TRANSACTION_FAILED\"",
+  "Commerce service serializable yarış hatasını kullanıcı dostu şekilde ele almıyor.",
+);
+assertIncludes(
+  commerceService,
+  "Stok eşzamanlı değiştiği için sepet yeniden doğrulanmalıdır",
+  "Commerce service concurrency hata mesajı güncellenmedi.",
+);
 
-const eventRoute = read("src/app/api/admin/inventory/external-events/route.ts");
-assertIncludes(eventRoute, "inventoryService.receiveExternalStockEvent", "Harici event route'u eksik.");
+const stockCountApplyRoute = read("src/app/api/admin/inventory/stock-counts/[id]/apply/route.ts");
+assertIncludes(
+  stockCountApplyRoute,
+  "Sayım uygulanırken eşzamanlı stok değişikliği algılandı. Sayımı yenileyip tekrar deneyin.",
+  "Stock count apply route serializable yarış mesajını döndürmüyor.",
+);
+assertIncludes(
+  stockCountApplyRoute,
+  "STOCK_COUNT_HAS_ACTIVE_RESERVATIONS:",
+  "Stock count apply route aktif rezervasyon çakışma guard'ını işlemiyor.",
+);
+
+const inventoryRepository = read("src/modules/inventory/repositories/inventory.repository.ts");
+assertIncludes(
+  inventoryRepository,
+  "STOCK_COUNT_STALE_LEVEL:",
+  "Inventory repository stale sayım guard'ı eksik.",
+);
+assertIncludes(
+  inventoryRepository,
+  "STOCK_COUNT_HAS_ACTIVE_RESERVATIONS:",
+  "Inventory repository rezervasyon çakışma guard'ı eksik.",
+);
 
 console.log("Sprint 2 inventory doğrulamaları başarıyla geçti.");

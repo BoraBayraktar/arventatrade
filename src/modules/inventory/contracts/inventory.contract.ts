@@ -41,10 +41,12 @@ export type RecordProductInventoryMovementInput = {
   quantity: number;
   type: "PURCHASE_RECEIPT" | "DAMAGE_WRITE_OFF";
   note?: string;
+  documentType?: "PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH";
   sourceDocumentNumber?: string;
   sourceDocumentDate?: string;
   sourceDocumentSupplier?: string;
   sourceDocumentReference?: string;
+  externalSystemStatus?: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED";
   unitCost?: number | null;
 };
 
@@ -112,6 +114,9 @@ export type AdminInventoryExportHistoryItem = {
   summary: string;
   total: number;
   createdAt: string;
+  scopeLabel: string;
+  filterCount: number;
+  hasFilters: boolean;
   filters: {
     search: string | null;
     stockStatusFilter: string | null;
@@ -219,6 +224,12 @@ export type AdminInventoryListResult = {
   summary: AdminInventorySummary;
 };
 
+export type AdminInventoryQuickLookupResult = {
+  item: AdminInventoryItem | null;
+  matchType: "BARCODE" | "SKU" | "NAME" | "NONE";
+  query: string;
+};
+
 export type AdminInventoryTransactionLineItem = {
   id: string;
   quantity: number;
@@ -236,6 +247,7 @@ export type AdminInventorySourceDocument = {
   url: string | null;
   date: string | null;
   externalReference: string | null;
+  externalSystemStatus: string | null;
   counterpartyName: string | null;
 };
 
@@ -382,11 +394,44 @@ export type AdminInventoryReportsQuery = {
   periodDays?: 7 | 30 | 90;
   comparePreviousPeriod?: boolean;
   costingMethod?: AdminInventoryReportCostingMethod;
+  categoryId?: string;
+  productType?: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  warehouseCode?: string;
+  stockStatus?: "in_stock" | "low_stock" | "out_of_stock";
+  reservationStatus?: "with_reserved" | "without_reserved";
+  movementType?:
+    | "INITIAL_LOAD"
+    | "MANUAL_ADJUSTMENT"
+    | "PURCHASE_RECEIPT"
+    | "DAMAGE_WRITE_OFF"
+    | "TRANSFER_OUT"
+    | "TRANSFER_IN"
+    | "RESERVATION_HOLD"
+    | "RESERVATION_RELEASE"
+    | "ORDER_COMMIT"
+    | "ORDER_CANCEL_RESTOCK"
+    | "RETURN_RESTOCK";
+};
+
+export type AdminInventoryReportFilterOptions = {
+  categories: Array<{
+    id: string;
+    name: string;
+  }>;
+  productTypes: string[];
+  warehouses: Array<{
+    code: string;
+    name: string;
+  }>;
+  movementTypes: string[];
 };
 
 export type AdminInventoryReportOverview = {
-  costingMethod: AdminInventoryReportCostingMethod;
-  costingMethodLabel: string;
+  officialCostingMethod: "AVERAGE_COST";
+  officialCostingMethodLabel: string;
+  displayCostingMethod: AdminInventoryReportCostingMethod;
+  displayCostingMethodLabel: string;
+  comparisonCostingModeEnabled: boolean;
   totalOnHandUnits: number;
   totalAvailableUnits: number;
   totalCostValue: number;
@@ -499,6 +544,7 @@ export type AdminInventoryReportsResult = {
   overview: AdminInventoryReportOverview;
   periodDays: number;
   comparison: AdminInventoryReportPeriodComparison;
+  filterOptions: AdminInventoryReportFilterOptions;
   warehouses: AdminInventoryWarehouseReportItem[];
   lowStock: AdminInventoryLowStockReportItem[];
   movementSummary: AdminInventoryMovementSummaryItem[];
@@ -511,7 +557,7 @@ export type AdminInventoryReportsResult = {
 
 export type AdminInventoryIntegrationJobItem = {
   id: string;
-  channel: "TRENDYOL" | "N11";
+  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
   status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
   entityId: string;
   createdAt: string;
@@ -564,9 +610,14 @@ export type AdminExternalStockEventItem = {
   eventKey: string;
   eventType: ExternalStockEventType;
   status: ExternalStockEventStatus;
+  direction: "INBOUND" | "OUTBOUND";
   externalProductId: string | null;
   externalSku: string | null;
   externalWarehouseCode: string | null;
+  mappingId: string | null;
+  mappingMode: "EXTERNAL_PRODUCT_ID" | "EXTERNAL_SKU" | "UNRESOLVED";
+  warehouseResolution: "MAPPING_WAREHOUSE" | "DEFAULT_WAREHOUSE" | "UNRESOLVED";
+  projectionStatus: "PENDING" | "APPLIED" | "FAILED" | "DUPLICATE";
   productId: string | null;
   productName: string | null;
   productSku: string | null;
@@ -576,6 +627,7 @@ export type AdminExternalStockEventItem = {
   quantity: number;
   reference: string | null;
   note: string | null;
+  payloadSummary: string | null;
   appliedOnHand: number | null;
   appliedAvailable: number | null;
   errorMessage: string | null;
@@ -588,6 +640,9 @@ export type AdminExternalStockEventMonitoring = {
   appliedCount: number;
   failedCount: number;
   duplicateCount: number;
+  unresolvedCount: number;
+  readOnlyCount: number;
+  targetLevelMissingCount: number;
   latestFailedMessage: string | null;
   items: AdminExternalStockEventItem[];
 };

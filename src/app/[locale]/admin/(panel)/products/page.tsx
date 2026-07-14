@@ -15,6 +15,9 @@ export default async function AdminProductsPage({
   searchParams: Promise<{
     search?: string;
     categoryId?: string;
+    status?: string;
+    brandId?: string;
+    supplierId?: string;
     page?: string;
   }>;
 }) {
@@ -32,15 +35,21 @@ export default async function AdminProductsPage({
   }
 
   const query = await searchParams;
-  const [productResult, categories, warehouses] = await Promise.all([
+  const [productResult, categories, warehouses, brands, suppliers, attributeDefinitions] = await Promise.all([
     catalogAdminService.listProducts({
       search: query.search,
       categoryId: query.categoryId,
+      status: (query.status as "all" | "DRAFT" | "ACTIVE" | "ARCHIVED" | undefined) ?? "all",
+      brandId: query.brandId,
+      supplierId: query.supplierId,
       page: query.page ? Number(query.page) : 1,
       pageSize: 10,
     }),
     catalogService.listCategories(),
     inventoryService.listWarehouses(),
+    catalogAdminService.listBrands(),
+    catalogAdminService.listSuppliers(),
+    catalogAdminService.listAttributeDefinitions(),
   ]);
 
   return (
@@ -51,8 +60,14 @@ export default async function AdminProductsPage({
       initialQuery={{
         search: query.search ?? "",
         categoryId: query.categoryId ?? "",
+        status: query.status ?? "all",
+        brandId: query.brandId ?? "",
+        supplierId: query.supplierId ?? "",
       }}
       categories={categories}
+      brands={brands}
+      suppliers={suppliers}
+      attributeDefinitions={attributeDefinitions}
       warehouses={warehouses}
       canDelete={user.role === "ADMIN"}
       labels={{
@@ -83,6 +98,85 @@ export default async function AdminProductsPage({
         additionalImageUrls: dictionary.admin.additionalImageUrls,
         additionalImageUrlsHint: dictionary.admin.additionalImageUrlsHint,
         category: dictionary.catalog.category,
+        brand: dictionary.admin.brand,
+        supplier: dictionary.admin.supplier,
+        statusLabel: dictionary.admin.status,
+        statusDraft: dictionary.admin.productStatusDraft,
+        statusActive: dictionary.admin.productStatusActive,
+        statusArchived: dictionary.admin.productStatusArchived,
+        salesEnabled: dictionary.admin.salesEnabled,
+        purchaseEnabled: dictionary.admin.purchaseEnabled,
+        internalNote: dictionary.admin.internalNote,
+        searchKeywords: dictionary.admin.searchKeywords,
+        searchKeywordsHint: dictionary.admin.searchKeywordsHint,
+        allStatuses: dictionary.admin.allStatuses,
+        allBrands: dictionary.admin.allBrands,
+        allSuppliers: dictionary.admin.allSuppliers,
+        createBrand: dictionary.admin.createBrand,
+        createSupplier: dictionary.admin.createSupplier,
+        createAttributeDefinition: dictionary.admin.createAttributeDefinition,
+        attributesTitle: dictionary.admin.attributesTitle,
+        attributeName: dictionary.admin.attributeName,
+        attributeDisplayType: dictionary.admin.attributeDisplayType,
+        attributeDisplayText: dictionary.admin.attributeDisplayText,
+        attributeDisplayColor: dictionary.admin.attributeDisplayColor,
+        attributeDisplayNumber: dictionary.admin.attributeDisplayNumber,
+        variantAxes: dictionary.admin.variantAxes,
+        variantAxesHint: dictionary.admin.variantAxesHint,
+        variantTitle: dictionary.admin.variantTitle,
+        variantsTitle: dictionary.admin.variantsTitle,
+        variantsHint: dictionary.admin.variantsHint,
+        addVariant: dictionary.admin.addVariant,
+        variantOptionSummary: dictionary.admin.variantOptionSummary,
+        variantPriceOverride: dictionary.admin.variantPriceOverride,
+        variantPurchasePriceOverride: dictionary.admin.variantPurchasePriceOverride,
+        variantCompareAtPriceOverride: dictionary.admin.variantCompareAtPriceOverride,
+        variantImageUrl: dictionary.admin.variantImageUrl,
+        variantStockOverride: dictionary.admin.variantStockOverride,
+        variantDefault: dictionary.admin.variantDefault,
+        variantSalesEnabled: dictionary.admin.variantSalesEnabled,
+        variantAttributeValue: dictionary.admin.variantAttributeValue,
+        variantDetails: dictionary.admin.variantDetails,
+        variantEmptyState: dictionary.admin.variantEmptyState,
+        variantAxisDeleteConfirm: dictionary.admin.variantAxisDeleteConfirm,
+        variantAxisDeleteBlocked: dictionary.admin.variantAxisDeleteBlocked,
+        variantAxisUsageCount: dictionary.admin.variantAxisUsageCount,
+        selectedVariantAxes: dictionary.admin.selectedVariantAxes,
+        generateVariants: dictionary.admin.generateVariants,
+        generateVariantsTitle: dictionary.admin.generateVariantsTitle,
+        generateVariantsHint: dictionary.admin.generateVariantsHint,
+        generateVariantsValues: dictionary.admin.generateVariantsValues,
+        generateVariantsApply: dictionary.admin.generateVariantsApply,
+        generateVariantsEmptyAxes: dictionary.admin.generateVariantsEmptyAxes,
+        generateVariantsSuggestions: dictionary.admin.generateVariantsSuggestions,
+        generateVariantsUseAllSuggestions: dictionary.admin.generateVariantsUseAllSuggestions,
+        orderCount: dictionary.admin.orderCount,
+        soldQuantity: dictionary.admin.soldQuantity,
+        grossRevenue: dictionary.admin.grossRevenue,
+        averageUnitCost: dictionary.admin.averageUnitCost,
+        lastPurchaseUnitCost: dictionary.admin.lastPurchaseUnitCost,
+        stockValue: dictionary.admin.stockValue,
+        grossProfit: dictionary.admin.grossProfit,
+        grossMarginRate: dictionary.admin.grossMarginRate,
+        lastOrderedAt: dictionary.admin.lastOrderedAt,
+        decisionAlerts: dictionary.admin.decisionAlerts,
+        alertLowMargin: dictionary.admin.alertLowMargin,
+        alertSlowSales: dictionary.admin.alertSlowSales,
+        alertStockRisk: dictionary.admin.alertStockRisk,
+        alertHealthy: dictionary.admin.alertHealthy,
+        reviewInventory: dictionary.admin.reviewInventory,
+        reviewTransactions: dictionary.admin.reviewTransactions,
+        brandName: dictionary.admin.brandName,
+        supplierName: dictionary.admin.supplierName,
+        supplierTaxNumber: dictionary.admin.supplierTaxNumber,
+        supplierEmail: dictionary.admin.supplierEmail,
+        supplierPhone: dictionary.admin.supplierPhone,
+        importCsv: dictionary.admin.importCsv,
+        exportCsv: dictionary.admin.exportCsv,
+        importHint: dictionary.admin.productImportHint,
+        importSuccess: dictionary.admin.productImportSuccess,
+        importFailed: dictionary.admin.productImportFailed,
+        exportFailed: dictionary.admin.productExportFailed,
         discount: dictionary.admin.discount,
         stockStatus: dictionary.admin.stockStatus,
         inStock: dictionary.admin.inStock,
@@ -101,6 +195,9 @@ export default async function AdminProductsPage({
         validationImageUrl: dictionary.admin.validationImageUrl,
         validationImageUrls: dictionary.admin.validationImageUrls,
         validationImageUrlsLimit: dictionary.admin.validationImageUrlsLimit,
+        validationVariantRequired: dictionary.admin.validationVariantRequired,
+        validationVariantAttributes: dictionary.admin.validationVariantAttributes,
+        validationVariantImageUrl: dictionary.admin.validationVariantImageUrl,
         uploadImage: dictionary.admin.uploadImage,
         uploadImages: dictionary.admin.uploadImages,
         uploadingImage: dictionary.admin.uploadingImage,
@@ -114,6 +211,7 @@ export default async function AdminProductsPage({
         highlightFeature: dictionary.admin.highlightFeature,
         addFeature: dictionary.admin.addFeature,
         removeFeature: dictionary.admin.removeFeature,
+        createEntity: dictionary.admin.create,
         loading: dictionary.common.loading,
         notSpecified: dictionary.common.notSpecified,
       }}

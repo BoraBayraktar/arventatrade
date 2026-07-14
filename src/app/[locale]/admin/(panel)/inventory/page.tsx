@@ -12,6 +12,17 @@ export default async function AdminInventoryPage({
   const { locale } = await params;
   const resolvedSearchParams = await searchParams;
   const context = await loadInventoryRouteContext(locale, resolvedSearchParams, "overview");
+  const requestedSection = resolvedSearchParams.section;
+
+  const initialSection = requestedSection === "quick-actions"
+    ? "quick-actions"
+    : requestedSection === "inventory-list"
+      ? "inventory-list"
+      : requestedSection === "inventory-critical"
+        ? "inventory-critical"
+        : "inventory-reports";
+
+  const initialSectionGroup = initialSection === "inventory-list" ? "operations" : "overview";
 
   return (
     <InventoryManager
@@ -30,15 +41,14 @@ export default async function AdminInventoryPage({
       query={context.query}
       labels={context.labels}
       overviewPath={`/${context.locale}/admin/inventory`}
-      inventoryListPath={`/${context.locale}/admin/inventory`}
+      inventoryListPath={`/${context.locale}/admin/inventory/products`}
       transactionListPath={`/${context.locale}/admin/inventory/transactions`}
       stockCountsPath={`/${context.locale}/admin/inventory/counts`}
       warehousesPath={`/${context.locale}/admin/inventory/warehouses`}
-      exportsPath={`/${context.locale}/admin/inventory/exports`}
       externalEventsPath={`/${context.locale}/admin/inventory/external-events`}
       pageVariant="overview"
-      initialSectionGroup="overview"
-      initialSection="inventory-reports"
+      initialSectionGroup={initialSectionGroup}
+      initialSection={initialSection}
     />
   );
 }

@@ -13,24 +13,35 @@ function assertIncludes(content, expected, message) {
   }
 }
 
-const schema = read("prisma/schema.prisma");
-assertIncludes(schema, "model UserInventoryPreference", "UserInventoryPreference modeli bulunamadi.");
-assertIncludes(schema, "inventoryPreference UserInventoryPreference?", "User modeli tercih iliskisi icermiyor.");
-
 const repository = read("src/modules/inventory/repositories/inventory.repository.ts");
-assertIncludes(repository, "async getUserInventoryPreferences", "Repository tercih okuma metodu eksik.");
-assertIncludes(repository, "async upsertUserInventoryPreferences", "Repository tercih kaydetme metodu eksik.");
+assertIncludes(repository, "async listInventoryReportLevels()", "Repository rapor stok seviyeleri metodu eksik.");
+assertIncludes(repository, "categoryId: true", "Repository rapor seviyelerinde kategori secimi eksik.");
+assertIncludes(repository, "productType: true", "Repository rapor seviyelerinde urun tipi secimi eksik.");
+assertIncludes(repository, "warehouse: {", "Repository rapor hareketlerinde depo secimi eksik.");
+assertIncludes(repository, "inventoryItemId: true", "Repository rapor hareketlerinde inventoryItemId secimi eksik.");
 
 const service = read("src/modules/inventory/services/inventory.service.ts");
-assertIncludes(service, "async getUserInventoryPreferences", "Service tercih okuma metodu eksik.");
-assertIncludes(service, "async saveUserInventoryPreferences", "Service tercih kaydetme metodu eksik.");
+assertIncludes(service, "categoryId: z.string().trim().min(1).optional()", "Service rapor kategori filtresi eksik.");
+assertIncludes(service, "warehouseCode: z.string().trim().min(1).max(32).optional()", "Service rapor depo filtresi eksik.");
+assertIncludes(service, "const filterOptions: AdminInventoryReportsResult[\"filterOptions\"]", "Service rapor filtre secenekleri eksik.");
+assertIncludes(service, "const filteredLevels = levels.filter", "Service rapor seviye filtreleme eksik.");
+assertIncludes(service, "const filteredMovements = movements.filter", "Service rapor hareket filtreleme eksik.");
+assertIncludes(service, "filterOptions,", "Service sonucunda filterOptions donulmuyor.");
 
-const route = read("src/app/api/admin/inventory/preferences/route.ts");
-assertIncludes(route, "export async function GET()", "Tercih GET route'u eksik.");
-assertIncludes(route, "export async function PUT(request: Request)", "Tercih PUT route'u eksik.");
+const shared = read("src/app/[locale]/admin/(panel)/inventory/_shared.ts");
+assertIncludes(shared, "reportCategoryFilter?: string;", "Route context rapor kategori query alani eksik.");
+assertIncludes(shared, "reportMovementTypeFilter?: string;", "Route context rapor hareket tipi query alani eksik.");
+assertIncludes(shared, "reportCategoryFilter: searchParams.reportCategoryFilter ?? \"all\"", "Route context varsayilan rapor kategori filtresi eksik.");
+assertIncludes(shared, "reportMovementTypeFilter: searchParams.reportMovementTypeFilter ?? \"all\"", "Route context varsayilan rapor hareket filtresi eksik.");
 
 const manager = read("src/ui/admin/inventory-manager.tsx");
-assertIncludes(manager, "inventoryPreferences: AdminInventoryListPreferences;", "InventoryManager tercih prop'u eksik.");
-assertIncludes(manager, "fetch(\"/api/admin/inventory/preferences\"", "InventoryManager tercih kaydi API cagrisi eksik.");
+assertIncludes(manager, "reportCategoryFilter: string;", "InventoryManager rapor kategori query prop'u eksik.");
+assertIncludes(manager, "const reportCategoryOptions = useMemo(", "InventoryManager rapor kategori secenekleri eksik.");
+assertIncludes(manager, "const hasActiveReportFilters = useMemo(", "InventoryManager aktif rapor filtre kontrolu eksik.");
+assertIncludes(manager, "labels.reportFiltersTitle", "InventoryManager rapor filtre paneli eksik.");
+
+const translations = read("src/i18n/tr.json");
+assertIncludes(translations, "\"inventoryReportFiltersTitle\": \"Rapor filtreleri\"", "Turkce rapor filtre basligi eksik.");
+assertIncludes(translations, "\"inventoryReportMovementTypeFilter\": \"Hareket tipi\"", "Turkce rapor hareket tipi etiketi eksik.");
 
 console.log("Sprint 7 inventory doğrulamaları başarıyla geçti.");

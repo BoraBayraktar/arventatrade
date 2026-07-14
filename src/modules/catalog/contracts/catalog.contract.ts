@@ -6,6 +6,42 @@ export type ProductFeature = {
   highlighted: boolean;
 };
 
+export type ProductVariantAttribute = {
+  attributeDefinitionId: string;
+  slug: string;
+  name: string;
+  displayType: "TEXT" | "COLOR" | "NUMBER";
+  value: string;
+};
+
+export type ProductVariantOption = {
+  id: string;
+  slug: string;
+  sku: string;
+  barcode: string | null;
+  title: string;
+  optionSummary: string;
+  price: number;
+  purchasePrice: number | null;
+  compareAtPrice: number | null;
+  discountRate: number | null;
+  stock: number;
+  inStock: boolean;
+  imageUrl: string;
+  imageUrls: string[];
+  isDefault: boolean;
+  salesEnabled: boolean;
+  attributes: ProductVariantAttribute[];
+};
+
+export type ProductAttributeAxis = {
+  attributeDefinitionId: string;
+  slug: string;
+  name: string;
+  displayType: "TEXT" | "COLOR" | "NUMBER";
+  values: string[];
+};
+
 export type ProductFeatureFacetOption = {
   value: string;
   count: number;
@@ -69,6 +105,7 @@ export type ProductCard = {
   id: string;
   slug: string;
   sku: string;
+  barcode?: string | null;
   name: string;
   description: string;
   price: number;
@@ -99,6 +136,9 @@ export type ProductDetail = ProductCard & {
   ratingSummary: ProductRatingSummary;
   reviews: ProductReview[];
   questions: ProductQuestionAnswer[];
+  variantAxes: ProductAttributeAxis[];
+  variants: ProductVariantOption[];
+  defaultVariantId: string | null;
 };
 
 export type CategoryOption = {

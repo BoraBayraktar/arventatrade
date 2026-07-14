@@ -10,8 +10,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
 
     const result = await integrationService.listJobs({
-      channel: (searchParams.get("channel") as "TRENDYOL" | "N11" | null) ?? undefined,
-      jobType: (searchParams.get("jobType") as "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | null) ?? undefined,
+      channel: (searchParams.get("channel") as "TRENDYOL" | "N11" | "EDOCS_MOCK" | null) ?? undefined,
+      jobType: (searchParams.get("jobType") as "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC" | null) ?? undefined,
       status: (searchParams.get("status") as "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER" | null) ?? undefined,
       page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
       pageSize: searchParams.get("pageSize") ? Number(searchParams.get("pageSize")) : 20,

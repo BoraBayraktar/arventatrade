@@ -11,6 +11,10 @@ const stockOutSchema = z.object({
   warehouseCode: z.string().trim().min(1).max(32),
   quantity: z.coerce.number().int().min(1),
   note: z.string().trim().min(3).max(280).optional(),
+  documentType: z.enum(["PURCHASE_DOCUMENT", "DELIVERY_NOTE", "E_INVOICE", "E_DISPATCH"]).optional(),
+  sourceDocumentNumber: z.string().trim().min(1).max(120).optional(),
+  sourceDocumentReference: z.string().trim().min(1).max(160).optional(),
+  externalSystemStatus: z.enum(["NOT_SENT", "QUEUED", "SENT", "FAILED"]).optional(),
 });
 
 export async function POST(request: Request) {
@@ -25,6 +29,10 @@ export async function POST(request: Request) {
       quantity: payload.quantity,
       type: "DAMAGE_WRITE_OFF",
       note: payload.note ?? "Inventory manager stock out",
+      documentType: payload.documentType,
+      sourceDocumentNumber: payload.sourceDocumentNumber,
+      sourceDocumentReference: payload.sourceDocumentReference,
+      externalSystemStatus: payload.externalSystemStatus,
     });
 
     await auditLogService.record({
@@ -36,6 +44,9 @@ export async function POST(request: Request) {
       metadata: {
         warehouseCode: payload.warehouseCode,
         quantity: payload.quantity,
+        documentType: payload.documentType ?? null,
+        sourceDocumentNumber: payload.sourceDocumentNumber ?? null,
+        externalSystemStatus: payload.externalSystemStatus ?? null,
       },
     });
 

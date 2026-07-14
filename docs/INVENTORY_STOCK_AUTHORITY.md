@@ -25,6 +25,7 @@ Anlamı:
 - Geriye dönük uyumluluk
 - Geçiş dönemi gözlemi
 - Aggregate olmayan eski yüzeyler için fallback
+- Aggregate henüz oluşmamış storefront/katalog özetleri için kontrollü okuma
 
 İzin verilmeyen kullanım:
 
@@ -32,6 +33,7 @@ Anlamı:
 - Admin stok kararları
 - Depo bazlı operasyonlar
 - Rezervasyon ve commit akışları
+- Yeni UI veya servis mantığında `Product.stock` değerini doğrudan “stok var/yok otoritesi” gibi yorumlamak
 
 ## Okuma Kuralları
 
@@ -75,8 +77,17 @@ Bu nedenle `Product.stock` bir kaynak değil, sonuç alanıdır.
 - Commerce ve admin akışları aggregate tabanlı kalmalıdır.
 - Yeni endpoint veya servislerde `Product.stock` referansı eklenmemelidir.
 - Legacy kullanım tespit edilirse inventory servisine taşınmalıdır.
+- Fallback gerekiyorsa kod içinde açıkça `legacy summary fallback` niyetiyle isimlendirilmelidir.
 - Harici sistemlerden gelen stok yazımları sadece `InventoryIntegrationMapping` üzerinden eşlenmiş ve açıkça izin verilmiş kayıtlarla uygulanmalıdır.
 - Harici stok eventleri `ExternalStockEvent` olarak idempotent biçimde kaydedilmeden aggregate üstünde işlenmemelidir.
+
+## Sprint 1 Uygulama Matrisi
+
+- Commerce sipariş uygunluğu: inventory aggregate otoritesi, `Product.stock` yalnızca aggregate bootstrap fallback
+- Katalog/storefront listeleme: inventory aggregate otoritesi, aggregate yoksa legacy summary fallback
+- Admin ürün listesi: inventory aggregate otoritesi, aggregate yoksa legacy summary fallback
+- Inventory availability contract: inventory aggregate otoritesi, aggregate yoksa legacy summary fallback
+- Inventory yazma akışları: doğrudan aggregate yazımı, summary senkronizasyonu türetilmiş sonuç
 
 ## Eşzamanlılık Kuralları
 

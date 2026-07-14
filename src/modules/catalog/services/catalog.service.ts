@@ -3,8 +3,10 @@ import { z } from "zod";
 import { redisCache } from "@/lib/redis";
 import type {
   CategoryOption,
+  ProductAttributeAxis,
   ProductCard,
   ProductDetail,
+  ProductVariantOption,
   ProductQuestionAnswer,
   ProductRatingDistributionItem,
   ProductRatingSummary,
@@ -73,12 +75,28 @@ async function invalidateProductDetailCache(slug: string) {
   await redisCache.del(`catalog:detail:${slug}`);
 }
 
+function resolveAggregateAvailableStock(
+  inventoryLevels: Array<{
+    onHand: number;
+    reserved: number;
+  }>,
+  legacySummaryStock: number,
+) {
+  if (inventoryLevels.length === 0) {
+    // Sprint 1 kuralı: Product.stock yalnızca legacy summary fallback olarak okunabilir.
+    return legacySummaryStock;
+  }
+
+  return inventoryLevels.reduce((sum, level) => sum + Math.max(0, level.onHand - level.reserved), 0);
+}
+
 function mapProduct(product: {
   id: string;
   slug: string;
   sku: string;
   name: string;
   description: string;
+  barcode?: string | null;
   price: { toNumber: () => number };
   compareAtPrice: { toNumber: () => number } | null;
   stock: number;
@@ -100,14 +118,13 @@ function mapProduct(product: {
     ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
     : null;
   const inventoryLevels = product.inventoryItem?.inventoryLevels ?? [];
-  const aggregateStock = inventoryLevels.length > 0
-    ? inventoryLevels.reduce((sum, level) => sum + Math.max(0, level.onHand - level.reserved), 0)
-    : product.stock;
+  const aggregateStock = resolveAggregateAvailableStock(inventoryLevels, product.stock);
 
   return {
     id: product.id,
     slug: product.slug,
     sku: product.sku,
+    barcode: product.barcode ?? null,
     name: product.name,
     description: cleanDescription,
     price,
@@ -126,6 +143,100 @@ function mapProduct(product: {
         }
       : null,
   };
+}
+
+function mapVariant(item: {
+  id: string;
+  slug: string;
+  sku: string;
+  barcode: string | null;
+  title: string;
+  optionSummary: string;
+  priceOverride: { toNumber: () => number } | null;
+  purchasePriceOverride: { toNumber: () => number } | null;
+  compareAtPriceOverride: { toNumber: () => number } | null;
+  imageUrl: string | null;
+  imageUrls: string[];
+  stockOverride: number | null;
+  salesEnabled: boolean;
+  isDefault: boolean;
+  attributeValues: Array<{
+    value: string;
+    attributeDefinition: {
+      id: string;
+      slug: string;
+      name: string;
+      displayType: "TEXT" | "COLOR" | "NUMBER";
+    };
+  }>;
+}, base: ProductCard): ProductVariantOption {
+  const price = item.priceOverride?.toNumber() ?? base.price;
+  const compareAtPrice = item.compareAtPriceOverride?.toNumber() ?? base.compareAtPrice;
+  const stock = item.stockOverride ?? base.stock;
+  const discountRate = compareAtPrice && compareAtPrice > price
+    ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
+    : null;
+
+  return {
+    id: item.id,
+    slug: item.slug,
+    sku: item.sku,
+    barcode: item.barcode,
+    title: item.title,
+    optionSummary: item.optionSummary,
+    price,
+    purchasePrice: item.purchasePriceOverride?.toNumber() ?? null,
+    compareAtPrice,
+    discountRate,
+    stock,
+    inStock: stock > 0,
+    imageUrl: item.imageUrl ?? base.imageUrl,
+    imageUrls: item.imageUrls.length > 0 ? item.imageUrls : base.imageUrls,
+    isDefault: item.isDefault,
+    salesEnabled: item.salesEnabled,
+    attributes: item.attributeValues.map((attribute) => ({
+      attributeDefinitionId: attribute.attributeDefinition.id,
+      slug: attribute.attributeDefinition.slug,
+      name: attribute.attributeDefinition.name,
+      displayType: attribute.attributeDefinition.displayType,
+      value: attribute.value,
+    })),
+  };
+}
+
+function buildVariantAxes(product: {
+  attributeLinks: Array<{
+    attributeDefinition: {
+      id: string;
+      slug: string;
+      name: string;
+      displayType: "TEXT" | "COLOR" | "NUMBER";
+    };
+  }>;
+  variants: Array<{
+    attributeValues: Array<{
+      value: string;
+      attributeDefinition: {
+        id: string;
+      };
+    }>;
+  }>;
+}): ProductAttributeAxis[] {
+  return product.attributeLinks.map((link) => {
+    const values = Array.from(new Set(product.variants.flatMap((variant) => (
+      variant.attributeValues
+        .filter((item) => item.attributeDefinition.id === link.attributeDefinition.id)
+        .map((item) => item.value)
+    ))));
+
+    return {
+      attributeDefinitionId: link.attributeDefinition.id,
+      slug: link.attributeDefinition.slug,
+      name: link.attributeDefinition.name,
+      displayType: link.attributeDefinition.displayType,
+      values,
+    };
+  });
 }
 
 function toRatingValue(value: number): 1 | 2 | 3 | 4 | 5 {
@@ -396,8 +507,17 @@ export class CatalogService {
   async getProductBySlug(slug: string): Promise<ProductDetail | null> {
     const cacheKey = `catalog:detail:${slug}`;
     const cached = await redisCache.get<ProductDetail>(cacheKey);
-    if (cached) {
+    if (
+      cached
+      && Array.isArray(cached.variants)
+      && Array.isArray(cached.variantAxes)
+      && "defaultVariantId" in cached
+    ) {
       return cached;
+    }
+
+    if (cached) {
+      await redisCache.del(cacheKey);
     }
 
     const product = await this.repository.findBySlug(slug);
@@ -412,11 +532,16 @@ export class CatalogService {
     ]);
 
     const mappedCard = mapProduct(product);
+    const variants = product.variants.map((variant) => mapVariant(variant, mappedCard));
+    const defaultVariantId = variants.find((variant) => variant.isDefault)?.id ?? variants[0]?.id ?? null;
     const mapped: ProductDetail = {
       ...mappedCard,
       ratingSummary: buildRatingSummary(ratingRows),
       reviews: reviews.map(mapReview),
       questions: questions.map(mapQuestion),
+      variantAxes: buildVariantAxes(product),
+      variants,
+      defaultVariantId,
     };
 
     await redisCache.set(cacheKey, mapped, 120);

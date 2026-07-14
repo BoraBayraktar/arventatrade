@@ -1,10 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import type {
   AdminAnswerProductQuestionInput,
+  AdminCreateProductAttributeDefinitionInput,
+  AdminCreateBrandInput,
+  AdminCreateSupplierInput,
   AdminCategoryListQuery,
   AdminProductQuestionListQuery,
   AdminProductListQuery,
   AdminUpdateCategoryInput,
+  AdminUpdateProductAttributeDefinitionInput,
 } from "@/modules/catalog/contracts/catalog-admin.contract";
 
 type AdminCreateProductRecordInput = {
@@ -14,6 +18,7 @@ type AdminCreateProductRecordInput = {
   name: string;
   description: string;
   productType?: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  status?: "DRAFT" | "ACTIVE" | "ARCHIVED";
   unitType?: "PIECE" | "KILOGRAM" | "GRAM" | "LITER" | "MILLILITER" | "METER" | "CENTIMETER" | "BOX" | "PACK";
   price: number;
   purchasePrice?: number | null;
@@ -21,11 +26,43 @@ type AdminCreateProductRecordInput = {
   currency?: string;
   vatRate?: number;
   stockTrackingEnabled?: boolean;
+  salesEnabled?: boolean;
+  purchaseEnabled?: boolean;
+  internalNote?: string | null;
+  searchKeywords?: string[];
+  brandId?: string | null;
+  primarySupplierId?: string | null;
   preferredSalesWarehouseId?: string | null;
   preferredPurchaseWarehouseId?: string | null;
   imageUrl: string;
   imageUrls?: string[];
   categoryId?: string | null;
+  attributeLinks?: Array<{
+    attributeDefinitionId: string;
+    isVariantAxis: boolean;
+    sortOrder?: number;
+  }>;
+  variants?: Array<{
+    id?: string;
+    slug: string;
+    sku: string;
+    barcode?: string | null;
+    title: string;
+    optionSummary: string;
+    priceOverride?: number | null;
+    purchasePriceOverride?: number | null;
+    compareAtPriceOverride?: number | null;
+    imageUrl?: string | null;
+    imageUrls?: string[];
+    stockOverride?: number | null;
+    salesEnabled?: boolean;
+    isDefault?: boolean;
+    sortOrder?: number;
+    attributes: Array<{
+      attributeDefinitionId: string;
+      value: string;
+    }>;
+  }>;
 };
 
 type AdminUpdateProductRecordInput = {
@@ -36,6 +73,7 @@ type AdminUpdateProductRecordInput = {
   name?: string;
   description?: string;
   productType?: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  status?: "DRAFT" | "ACTIVE" | "ARCHIVED";
   unitType?: "PIECE" | "KILOGRAM" | "GRAM" | "LITER" | "MILLILITER" | "METER" | "CENTIMETER" | "BOX" | "PACK";
   price?: number;
   purchasePrice?: number | null;
@@ -43,14 +81,52 @@ type AdminUpdateProductRecordInput = {
   currency?: string;
   vatRate?: number;
   stockTrackingEnabled?: boolean;
+  salesEnabled?: boolean;
+  purchaseEnabled?: boolean;
+  internalNote?: string | null;
+  searchKeywords?: string[];
+  brandId?: string | null;
+  primarySupplierId?: string | null;
   preferredSalesWarehouseId?: string | null;
   preferredPurchaseWarehouseId?: string | null;
   imageUrl?: string;
   imageUrls?: string[];
   categoryId?: string | null;
+  attributeLinks?: Array<{
+    attributeDefinitionId: string;
+    isVariantAxis: boolean;
+    sortOrder?: number;
+  }>;
+  variants?: Array<{
+    id?: string;
+    slug: string;
+    sku: string;
+    barcode?: string | null;
+    title: string;
+    optionSummary: string;
+    priceOverride?: number | null;
+    purchasePriceOverride?: number | null;
+    compareAtPriceOverride?: number | null;
+    imageUrl?: string | null;
+    imageUrls?: string[];
+    stockOverride?: number | null;
+    salesEnabled?: boolean;
+    isDefault?: boolean;
+    sortOrder?: number;
+    attributes: Array<{
+      attributeDefinitionId: string;
+      value: string;
+    }>;
+  }>;
 };
 
-function buildWhere(args: { search?: string; categoryId?: string }) {
+function buildWhere(args: {
+  search?: string;
+  categoryId?: string;
+  status?: "all" | "DRAFT" | "ACTIVE" | "ARCHIVED";
+  brandId?: string;
+  supplierId?: string;
+}) {
   return {
     deleted: false,
     ...(args.search
@@ -59,10 +135,17 @@ function buildWhere(args: { search?: string; categoryId?: string }) {
             { name: { contains: args.search, mode: "insensitive" as const } },
             { slug: { contains: args.search, mode: "insensitive" as const } },
             { description: { contains: args.search, mode: "insensitive" as const } },
+            { sku: { contains: args.search, mode: "insensitive" as const } },
+            { barcode: { contains: args.search, mode: "insensitive" as const } },
+            { brand: { name: { contains: args.search, mode: "insensitive" as const } } },
+            { primarySupplier: { name: { contains: args.search, mode: "insensitive" as const } } },
           ],
         }
       : {}),
     ...(args.categoryId ? { categoryId: args.categoryId } : {}),
+    ...(args.status && args.status !== "all" ? { status: args.status } : {}),
+    ...(args.brandId ? { brandId: args.brandId } : {}),
+    ...(args.supplierId ? { primarySupplierId: args.supplierId } : {}),
   };
 }
 
@@ -102,9 +185,17 @@ export class CatalogAdminRepository {
     return prisma.product.findMany({
       where: buildWhere(args),
       include: {
+        brand: true,
         category: true,
+        attributeLinks: {
+          include: {
+            attributeDefinition: true,
+          },
+        },
         inventoryItem: {
           select: {
+            averageUnitCost: true,
+            lastPurchaseUnitCost: true,
             inventoryLevels: {
               where: {
                 warehouse: {
@@ -118,6 +209,24 @@ export class CatalogAdminRepository {
             },
           },
         },
+        primarySupplier: true,
+        variants: {
+          where: {
+            deleted: false,
+          },
+          orderBy: [
+            { isDefault: "desc" },
+            { sortOrder: "asc" },
+            { createdAt: "asc" },
+          ],
+          include: {
+            attributeValues: {
+              include: {
+                attributeDefinition: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         updatedAt: "desc",
@@ -127,10 +236,88 @@ export class CatalogAdminRepository {
     });
   }
 
-  async countProducts(args: Pick<AdminProductListQuery, "search" | "categoryId">) {
+  async countProducts(args: Pick<AdminProductListQuery, "search" | "categoryId" | "status" | "brandId" | "supplierId">) {
     return prisma.product.count({
       where: buildWhere(args),
     });
+  }
+
+  async summarizeProductSales(productIds: string[]) {
+    if (productIds.length === 0) {
+      return new Map<string, {
+        orderCount: number;
+        soldQuantity: number;
+        grossRevenue: number;
+        averageUnitCost: number | null;
+        lastPurchaseUnitCost: number | null;
+        stockValue: number;
+        grossProfit: number;
+        grossMarginRate: number | null;
+        lastOrderedAt: string | null;
+      }>();
+    }
+
+    const rows = await prisma.orderItem.findMany({
+      where: {
+        deleted: false,
+        productId: {
+          in: productIds,
+        },
+        order: {
+          deleted: false,
+        },
+      },
+      select: {
+        productId: true,
+        orderId: true,
+        quantity: true,
+        lineTotal: true,
+        createdAt: true,
+      },
+    });
+
+    const summary = new Map<string, {
+      orderIds: Set<string>;
+      soldQuantity: number;
+      grossRevenue: number;
+      lastOrderedAt: string | null;
+    }>();
+
+    for (const row of rows) {
+      if (!row.productId) {
+        continue;
+      }
+
+      const existing = summary.get(row.productId) ?? {
+        orderIds: new Set<string>(),
+        soldQuantity: 0,
+        grossRevenue: 0,
+        lastOrderedAt: null,
+      };
+
+      existing.orderIds.add(row.orderId);
+      existing.soldQuantity += row.quantity;
+      existing.grossRevenue += row.lineTotal.toNumber();
+      if (!existing.lastOrderedAt || row.createdAt.toISOString() > existing.lastOrderedAt) {
+        existing.lastOrderedAt = row.createdAt.toISOString();
+      }
+
+      summary.set(row.productId, existing);
+    }
+
+    return new Map(
+      [...summary.entries()].map(([productId, item]) => [productId, {
+        orderCount: item.orderIds.size,
+        soldQuantity: item.soldQuantity,
+        grossRevenue: item.grossRevenue,
+        averageUnitCost: null,
+        lastPurchaseUnitCost: null,
+        stockValue: 0,
+        grossProfit: 0,
+        grossMarginRate: null,
+        lastOrderedAt: item.lastOrderedAt,
+      }]),
+    );
   }
 
   async createProduct(input: AdminCreateProductRecordInput) {
@@ -142,6 +329,7 @@ export class CatalogAdminRepository {
         name: input.name,
         description: input.description,
         productType: input.productType ?? "PHYSICAL",
+        status: input.status ?? "ACTIVE",
         unitType: input.unitType ?? "PIECE",
         price: input.price,
         purchasePrice: input.purchasePrice ?? null,
@@ -150,16 +338,65 @@ export class CatalogAdminRepository {
         currency: input.currency ?? "TRY",
         vatRate: input.vatRate ?? 20,
         stockTrackingEnabled: input.stockTrackingEnabled ?? true,
+        salesEnabled: input.salesEnabled ?? true,
+        purchaseEnabled: input.purchaseEnabled ?? true,
+        internalNote: input.internalNote ?? null,
+        searchKeywords: input.searchKeywords ?? [],
+        brandId: input.brandId ?? null,
+        primarySupplierId: input.primarySupplierId ?? null,
         preferredSalesWarehouseId: input.preferredSalesWarehouseId ?? null,
         preferredPurchaseWarehouseId: input.preferredPurchaseWarehouseId ?? null,
         imageUrl: input.imageUrl,
         imageUrls: input.imageUrls ?? [],
         categoryId: input.categoryId ?? null,
+        attributeLinks: input.attributeLinks?.length
+          ? {
+              create: input.attributeLinks.map((link, index) => ({
+                attributeDefinitionId: link.attributeDefinitionId,
+                isVariantAxis: link.isVariantAxis,
+                sortOrder: link.sortOrder ?? index,
+              })),
+            }
+          : undefined,
+        variants: input.variants?.length
+          ? {
+              create: input.variants.map((variant, index) => ({
+                slug: variant.slug,
+                sku: variant.sku,
+                barcode: variant.barcode ?? null,
+                title: variant.title,
+                optionSummary: variant.optionSummary,
+                priceOverride: variant.priceOverride ?? null,
+                purchasePriceOverride: variant.purchasePriceOverride ?? null,
+                compareAtPriceOverride: variant.compareAtPriceOverride ?? null,
+                imageUrl: variant.imageUrl ?? null,
+                imageUrls: variant.imageUrls ?? [],
+                stockOverride: variant.stockOverride ?? null,
+                salesEnabled: variant.salesEnabled ?? true,
+                isDefault: variant.isDefault ?? index === 0,
+                sortOrder: variant.sortOrder ?? index,
+                attributeValues: {
+                  create: variant.attributes.map((attribute) => ({
+                    attributeDefinitionId: attribute.attributeDefinitionId,
+                    value: attribute.value,
+                  })),
+                },
+              })),
+            }
+          : undefined,
       },
       include: {
+        brand: true,
         category: true,
+        attributeLinks: {
+          include: {
+            attributeDefinition: true,
+          },
+        },
         inventoryItem: {
           select: {
+            averageUnitCost: true,
+            lastPurchaseUnitCost: true,
             inventoryLevels: {
               where: {
                 warehouse: {
@@ -169,6 +406,24 @@ export class CatalogAdminRepository {
               select: {
                 onHand: true,
                 reserved: true,
+              },
+            },
+          },
+        },
+        primarySupplier: true,
+        variants: {
+          where: {
+            deleted: false,
+          },
+          orderBy: [
+            { isDefault: "desc" },
+            { sortOrder: "asc" },
+            { createdAt: "asc" },
+          ],
+          include: {
+            attributeValues: {
+              include: {
+                attributeDefinition: true,
               },
             },
           },
@@ -189,6 +444,7 @@ export class CatalogAdminRepository {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.productType !== undefined ? { productType: input.productType } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.unitType !== undefined ? { unitType: input.unitType } : {}),
         ...(input.price !== undefined ? { price: input.price } : {}),
         ...(input.purchasePrice !== undefined ? { purchasePrice: input.purchasePrice } : {}),
@@ -196,16 +452,71 @@ export class CatalogAdminRepository {
         ...(input.currency !== undefined ? { currency: input.currency } : {}),
         ...(input.vatRate !== undefined ? { vatRate: input.vatRate } : {}),
         ...(input.stockTrackingEnabled !== undefined ? { stockTrackingEnabled: input.stockTrackingEnabled } : {}),
+        ...(input.salesEnabled !== undefined ? { salesEnabled: input.salesEnabled } : {}),
+        ...(input.purchaseEnabled !== undefined ? { purchaseEnabled: input.purchaseEnabled } : {}),
+        ...(input.internalNote !== undefined ? { internalNote: input.internalNote } : {}),
+        ...(input.searchKeywords !== undefined ? { searchKeywords: input.searchKeywords } : {}),
+        ...(input.brandId !== undefined ? { brandId: input.brandId } : {}),
+        ...(input.primarySupplierId !== undefined ? { primarySupplierId: input.primarySupplierId } : {}),
         ...(input.preferredSalesWarehouseId !== undefined ? { preferredSalesWarehouseId: input.preferredSalesWarehouseId } : {}),
         ...(input.preferredPurchaseWarehouseId !== undefined ? { preferredPurchaseWarehouseId: input.preferredPurchaseWarehouseId } : {}),
         ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
         ...(input.imageUrls !== undefined ? { imageUrls: input.imageUrls } : {}),
         ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
+        ...(input.attributeLinks !== undefined
+          ? {
+              attributeLinks: {
+                deleteMany: {},
+                create: input.attributeLinks.map((link, index) => ({
+                  attributeDefinitionId: link.attributeDefinitionId,
+                  isVariantAxis: link.isVariantAxis,
+                  sortOrder: link.sortOrder ?? index,
+                })),
+              },
+            }
+          : {}),
+        ...(input.variants !== undefined
+          ? {
+              variants: {
+                deleteMany: {},
+                create: input.variants.map((variant, index) => ({
+                  slug: variant.slug,
+                  sku: variant.sku,
+                  barcode: variant.barcode ?? null,
+                  title: variant.title,
+                  optionSummary: variant.optionSummary,
+                  priceOverride: variant.priceOverride ?? null,
+                  purchasePriceOverride: variant.purchasePriceOverride ?? null,
+                  compareAtPriceOverride: variant.compareAtPriceOverride ?? null,
+                  imageUrl: variant.imageUrl ?? null,
+                  imageUrls: variant.imageUrls ?? [],
+                  stockOverride: variant.stockOverride ?? null,
+                  salesEnabled: variant.salesEnabled ?? true,
+                  isDefault: variant.isDefault ?? index === 0,
+                  sortOrder: variant.sortOrder ?? index,
+                  attributeValues: {
+                    create: variant.attributes.map((attribute) => ({
+                      attributeDefinitionId: attribute.attributeDefinitionId,
+                      value: attribute.value,
+                    })),
+                  },
+                })),
+              },
+            }
+          : {}),
       },
       include: {
+        brand: true,
         category: true,
+        attributeLinks: {
+          include: {
+            attributeDefinition: true,
+          },
+        },
         inventoryItem: {
           select: {
+            averageUnitCost: true,
+            lastPurchaseUnitCost: true,
             inventoryLevels: {
               where: {
                 warehouse: {
@@ -215,6 +526,24 @@ export class CatalogAdminRepository {
               select: {
                 onHand: true,
                 reserved: true,
+              },
+            },
+          },
+        },
+        primarySupplier: true,
+        variants: {
+          where: {
+            deleted: false,
+          },
+          orderBy: [
+            { isDefault: "desc" },
+            { sortOrder: "asc" },
+            { createdAt: "asc" },
+          ],
+          include: {
+            attributeValues: {
+              include: {
+                attributeDefinition: true,
               },
             },
           },
@@ -230,7 +559,13 @@ export class CatalogAdminRepository {
         deleted: false,
       },
       include: {
+        brand: true,
         category: true,
+        attributeLinks: {
+          include: {
+            attributeDefinition: true,
+          },
+        },
         inventoryItem: {
           select: {
             inventoryLevels: {
@@ -242,6 +577,24 @@ export class CatalogAdminRepository {
               select: {
                 onHand: true,
                 reserved: true,
+              },
+            },
+          },
+        },
+        primarySupplier: true,
+        variants: {
+          where: {
+            deleted: false,
+          },
+          orderBy: [
+            { isDefault: "desc" },
+            { sortOrder: "asc" },
+            { createdAt: "asc" },
+          ],
+          include: {
+            attributeValues: {
+              include: {
+                attributeDefinition: true,
               },
             },
           },
@@ -275,6 +628,294 @@ export class CatalogAdminRepository {
         price: true,
         compareAtPrice: true,
         productType: true,
+        preferredSalesWarehouseId: true,
+        preferredPurchaseWarehouseId: true,
+      },
+    });
+  }
+
+  async listBrands() {
+    return prisma.brand.findMany({
+      where: {
+        deleted: false,
+      },
+      include: {
+        _count: {
+          select: {
+            products: {
+              where: {
+                deleted: false,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+  }
+
+  async listSuppliers() {
+    return prisma.supplier.findMany({
+      where: {
+        deleted: false,
+      },
+      include: {
+        _count: {
+          select: {
+            primaryProducts: {
+              where: {
+                deleted: false,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+  }
+
+  async createBrand(input: AdminCreateBrandInput) {
+    return prisma.brand.create({
+      data: {
+        slug: input.slug,
+        name: input.name,
+        isActive: input.isActive ?? true,
+      },
+      include: {
+        _count: {
+          select: {
+            products: {
+              where: {
+                deleted: false,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async createSupplier(input: AdminCreateSupplierInput) {
+    return prisma.supplier.create({
+      data: {
+        slug: input.slug,
+        name: input.name,
+        taxNumber: input.taxNumber ?? null,
+        email: input.email ?? null,
+        phone: input.phone ?? null,
+        isActive: input.isActive ?? true,
+      },
+      include: {
+        _count: {
+          select: {
+            primaryProducts: {
+              where: {
+                deleted: false,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async listAttributeDefinitions() {
+    return prisma.productAttributeDefinition.findMany({
+      where: {
+        deleted: false,
+      },
+      include: {
+        _count: {
+          select: {
+            productLinks: true,
+          },
+        },
+      },
+      orderBy: [
+        { sortOrder: "asc" },
+        { name: "asc" },
+      ],
+    });
+  }
+
+  async createAttributeDefinition(input: AdminCreateProductAttributeDefinitionInput) {
+    return prisma.productAttributeDefinition.create({
+      data: {
+        slug: input.slug,
+        name: input.name,
+        displayType: input.displayType ?? "TEXT",
+        sortOrder: input.sortOrder ?? 0,
+        isActive: input.isActive ?? true,
+      },
+      include: {
+        _count: {
+          select: {
+            productLinks: true,
+          },
+        },
+      },
+    });
+  }
+
+  async updateAttributeDefinition(input: AdminUpdateProductAttributeDefinitionInput) {
+    return prisma.productAttributeDefinition.update({
+      where: {
+        id: input.id,
+      },
+      data: {
+        ...(input.slug !== undefined ? { slug: input.slug } : {}),
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.displayType !== undefined ? { displayType: input.displayType } : {}),
+        ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+        ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+      },
+      include: {
+        _count: {
+          select: {
+            productLinks: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findAttributeDefinitionById(id: string) {
+    return prisma.productAttributeDefinition.findFirst({
+      where: {
+        id,
+        deleted: false,
+      },
+      include: {
+        _count: {
+          select: {
+            productLinks: true,
+          },
+        },
+      },
+    });
+  }
+
+  async deleteAttributeDefinition(id: string) {
+    return prisma.productAttributeDefinition.update({
+      where: {
+        id,
+      },
+      data: {
+        deleted: true,
+        isActive: false,
+      },
+      include: {
+        _count: {
+          select: {
+            productLinks: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findActiveAttributeDefinitionsByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.productAttributeDefinition.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+        deleted: false,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  async findActiveBrandById(id: string) {
+    return prisma.brand.findFirst({
+      where: {
+        id,
+        deleted: false,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  async findActiveSupplierById(id: string) {
+    return prisma.supplier.findFirst({
+      where: {
+        id,
+        deleted: false,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  async findActiveCategoryBySlug(slug: string) {
+    return prisma.category.findFirst({
+      where: {
+        slug,
+        deleted: false,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  async findActiveBrandBySlug(slug: string) {
+    return prisma.brand.findFirst({
+      where: {
+        slug,
+        deleted: false,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  async findActiveSupplierBySlug(slug: string) {
+    return prisma.supplier.findFirst({
+      where: {
+        slug,
+        deleted: false,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  async findWarehouseIdsByCodes(codes: string[]) {
+    if (codes.length === 0) {
+      return [];
+    }
+
+    return prisma.warehouse.findMany({
+      where: {
+        code: {
+          in: codes,
+        },
+        isActive: true,
+      },
+      select: {
+        id: true,
+        code: true,
       },
     });
   }

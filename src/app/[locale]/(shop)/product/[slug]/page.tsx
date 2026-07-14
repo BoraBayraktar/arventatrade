@@ -132,6 +132,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                     quantity: dictionary.commerce.quantity,
                     addedToCart: dictionary.commerce.addedToCart,
                     viewCart: dictionary.commerce.viewCart,
+                    variants: dictionary.admin.variantsTitle,
                   }}
                 />
               </Suspense>

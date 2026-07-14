@@ -54,3 +54,27 @@ Bu doküman, harici stok event akışında en sık görülen hata durumları iç
 - Aksiyon:
   - hatayı gider
   - gerekiyorsa aynı iş kuralıyla yeni event üret
+
+## Operasyonel Okuma Sırası
+
+Bir event incelenirken şu sırayla bakılmalıdır:
+
+1. Ham event doğru mu
+   - event key
+   - kanal
+   - payload özeti
+   - harici ürün/depo alanları
+2. Mapping nasıl çözüldü
+   - `EXTERNAL_PRODUCT_ID` mi
+   - `EXTERNAL_SKU` mu
+   - eşleme hiç bulunamadı mı
+3. Depo nasıl seçildi
+   - mapping deposu mu
+   - varsayılan depo fallback mi
+4. Projection sonucu ne oldu
+   - `PENDING`
+   - `APPLIED`
+   - `FAILED`
+   - `DUPLICATE`
+
+Bu okuma sırası sayesinde “event geldi ama neden uygulanmadı?” sorusu daha hızlı cevaplanır.

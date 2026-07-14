@@ -11,6 +11,8 @@ type AddToCartControlsProps = {
 		id: string;
 		stock: number;
 		inStock: boolean;
+		selectedVariantId?: string | null;
+		selectedVariantLabel?: string | null;
 	};
 	labels: {
 		addToCart: string;
@@ -25,6 +27,8 @@ type AddToCartControlsProps = {
 type CartLine = {
 	productId: string;
 	quantity: number;
+	variantId?: string;
+	variantLabel?: string;
 };
 
 const CART_KEY = "2bem:cart";
@@ -68,15 +72,22 @@ export function AddToCartControls({ locale, product, labels }: AddToCartControls
 
 	function addToCart() {
 		const cart = readCart();
-		const existing = cart.find((line) => line.productId === product.id);
+		const existing = cart.find((line) => line.productId === product.id && (line.variantId ?? null) === (product.selectedVariantId ?? null));
 
 		if (existing) {
-			const next = cart.map((line) => line.productId === product.id
-				? { ...line, quantity: Math.min(99, line.quantity + quantity) }
-				: line);
+			const next = cart.map((line) => (
+				line.productId === product.id && (line.variantId ?? null) === (product.selectedVariantId ?? null)
+					? { ...line, quantity: Math.min(99, line.quantity + quantity) }
+					: line
+			));
 			writeCart(next);
 		} else {
-			writeCart([...cart, { productId: product.id, quantity }]);
+			writeCart([...cart, {
+				productId: product.id,
+				quantity,
+				variantId: product.selectedVariantId ?? undefined,
+				variantLabel: product.selectedVariantLabel ?? undefined,
+			}]);
 		}
 
 		setAdded(true);

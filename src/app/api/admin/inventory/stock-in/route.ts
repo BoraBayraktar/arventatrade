@@ -11,10 +11,12 @@ const stockInSchema = z.object({
   warehouseCode: z.string().trim().min(1).max(32),
   quantity: z.coerce.number().int().min(1),
   note: z.string().trim().min(3).max(280).optional(),
+  documentType: z.enum(["PURCHASE_DOCUMENT", "DELIVERY_NOTE", "E_INVOICE", "E_DISPATCH"]).optional(),
   sourceDocumentNumber: z.string().trim().min(1).max(120).optional(),
   sourceDocumentDate: z.string().datetime().optional(),
   sourceDocumentSupplier: z.string().trim().min(2).max(160).optional(),
   sourceDocumentReference: z.string().trim().min(1).max(160).optional(),
+  externalSystemStatus: z.enum(["NOT_SENT", "QUEUED", "SENT", "FAILED"]).optional(),
   unitCost: z.coerce.number().nonnegative().optional().nullable(),
 });
 
@@ -30,10 +32,12 @@ export async function POST(request: Request) {
       quantity: payload.quantity,
       type: "PURCHASE_RECEIPT",
       note: payload.note ?? "Inventory manager stock in",
+      documentType: payload.documentType,
       sourceDocumentNumber: payload.sourceDocumentNumber,
       sourceDocumentDate: payload.sourceDocumentDate,
       sourceDocumentSupplier: payload.sourceDocumentSupplier,
       sourceDocumentReference: payload.sourceDocumentReference,
+      externalSystemStatus: payload.externalSystemStatus,
       unitCost: payload.unitCost ?? null,
     });
 
@@ -46,8 +50,10 @@ export async function POST(request: Request) {
       metadata: {
         warehouseCode: payload.warehouseCode,
         quantity: payload.quantity,
+        documentType: payload.documentType ?? null,
         sourceDocumentNumber: payload.sourceDocumentNumber ?? null,
         sourceDocumentSupplier: payload.sourceDocumentSupplier ?? null,
+        externalSystemStatus: payload.externalSystemStatus ?? null,
       },
     });
 

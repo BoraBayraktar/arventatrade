@@ -18,7 +18,7 @@ assertIncludes(repository, "ürünü", "Inventory alert mesajları Türkçeleşt
 assertIncludes(repository, "async listInventoryOverviewMovements", "Overview movement ayrıştırması eksik.");
 
 const service = read("src/modules/inventory/services/inventory.service.ts");
-assertIncludes(service, "\"inventory:overview:v3\"", "Overview cache sürümü eksik.");
+assertIncludes(service, "\"inventory:overview:v4\"", "Overview cache sürümü eksik.");
 assertIncludes(service, "movementRelevantInventoryItemIds", "Overview hedef hareket yükleme optimizasyonu eksik.");
 
 console.log("Sprint 12 inventory doğrulamaları başarıyla geçti.");

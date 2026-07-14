@@ -29,6 +29,25 @@ Bu doküman, harici sistemlerden gelen stok eventlerinin 2BEM içinde nasıl iş
   - uygulanan on-hand ve available sonuçları
   - hata mesajı ve işlenme zamanı
 
+## Kurumsal Katmanlar
+
+- Ham event:
+  - `eventKey`
+  - kanal
+  - harici ürün/depo kimlikleri
+  - miktar
+  - payload
+- Mapping çözümü:
+  - `InventoryIntegrationMapping` bulundu mu
+  - çözüm `externalProductId` ile mi `externalSku` ile mi yapıldı
+  - depo doğrudan mapping ile mi varsayılan depo fallback ile mi seçildi
+- Projection sonucu:
+  - event aggregate'e uygulandı mı
+  - `appliedOnHand` ve `appliedAvailable` üretildi mi
+  - duplicate / failed / applied sonucu nedir
+
+Bu üç katman admin gözlem ekranında ayrı anlam katmanları olarak okunmalıdır; tek bir “başarılı/başarısız” statüsüne indirgenmemelidir.
+
 ## Otorite Kuralı
 
 - Harici event hiçbir zaman `Product.stock` alanına doğrudan yazmaz.

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const user = await requireUserRoles(["ADMIN", "EDITOR"]);
     const payload = exportSchema.parse(await request.json());
 
-    await inventoryService.recordInventoryExportHistory({
+    const exportHistory = await inventoryService.recordInventoryExportHistory({
       actorUserId: user.id,
       total: payload.total,
       filters: {
@@ -41,11 +41,19 @@ export async function POST(request: Request) {
       metadata: {
         ...payload,
         scope: "inventory_export",
+        exportHistoryId: exportHistory?.id ?? null,
+        filterCount: exportHistory?.filterCount ?? 0,
+        hasFilters: exportHistory?.hasFilters ?? false,
         exportedAt: new Date().toISOString(),
       },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      exportHistoryId: exportHistory?.id ?? null,
+      filterCount: exportHistory?.filterCount ?? 0,
+      hasFilters: exportHistory?.hasFilters ?? false,
+    });
   } catch (error) {
     if (error instanceof AuthContextError) {
       return NextResponse.json({ message: error.message }, { status: error.status });

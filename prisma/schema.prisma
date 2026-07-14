@@ -26,6 +26,58 @@ model Category {
   @@index([parentId])
 }
 
+model Brand {
+  id            String    @id @default(cuid())
+  slug          String    @unique
+  name          String
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deleted       Boolean   @default(false)
+  deletedDate   DateTime?
+  deletedUserId String?
+  products      Product[]
+
+  @@index([deleted, isActive])
+}
+
+model Supplier {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  name            String
+  taxNumber       String?
+  email           String?
+  phone           String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deleted         Boolean   @default(false)
+  deletedDate     DateTime?
+  deletedUserId   String?
+  primaryProducts Product[]
+
+  @@index([deleted, isActive])
+  @@index([taxNumber])
+}
+
+model ProductAttributeDefinition {
+  id            String                  @id @default(cuid())
+  slug          String                  @unique
+  name          String
+  displayType   ProductAttributeDisplayType @default(TEXT)
+  sortOrder     Int                     @default(0)
+  isActive      Boolean                 @default(true)
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  deleted       Boolean                 @default(false)
+  deletedDate   DateTime?
+  deletedUserId String?
+  productLinks  ProductAttributeLink[]
+  variantValues ProductVariantAttributeValue[]
+
+  @@index([deleted, isActive, sortOrder])
+}
+
 model Product {
   id              String              @id @default(cuid())
   slug            String              @unique
@@ -42,6 +94,13 @@ model Product {
   imageUrl        String
   imageUrls       String[]            @default([])
   categoryId      String?
+  brandId         String?
+  primarySupplierId String?
+  status          ProductStatus       @default(ACTIVE)
+  salesEnabled    Boolean             @default(true)
+  purchaseEnabled Boolean             @default(true)
+  internalNote    String?
+  searchKeywords  String[]            @default([])
   preferredSalesWarehouseId String?
   preferredPurchaseWarehouseId String?
   createdAt       DateTime            @default(now())
@@ -53,25 +112,93 @@ model Product {
   compareAtPrice  Decimal?            @db.Decimal(10, 2)
   stock           Int                 @default(0)
   orderItems      OrderItem[]
+  brand           Brand?              @relation(fields: [brandId], references: [id])
   category        Category?           @relation(fields: [categoryId], references: [id])
   inventoryItem   InventoryItem?
   interaction     ProductInteraction?
+  primarySupplier Supplier?           @relation(fields: [primarySupplierId], references: [id])
   preferredSalesWarehouse Warehouse?  @relation("PreferredSalesWarehouseProducts", fields: [preferredSalesWarehouseId], references: [id])
   preferredPurchaseWarehouse Warehouse? @relation("PreferredPurchaseWarehouseProducts", fields: [preferredPurchaseWarehouseId], references: [id])
   reviews         ProductReview[]
   questions       ProductQuestion[]
+  attributeLinks  ProductAttributeLink[]
+  variants        ProductVariant[]
   storefrontItems StorefrontItem[]
   externalStockEvents ExternalStockEvent[]
   inventoryIntegrationMappings InventoryIntegrationMapping[]
   purchaseReceiptLines PurchaseReceiptLine[]
+  businessDocumentLines BusinessDocumentLine[]
   inventoryHistoryEvents InventoryHistoryEvent[]
 
   @@index([categoryId])
+  @@index([brandId])
+  @@index([primarySupplierId])
   @@index([barcode])
   @@index([deleted])
+  @@index([status, salesEnabled])
   @@index([preferredSalesWarehouseId])
   @@index([preferredPurchaseWarehouseId])
   @@index([stock])
+}
+
+model ProductAttributeLink {
+  id                   String                      @id @default(cuid())
+  productId            String
+  attributeDefinitionId String
+  isVariantAxis        Boolean                     @default(false)
+  sortOrder            Int                         @default(0)
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  attributeDefinition  ProductAttributeDefinition  @relation(fields: [attributeDefinitionId], references: [id])
+  product              Product                     @relation(fields: [productId], references: [id])
+
+  @@unique([productId, attributeDefinitionId])
+  @@index([attributeDefinitionId, isVariantAxis])
+  @@index([productId, sortOrder])
+}
+
+model ProductVariant {
+  id                String                       @id @default(cuid())
+  productId         String
+  slug              String                       @unique
+  sku               String                       @unique
+  barcode           String?
+  title             String
+  optionSummary     String
+  priceOverride     Decimal?                     @db.Decimal(10, 2)
+  purchasePriceOverride Decimal?                 @db.Decimal(10, 2)
+  compareAtPriceOverride Decimal?                @db.Decimal(10, 2)
+  imageUrl          String?
+  imageUrls         String[]                     @default([])
+  stockOverride     Int?
+  salesEnabled      Boolean                      @default(true)
+  isDefault         Boolean                      @default(false)
+  sortOrder         Int                          @default(0)
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  deleted           Boolean                      @default(false)
+  deletedDate       DateTime?
+  deletedUserId     String?
+  product           Product                      @relation(fields: [productId], references: [id])
+  attributeValues   ProductVariantAttributeValue[]
+  orderItems        OrderItem[]
+
+  @@index([productId, deleted, salesEnabled, sortOrder])
+  @@index([barcode])
+}
+
+model ProductVariantAttributeValue {
+  id                   String                      @id @default(cuid())
+  productVariantId     String
+  attributeDefinitionId String
+  value                String
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  attributeDefinition  ProductAttributeDefinition  @relation(fields: [attributeDefinitionId], references: [id])
+  productVariant       ProductVariant              @relation(fields: [productVariantId], references: [id])
+
+  @@unique([productVariantId, attributeDefinitionId])
+  @@index([attributeDefinitionId, value])
 }
 
 model ProductReview {
@@ -171,6 +298,7 @@ model Order {
   paymentStatusHistory OrderPaymentStatusHistory[]
   stockReservations    StockReservation[]
   statusHistory        OrderStatusHistory[]
+  businessDocuments    BusinessDocument[]
 
   @@index([deleted])
   @@index([createdAt])
@@ -182,8 +310,13 @@ model OrderItem {
   id              String    @id @default(cuid())
   orderId         String
   productId       String?
+  productVariantId String?
   productSlug     String
   productSku      String
+  productVariantSlug String?
+  productVariantSku String?
+  productVariantTitle String?
+  productVariantOptionSummary String?
   productName     String
   productImageUrl String
   quantity        Int
@@ -198,9 +331,11 @@ model OrderItem {
   deletedUserId   String?
   order           Order     @relation(fields: [orderId], references: [id])
   product         Product?  @relation(fields: [productId], references: [id])
+  productVariant  ProductVariant? @relation(fields: [productVariantId], references: [id])
 
   @@index([orderId])
   @@index([productId])
+  @@index([productVariantId])
   @@index([deleted])
 }
 
@@ -240,6 +375,113 @@ model OrderPaymentStatusHistory {
 
   @@index([deleted])
   @@index([orderId, createdAt])
+}
+
+model BusinessDocument {
+  id                    String                       @id @default(cuid())
+  documentNumber        String                       @unique
+  documentType          BusinessDocumentType
+  status                BusinessDocumentStatus       @default(DRAFT)
+  issueDate             DateTime
+  currency              String                       @default("TRY")
+  totalAmount           Decimal?                     @db.Decimal(10, 2)
+  externalReference     String?
+  externalSystemStatus  BusinessDocumentSyncStatus   @default(NOT_SENT)
+  providerConfigId      String?
+  counterpartyName      String
+  counterpartyTaxNumber String?
+  counterpartyTaxOffice String?
+  counterpartyEmail     String?
+  counterpartyAddress   String?
+  note                  String?
+  orderId               String?
+  inventoryTransactionId String?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+  deleted               Boolean                      @default(false)
+  deletedDate           DateTime?
+  deletedUserId         String?
+  dispatches            BusinessDocumentDispatch[]
+  lines                 BusinessDocumentLine[]
+  order                 Order?                       @relation(fields: [orderId], references: [id])
+  inventoryTransaction  InventoryTransaction?        @relation(fields: [inventoryTransactionId], references: [id])
+  providerConfig        DocumentProviderConfig?      @relation(fields: [providerConfigId], references: [id])
+
+  @@index([documentType, issueDate])
+  @@index([status, issueDate])
+  @@index([providerConfigId])
+  @@index([orderId])
+  @@index([inventoryTransactionId])
+  @@index([deleted, issueDate])
+}
+
+model BusinessDocumentLine {
+  id                 String            @id @default(cuid())
+  businessDocumentId String
+  productId          String?
+  productSku         String
+  productName        String
+  quantity           Int
+  unitPrice          Decimal?          @db.Decimal(10, 2)
+  lineTotal          Decimal?          @db.Decimal(10, 2)
+  currency           String            @default("TRY")
+  note               String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  businessDocument   BusinessDocument  @relation(fields: [businessDocumentId], references: [id])
+  product            Product?          @relation(fields: [productId], references: [id])
+
+  @@index([businessDocumentId])
+  @@index([productId])
+}
+
+model BusinessDocumentDispatch {
+  id                 String                     @id @default(cuid())
+  businessDocumentId String
+  integrationJobId   String?
+  channel            IntegrationChannel
+  providerKey        String
+  status             BusinessDocumentSyncStatus @default(QUEUED)
+  externalReference  String?
+  requestPayload     Json?
+  responsePayload    Json?
+  errorMessage       String?
+  queuedAt           DateTime                   @default(now())
+  dispatchedAt       DateTime?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  businessDocument   BusinessDocument           @relation(fields: [businessDocumentId], references: [id])
+
+  @@index([businessDocumentId, createdAt])
+  @@index([integrationJobId])
+  @@index([channel, status])
+}
+
+model DocumentProviderConfig {
+  id                    String              @id @default(cuid())
+  providerCode          String              @unique
+  channel               IntegrationChannel
+  displayName           String
+  endpointUrl           String?
+  senderLabel           String?
+  senderVkn            String?
+  username              String?
+  secretKey             String?
+  companyName           String?
+  webhookSecret         String?
+  supportsStatusSync    Boolean             @default(true)
+  isActive              Boolean             @default(true)
+  isDefault             Boolean             @default(false)
+  note                  String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  deleted               Boolean             @default(false)
+  deletedDate           DateTime?
+  deletedUserId         String?
+  documents             BusinessDocument[]
+
+  @@index([channel, isActive, deleted])
+  @@index([isDefault, deleted])
 }
 
 model Warehouse {
@@ -429,6 +671,7 @@ model InventoryTransaction {
   sourceDocumentUrl String?
   sourceDocumentDate DateTime?
   externalReference String?
+  externalSystemStatus String?
   counterpartyName  String?
   note              String?
   createdAt         DateTime                   @default(now())
@@ -436,6 +679,7 @@ model InventoryTransaction {
   lines             InventoryTransactionLine[]
   movements         InventoryMovement[]
   purchaseReceipt   PurchaseReceipt?
+  businessDocuments BusinessDocument[]
 
   @@index([type, createdAt])
   @@index([sourceDocumentType, sourceDocumentNumber])
@@ -769,16 +1013,20 @@ enum PromotionType {
 enum IntegrationChannel {
   TRENDYOL
   N11
+  EDOCS_MOCK
 }
 
 enum IntegrationJobType {
   PRODUCT_SYNC
   PRICE_SYNC
   STOCK_SYNC
+  DOCUMENT_OUTBOUND
+  DOCUMENT_STATUS_SYNC
 }
 
 enum IntegrationEntityType {
   PRODUCT
+  BUSINESS_DOCUMENT
 }
 
 enum IntegrationJobStatus {
@@ -852,6 +1100,18 @@ enum ProductType {
   SEMI_FINISHED
 }
 
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ProductAttributeDisplayType {
+  TEXT
+  COLOR
+  NUMBER
+}
+
 enum ProductUnitType {
   PIECE
   KILOGRAM
@@ -903,6 +1163,27 @@ enum OrderStatusChangeSource {
 enum PaymentStatusChangeSource {
   SYSTEM
   ADMIN
+}
+
+enum BusinessDocumentType {
+  PURCHASE_DOCUMENT
+  DELIVERY_NOTE
+  E_INVOICE
+  E_DISPATCH
+}
+
+enum BusinessDocumentStatus {
+  DRAFT
+  LINKED
+  ISSUED
+  CANCELLED
+}
+
+enum BusinessDocumentSyncStatus {
+  NOT_SENT
+  QUEUED
+  SENT
+  FAILED
 }
 
 enum UserNotificationType {

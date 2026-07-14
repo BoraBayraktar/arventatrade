@@ -6,8 +6,8 @@ import { Maximize2, Minimize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type JobStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
-type Channel = "TRENDYOL" | "N11";
-type JobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC";
+type Channel = "TRENDYOL" | "N11" | "EDOCS_MOCK";
+type JobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
 type DrawerMode = "create" | "process";
 
 type Job = {
@@ -15,7 +15,7 @@ type Job = {
   idempotencyKey: string;
   channel: Channel;
   jobType: JobType;
-  entityType: "PRODUCT";
+  entityType: "PRODUCT" | "BUSINESS_DOCUMENT";
   entityId: string;
   status: JobStatus;
   attemptCount: number;
@@ -32,7 +32,7 @@ type DeadLetter = {
   jobId: string;
   channel: Channel;
   jobType: JobType;
-  entityType: "PRODUCT";
+  entityType: "PRODUCT" | "BUSINESS_DOCUMENT";
   entityId: string;
   lastError: string;
   attemptCount: number;
@@ -118,6 +118,14 @@ const JOB_TYPE_TRIGGER_PRESETS: Record<JobType, string[]> = {
   ],
   PRICE_SYNC: [
     "PRICE_UPDATE",
+    "MANUAL_DISPATCH",
+  ],
+  DOCUMENT_OUTBOUND: [
+    "MANUAL_DISPATCH",
+    "DOCUMENT_ISSUE",
+  ],
+  DOCUMENT_STATUS_SYNC: [
+    "STATUS_REFRESH",
     "MANUAL_DISPATCH",
   ],
 };
@@ -228,6 +236,7 @@ export function IntegrationManager({
   }), [jobs]);
 
   const isStockSync = jobType === "STOCK_SYNC";
+  const isDocumentJob = jobType === "DOCUMENT_OUTBOUND" || jobType === "DOCUMENT_STATUS_SYNC";
   const triggerOptions = JOB_TYPE_TRIGGER_PRESETS[jobType];
 
   const filteredJobs = useMemo(() => [...jobs]
@@ -303,7 +312,7 @@ export function IntegrationManager({
       const payload = {
         channel,
         jobType,
-        entityType: "PRODUCT" as const,
+        entityType: (isDocumentJob ? "BUSINESS_DOCUMENT" : "PRODUCT") as "PRODUCT" | "BUSINESS_DOCUMENT",
         entityIds: normalizedEntityIds,
         maxAttempts: Number(maxAttempts || "3"),
         idempotencySuffix: idempotencySuffix.trim() || undefined,
@@ -446,6 +455,7 @@ export function IntegrationManager({
               <option value="all">{labels.filterChannel}: {labels.all}</option>
               <option value="TRENDYOL">TRENDYOL</option>
               <option value="N11">N11</option>
+              <option value="EDOCS_MOCK">EDOCS_MOCK</option>
             </select>
             <select
               value={jobTypeFilter}
@@ -456,6 +466,8 @@ export function IntegrationManager({
               <option value="PRODUCT_SYNC">PRODUCT_SYNC</option>
               <option value="PRICE_SYNC">PRICE_SYNC</option>
               <option value="STOCK_SYNC">STOCK_SYNC</option>
+              <option value="DOCUMENT_OUTBOUND">DOCUMENT_OUTBOUND</option>
+              <option value="DOCUMENT_STATUS_SYNC">DOCUMENT_STATUS_SYNC</option>
             </select>
             <select
               value={statusFilter}
@@ -598,6 +610,7 @@ export function IntegrationManager({
                       <select value={channel} onChange={(event) => setChannel(event.target.value as Channel)} className="h-11 rounded-xl border border-neutral-300 px-3 text-sm">
                         <option value="TRENDYOL">TRENDYOL</option>
                         <option value="N11">N11</option>
+                        <option value="EDOCS_MOCK">EDOCS_MOCK</option>
                       </select>
                     </div>
                     <div className="grid gap-1">
@@ -614,6 +627,8 @@ export function IntegrationManager({
                         <option value="PRODUCT_SYNC">PRODUCT_SYNC</option>
                         <option value="PRICE_SYNC">PRICE_SYNC</option>
                         <option value="STOCK_SYNC">STOCK_SYNC</option>
+                        <option value="DOCUMENT_OUTBOUND">DOCUMENT_OUTBOUND</option>
+                        <option value="DOCUMENT_STATUS_SYNC">DOCUMENT_STATUS_SYNC</option>
                       </select>
                     </div>
                   </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -89,28 +89,9 @@ type ProductQuestionsManagerProps = {
     overdue: number;
   };
 };
-function getInitialSearchHistory() {
-  if (typeof window === "undefined") {
-    return [];
-  }
 
-  try {
-    const stored = window.localStorage.getItem("admin:question-search-history");
-    if (!stored) {
-      return [];
-    }
-
-    const parsed = JSON.parse(stored) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-      .slice(0, 5);
-  } catch {
-    return [];
-  }
+function subscribeNoop() {
+  return () => {};
 }
 
 export function ProductQuestionsManager({
@@ -123,7 +104,11 @@ export function ProductQuestionsManager({
 }: ProductQuestionsManagerProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [referenceTime] = useState(() => Date.now());
+  const referenceTime = useSyncExternalStore(
+    subscribeNoop,
+    () => Date.now(),
+    () => 0,
+  );
   const [error, setError] = useState<string | null>(null);
   const [questionStatus, setQuestionStatus] = useState<"all" | "pending" | "answered">(initialQuery.status);
   const [questionSort, setQuestionSort] = useState<"priority" | "latest" | "oldest">(initialQuery.sort);
@@ -136,7 +121,7 @@ export function ProductQuestionsManager({
     Object.fromEntries(initialQuestionResult.items.map((item) => [item.id, item.answer ?? ""])),
   );
   const [pinnedQuestionId, setPinnedQuestionId] = useState<string | null>(initialFocusQuestionId);
-  const [searchHistory, setSearchHistory] = useState<string[]>(() => getInitialSearchHistory());
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [bulkAnswerDraft, setBulkAnswerDraft] = useState("");
   const [stats, setStats] = useState<{ total: number; pending: number; answered: number; overdue: number }>(

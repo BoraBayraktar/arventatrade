@@ -38,10 +38,12 @@ type RecordInventoryMovementArgs = {
   quantity: number;
   type: "PURCHASE_RECEIPT" | "DAMAGE_WRITE_OFF";
   note?: string;
+  documentType?: "PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH";
   sourceDocumentNumber?: string;
   sourceDocumentDate?: Date;
   sourceDocumentSupplier?: string;
   sourceDocumentReference?: string;
+  externalSystemStatus?: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED";
   unitCost?: number | null;
 };
 
@@ -110,6 +112,7 @@ export class InventoryRepository {
       sourceDocumentUrl?: string | null;
       sourceDocumentDate?: Date | null;
       externalReference?: string | null;
+      externalSystemStatus?: string | null;
       counterpartyName?: string | null;
       note?: string | null;
     },
@@ -127,6 +130,7 @@ export class InventoryRepository {
         sourceDocumentUrl: args.sourceDocumentUrl ?? null,
         sourceDocumentDate: args.sourceDocumentDate ?? null,
         externalReference: args.externalReference ?? null,
+        externalSystemStatus: args.externalSystemStatus ?? null,
         counterpartyName: args.counterpartyName ?? null,
         note: args.note ?? null,
       },
@@ -174,6 +178,7 @@ export class InventoryRepository {
                 { name: { contains: args.search, mode: "insensitive" as const } },
                 { slug: { contains: args.search, mode: "insensitive" as const } },
                 { sku: { contains: args.search, mode: "insensitive" as const } },
+                { barcode: { contains: args.search, mode: "insensitive" as const } },
               ],
             }
           : {}),
@@ -1572,18 +1577,25 @@ export class InventoryRepository {
       const inventoryTransaction = await this.createInventoryTransaction(tx, {
         type: args.type === "PURCHASE_RECEIPT" ? "STOCK_IN" : "STOCK_OUT",
         reference: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentNumber ?? args.sku) : args.sku,
-        sourceDocumentType: args.type === "PURCHASE_RECEIPT" ? "PURCHASE_RECEIPT" : "STOCK_WRITE_OFF",
+        sourceDocumentType: args.documentType ?? (args.type === "PURCHASE_RECEIPT" ? "PURCHASE_RECEIPT" : "STOCK_WRITE_OFF"),
         sourceDocumentId: args.type === "PURCHASE_RECEIPT" ? null : product.id,
         sourceDocumentNumber: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentNumber ?? args.sku) : args.sku,
         sourceDocumentDate: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentDate ?? null) : null,
         externalReference: args.sourceDocumentReference ?? null,
+        externalSystemStatus: args.externalSystemStatus ?? null,
         counterpartyName: args.sourceDocumentSupplier ?? null,
         note: args.note ?? (args.type === "PURCHASE_RECEIPT" ? "Manuel stok girişi" : "Manuel stok çıkışı"),
       });
 
       let purchaseReceiptId: string | null = null;
 
-      if (args.type === "PURCHASE_RECEIPT" && args.sourceDocumentNumber && args.sourceDocumentSupplier && args.sourceDocumentDate) {
+      if (
+        args.type === "PURCHASE_RECEIPT"
+        && (args.documentType === undefined || args.documentType === "PURCHASE_DOCUMENT")
+        && args.sourceDocumentNumber
+        && args.sourceDocumentSupplier
+        && args.sourceDocumentDate
+      ) {
         const createdReceipt = await tx.purchaseReceipt.create({
           data: {
             receiptNumber: args.sourceDocumentNumber,
@@ -1680,12 +1692,13 @@ export class InventoryRepository {
           note: args.note ?? (args.type === "PURCHASE_RECEIPT" ? "Manuel stok girişi" : "Manuel stok çıkışı"),
           metadata: {
             transactionNumber: inventoryTransaction.transactionNumber,
-            sourceDocumentType: args.type === "PURCHASE_RECEIPT" ? "PURCHASE_RECEIPT" : "STOCK_WRITE_OFF",
+            sourceDocumentType: args.documentType ?? (args.type === "PURCHASE_RECEIPT" ? "PURCHASE_RECEIPT" : "STOCK_WRITE_OFF"),
             sourceDocumentId: purchaseReceiptId ?? product.id,
             sourceDocumentNumber: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentNumber ?? args.sku) : args.sku,
             sourceDocumentUrl: args.type === "PURCHASE_RECEIPT" && purchaseReceiptId ? null : null,
             supplierName: args.sourceDocumentSupplier ?? null,
             externalReference: args.sourceDocumentReference ?? null,
+            externalSystemStatus: args.externalSystemStatus ?? null,
             unitCost: args.unitCost ?? null,
           },
         },
@@ -2416,8 +2429,16 @@ export class InventoryRepository {
                 id: true,
                 name: true,
                 sku: true,
+                categoryId: true,
+                productType: true,
                 price: true,
                 purchasePrice: true,
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
           },
@@ -2443,7 +2464,15 @@ export class InventoryRepository {
         id: true,
         name: true,
         sku: true,
+        categoryId: true,
+        productType: true,
         stock: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         inventoryItem: {
           select: {
             inventoryLevels: {
@@ -2481,6 +2510,13 @@ export class InventoryRepository {
         type: true,
         quantity: true,
         createdAt: true,
+        warehouse: {
+          select: {
+            code: true,
+            name: true,
+          },
+        },
+        inventoryItemId: true,
         inventoryItem: {
           select: {
             product: {
@@ -2488,7 +2524,15 @@ export class InventoryRepository {
                 id: true,
                 name: true,
                 sku: true,
+                categoryId: true,
+                productType: true,
                 price: true,
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
           },

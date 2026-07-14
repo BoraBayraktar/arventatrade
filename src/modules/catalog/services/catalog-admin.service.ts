@@ -3,12 +3,19 @@ import { z } from "zod";
 import { redisCache } from "@/lib/redis";
 import type {
   AdminAnswerProductQuestionInput,
+  AdminCreateProductAttributeDefinitionInput,
+  AdminUpdateProductAttributeDefinitionInput,
+  AdminBrandItem,
   AdminBulkModerateProductQuestionsInput,
   AdminCategoryListItem,
   AdminCategoryListQuery,
   AdminCategoryListResult,
+  AdminCreateBrandInput,
   AdminCreateCategoryInput,
   AdminCreateProductInput,
+  AdminCreateSupplierInput,
+  AdminProductAttributeDefinitionItem,
+  AdminProductAttributeLinkInput,
   AdminProductQuestionItem,
   AdminProductQuestionListQuery,
   AdminProductQuestionListResult,
@@ -17,10 +24,13 @@ import type {
   AdminProductListItem,
   AdminProductListQuery,
   AdminProductListResult,
+  AdminProductVariantInput,
+  AdminSupplierItem,
   AdminTopInteractionItem,
   AdminUpdateCategoryInput,
   AdminUpdateProductInput,
-} from "@/modules/catalog/contracts/catalog-admin.contract";import { CatalogAdminRepository } from "@/modules/catalog/repositories/catalog-admin.repository";
+} from "@/modules/catalog/contracts/catalog-admin.contract";
+import { CatalogAdminRepository } from "@/modules/catalog/repositories/catalog-admin.repository";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
 import {
   decodeProductDescriptionWithFeatures,
@@ -34,9 +44,40 @@ const productFeatureSchema = z.object({
   highlighted: z.boolean().default(false),
 });
 
+const productAttributeLinkSchema = z.object({
+  attributeDefinitionId: z.string().trim().min(1),
+  isVariantAxis: z.boolean().default(false),
+  sortOrder: z.coerce.number().int().min(0).optional(),
+});
+
+const productVariantSchema = z.object({
+  id: z.string().trim().min(1).optional(),
+  slug: z.string().trim().min(3),
+  sku: z.string().trim().min(3).max(64),
+  barcode: z.string().trim().min(3).max(64).optional().nullable(),
+  title: z.string().trim().min(2).max(160),
+  optionSummary: z.string().trim().min(2).max(240),
+  priceOverride: z.coerce.number().positive().optional().nullable(),
+  purchasePriceOverride: z.coerce.number().nonnegative().optional().nullable(),
+  compareAtPriceOverride: z.coerce.number().positive().optional().nullable(),
+  imageUrl: z.string().trim().url().optional().nullable(),
+  imageUrls: z.array(z.string().trim().url()).max(12).optional().default([]),
+  stockOverride: z.coerce.number().int().min(0).optional().nullable(),
+  salesEnabled: z.boolean().default(true),
+  isDefault: z.boolean().default(false),
+  sortOrder: z.coerce.number().int().min(0).optional(),
+  attributes: z.array(z.object({
+    attributeDefinitionId: z.string().trim().min(1),
+    value: z.string().trim().min(1).max(120),
+  })).min(1).max(12),
+});
+
 const adminListQuerySchema = z.object({
   search: z.string().trim().optional(),
   categoryId: z.string().trim().optional(),
+  status: z.enum(["all", "DRAFT", "ACTIVE", "ARCHIVED"]).default("all"),
+  brandId: z.string().trim().optional(),
+  supplierId: z.string().trim().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(10),
 });
@@ -48,6 +89,7 @@ const createProductSchema = z.object({
   name: z.string().trim().min(2),
   description: z.string().trim().min(3),
   productType: z.enum(["PHYSICAL", "SERVICE", "RAW_MATERIAL", "SEMI_FINISHED"]).default("PHYSICAL"),
+  status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).default("ACTIVE"),
   unitType: z.enum(["PIECE", "KILOGRAM", "GRAM", "LITER", "MILLILITER", "METER", "CENTIMETER", "BOX", "PACK"]).default("PIECE"),
   price: z.coerce.number().positive(),
   purchasePrice: z.coerce.number().nonnegative().optional().nullable(),
@@ -56,12 +98,20 @@ const createProductSchema = z.object({
   currency: z.string().trim().min(3).max(3).optional(),
   vatRate: z.coerce.number().int().min(0).max(100).default(20),
   stockTrackingEnabled: z.boolean().default(true),
+  salesEnabled: z.boolean().default(true),
+  purchaseEnabled: z.boolean().default(true),
+  internalNote: z.string().trim().max(1000).optional().nullable(),
+  searchKeywords: z.array(z.string().trim().min(1).max(60)).max(40).optional().default([]),
+  brandId: z.string().trim().min(1).optional().nullable(),
+  primarySupplierId: z.string().trim().min(1).optional().nullable(),
   preferredSalesWarehouseId: z.string().trim().min(1).optional().nullable(),
   preferredPurchaseWarehouseId: z.string().trim().min(1).optional().nullable(),
   imageUrl: z.string().trim().url(),
   imageUrls: z.array(z.string().trim().url()).max(20).optional().default([]),
   features: z.array(productFeatureSchema).max(50).optional().default([]),
   categoryId: z.string().trim().optional().nullable(),
+  attributeLinks: z.array(productAttributeLinkSchema).max(20).optional().default([]),
+  variants: z.array(productVariantSchema).max(100).optional().default([]),
 }).refine((value) => value.compareAtPrice == null || value.compareAtPrice > value.price, {
   message: "Compare-at price must be greater than price",
   path: ["compareAtPrice"],
@@ -75,6 +125,7 @@ const updateProductSchema = z.object({
   name: z.string().trim().min(2).optional(),
   description: z.string().trim().min(3).optional(),
   productType: z.enum(["PHYSICAL", "SERVICE", "RAW_MATERIAL", "SEMI_FINISHED"]).optional(),
+  status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
   unitType: z.enum(["PIECE", "KILOGRAM", "GRAM", "LITER", "MILLILITER", "METER", "CENTIMETER", "BOX", "PACK"]).optional(),
   price: z.coerce.number().positive().optional(),
   purchasePrice: z.coerce.number().nonnegative().optional().nullable(),
@@ -83,12 +134,52 @@ const updateProductSchema = z.object({
   currency: z.string().trim().min(3).max(3).optional(),
   vatRate: z.coerce.number().int().min(0).max(100).optional(),
   stockTrackingEnabled: z.boolean().optional(),
+  salesEnabled: z.boolean().optional(),
+  purchaseEnabled: z.boolean().optional(),
+  internalNote: z.string().trim().max(1000).optional().nullable(),
+  searchKeywords: z.array(z.string().trim().min(1).max(60)).max(40).optional(),
+  brandId: z.string().trim().min(1).optional().nullable(),
+  primarySupplierId: z.string().trim().min(1).optional().nullable(),
   preferredSalesWarehouseId: z.string().trim().min(1).optional().nullable(),
   preferredPurchaseWarehouseId: z.string().trim().min(1).optional().nullable(),
   imageUrl: z.string().trim().url().optional(),
   imageUrls: z.array(z.string().trim().url()).max(20).optional(),
   features: z.array(productFeatureSchema).max(50).optional(),
   categoryId: z.string().trim().optional().nullable(),
+  attributeLinks: z.array(productAttributeLinkSchema).max(20).optional(),
+  variants: z.array(productVariantSchema).max(100).optional(),
+});
+
+const createBrandSchema = z.object({
+  slug: z.string().trim().min(2).max(120),
+  name: z.string().trim().min(2).max(120),
+  isActive: z.boolean().default(true),
+});
+
+const createSupplierSchema = z.object({
+  slug: z.string().trim().min(2).max(120),
+  name: z.string().trim().min(2).max(120),
+  taxNumber: z.string().trim().max(64).optional().nullable(),
+  email: z.string().trim().email().max(160).optional().nullable(),
+  phone: z.string().trim().max(40).optional().nullable(),
+  isActive: z.boolean().default(true),
+});
+
+const createAttributeDefinitionSchema = z.object({
+  slug: z.string().trim().min(2).max(120),
+  name: z.string().trim().min(2).max(120),
+  displayType: z.enum(["TEXT", "COLOR", "NUMBER"]).default("TEXT"),
+  sortOrder: z.coerce.number().int().min(0).default(0),
+  isActive: z.boolean().default(true),
+});
+
+const updateAttributeDefinitionSchema = z.object({
+  id: z.string().trim().min(1),
+  slug: z.string().trim().min(2).max(120).optional(),
+  name: z.string().trim().min(2).max(120).optional(),
+  displayType: z.enum(["TEXT", "COLOR", "NUMBER"]).optional(),
+  sortOrder: z.coerce.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
 });
 
 const categoryListQuerySchema = z.object({
@@ -138,6 +229,89 @@ const bulkModerateQuestionsSchema = z
     }
   });
 
+function resolveAggregateAvailableStock(
+  inventoryLevels: Array<{
+    onHand: number;
+    reserved: number;
+  }>,
+  legacySummaryStock: number,
+) {
+  if (inventoryLevels.length === 0) {
+    // Sprint 1 kuralı: admin listeleme bile aggregate yoksa ancak legacy summary fallback kullanır.
+    return legacySummaryStock;
+  }
+
+  return inventoryLevels.reduce((sum, level) => sum + Math.max(0, level.onHand - level.reserved), 0);
+}
+
+function normalizeKeywordList(keywords: string[]) {
+  return Array.from(
+    new Set(
+      keywords
+        .map((keyword) => keyword.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function mapBrand(item: {
+  id: string;
+  slug: string;
+  name: string;
+  isActive: boolean;
+  _count: { products: number };
+}): AdminBrandItem {
+  return {
+    id: item.id,
+    slug: item.slug,
+    name: item.name,
+    isActive: item.isActive,
+    productCount: item._count.products,
+  };
+}
+
+function mapSupplier(item: {
+  id: string;
+  slug: string;
+  name: string;
+  taxNumber: string | null;
+  email: string | null;
+  phone: string | null;
+  isActive: boolean;
+  _count: { primaryProducts: number };
+}): AdminSupplierItem {
+  return {
+    id: item.id,
+    slug: item.slug,
+    name: item.name,
+    taxNumber: item.taxNumber,
+    email: item.email,
+    phone: item.phone,
+    isActive: item.isActive,
+    productCount: item._count.primaryProducts,
+  };
+}
+
+function mapAttributeDefinition(item: {
+  id: string;
+  slug: string;
+  name: string;
+  displayType: "TEXT" | "COLOR" | "NUMBER";
+  sortOrder: number;
+  isActive: boolean;
+  _count: { productLinks: number };
+}): AdminProductAttributeDefinitionItem {
+  return {
+    id: item.id,
+    slug: item.slug,
+    name: item.name,
+    displayType: item.displayType,
+    sortOrder: item.sortOrder,
+    isActive: item.isActive,
+    productCount: item._count.productLinks,
+  };
+}
+
 const createCategorySchema = z.object({
   slug: z.string().trim().min(2),
   name: z.string().trim().min(2),
@@ -163,6 +337,7 @@ function mapProduct(product: {
   name: string;
   description: string;
   productType: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   unitType: "PIECE" | "KILOGRAM" | "GRAM" | "LITER" | "MILLILITER" | "METER" | "CENTIMETER" | "BOX" | "PACK";
   price: { toNumber: () => number };
   purchasePrice: { toNumber: () => number } | null;
@@ -171,18 +346,64 @@ function mapProduct(product: {
   currency: string;
   vatRate: number;
   stockTrackingEnabled: boolean;
+  salesEnabled: boolean;
+  purchaseEnabled: boolean;
+  internalNote: string | null;
+  searchKeywords: string[];
+  brandId: string | null;
+  brand: { name: string } | null;
+  primarySupplierId: string | null;
+  primarySupplier: { name: string } | null;
   preferredSalesWarehouseId: string | null;
   preferredPurchaseWarehouseId: string | null;
   imageUrl: string;
   imageUrls: string[];
   categoryId: string | null;
   category: { name: string } | null;
+  attributeLinks: Array<{
+    attributeDefinitionId: string;
+    isVariantAxis: boolean;
+    sortOrder: number;
+  }>;
+  variants: Array<{
+    id: string;
+    slug: string;
+    sku: string;
+    barcode: string | null;
+    title: string;
+    optionSummary: string;
+    priceOverride: { toNumber: () => number } | null;
+    purchasePriceOverride: { toNumber: () => number } | null;
+    compareAtPriceOverride: { toNumber: () => number } | null;
+    imageUrl: string | null;
+    imageUrls: string[];
+    stockOverride: number | null;
+    salesEnabled: boolean;
+    isDefault: boolean;
+    sortOrder: number;
+    attributeValues: Array<{
+      attributeDefinitionId: string;
+      value: string;
+    }>;
+  }>;
   inventoryItem?: {
+    averageUnitCost?: { toNumber: () => number } | null;
+    lastPurchaseUnitCost?: { toNumber: () => number } | null;
     inventoryLevels: Array<{
       onHand: number;
       reserved: number;
     }>;
   } | null;
+}, salesSummary?: {
+  orderCount: number;
+  soldQuantity: number;
+  grossRevenue: number;
+  averageUnitCost: number | null;
+  lastPurchaseUnitCost: number | null;
+  stockValue: number;
+  grossProfit: number;
+  grossMarginRate: number | null;
+  lastOrderedAt: string | null;
 }): AdminProductListItem {
   const { cleanDescription, features } = decodeProductDescriptionWithFeatures(product.description);
   const price = product.price.toNumber();
@@ -191,9 +412,21 @@ function mapProduct(product: {
     ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
     : null;
   const inventoryLevels = product.inventoryItem?.inventoryLevels ?? [];
-  const aggregateStock = inventoryLevels.length > 0
-    ? inventoryLevels.reduce((sum, level) => sum + Math.max(0, level.onHand - level.reserved), 0)
-    : product.stock;
+  const aggregateStock = resolveAggregateAvailableStock(inventoryLevels, product.stock);
+  const averageUnitCost = product.inventoryItem?.averageUnitCost?.toNumber()
+    ?? product.purchasePrice?.toNumber()
+    ?? null;
+  const lastPurchaseUnitCost = product.inventoryItem?.lastPurchaseUnitCost?.toNumber()
+    ?? product.purchasePrice?.toNumber()
+    ?? null;
+  const stockValue = averageUnitCost != null ? Number((aggregateStock * averageUnitCost).toFixed(2)) : 0;
+  const soldQuantity = salesSummary?.soldQuantity ?? 0;
+  const grossProfit = salesSummary?.grossRevenue != null && averageUnitCost != null
+    ? Number((salesSummary.grossRevenue - (soldQuantity * averageUnitCost)).toFixed(2))
+    : 0;
+  const grossMarginRate = salesSummary?.grossRevenue && salesSummary.grossRevenue > 0
+    ? Math.round((grossProfit / salesSummary.grossRevenue) * 100)
+    : null;
 
   return {
     id: product.id,
@@ -203,6 +436,7 @@ function mapProduct(product: {
     name: product.name,
     description: cleanDescription,
     productType: product.productType,
+    status: product.status,
     unitType: product.unitType,
     price,
     purchasePrice: product.purchasePrice?.toNumber() ?? null,
@@ -213,6 +447,14 @@ function mapProduct(product: {
     currency: product.currency,
     vatRate: product.vatRate,
     stockTrackingEnabled: product.stockTrackingEnabled,
+    salesEnabled: product.salesEnabled,
+    purchaseEnabled: product.purchaseEnabled,
+    internalNote: product.internalNote,
+    searchKeywords: product.searchKeywords ?? [],
+    brandId: product.brandId,
+    brandName: product.brand?.name ?? null,
+    primarySupplierId: product.primarySupplierId,
+    primarySupplierName: product.primarySupplier?.name ?? null,
     preferredSalesWarehouseId: product.preferredSalesWarehouseId,
     preferredPurchaseWarehouseId: product.preferredPurchaseWarehouseId,
     imageUrl: product.imageUrl,
@@ -220,6 +462,43 @@ function mapProduct(product: {
     features,
     categoryId: product.categoryId,
     categoryName: product.category?.name ?? null,
+    variantCount: product.variants.length,
+    variantAxisCount: product.attributeLinks.filter((item) => item.isVariantAxis).length,
+    orderCount: salesSummary?.orderCount ?? 0,
+    soldQuantity,
+    grossRevenue: salesSummary?.grossRevenue ?? 0,
+    averageUnitCost,
+    lastPurchaseUnitCost,
+    stockValue,
+    grossProfit,
+    grossMarginRate,
+    lastOrderedAt: salesSummary?.lastOrderedAt ?? null,
+    attributeLinks: product.attributeLinks.map((item) => ({
+      attributeDefinitionId: item.attributeDefinitionId,
+      isVariantAxis: item.isVariantAxis,
+      sortOrder: item.sortOrder,
+    })),
+    variants: product.variants.map((variant) => ({
+      id: variant.id,
+      slug: variant.slug,
+      sku: variant.sku,
+      barcode: variant.barcode,
+      title: variant.title,
+      optionSummary: variant.optionSummary,
+      priceOverride: variant.priceOverride?.toNumber() ?? null,
+      purchasePriceOverride: variant.purchasePriceOverride?.toNumber() ?? null,
+      compareAtPriceOverride: variant.compareAtPriceOverride?.toNumber() ?? null,
+      imageUrl: variant.imageUrl,
+      imageUrls: variant.imageUrls ?? [],
+      stockOverride: variant.stockOverride ?? null,
+      salesEnabled: variant.salesEnabled,
+      isDefault: variant.isDefault,
+      sortOrder: variant.sortOrder,
+      attributes: variant.attributeValues.map((attribute) => ({
+        attributeDefinitionId: attribute.attributeDefinitionId,
+        value: attribute.value,
+      })),
+    })),
   };
 }
 
@@ -313,6 +592,114 @@ async function invalidateProductDetailCache(slug: string) {
 export class CatalogAdminService {
   constructor(private readonly repository: CatalogAdminRepository) {}
 
+  private async assertProductRelations(args: {
+    categoryId: string | null;
+    brandId: string | null;
+    primarySupplierId: string | null;
+    attributeDefinitionIds?: string[];
+    skipMissingValues?: boolean;
+  }) {
+    const [category, brand, supplier, attributeDefinitions] = await Promise.all([
+      args.categoryId
+        ? this.repository.findActiveCategoryById(args.categoryId)
+        : Promise.resolve(args.skipMissingValues ? { id: "skip", parentId: null } : null),
+      args.brandId
+        ? this.repository.findActiveBrandById(args.brandId)
+        : Promise.resolve(args.skipMissingValues ? { id: "skip" } : null),
+      args.primarySupplierId
+        ? this.repository.findActiveSupplierById(args.primarySupplierId)
+        : Promise.resolve(args.skipMissingValues ? { id: "skip" } : null),
+      args.attributeDefinitionIds?.length
+        ? this.repository.findActiveAttributeDefinitionsByIds(args.attributeDefinitionIds)
+        : Promise.resolve([]),
+    ]);
+
+    if (args.categoryId && !category) {
+      throw new z.ZodError([{
+        code: "custom",
+        path: ["categoryId"],
+        message: "Category not found",
+      }]);
+    }
+
+    if (args.brandId && !brand) {
+      throw new z.ZodError([{
+        code: "custom",
+        path: ["brandId"],
+        message: "Brand not found",
+      }]);
+    }
+
+    if (args.primarySupplierId && !supplier) {
+      throw new z.ZodError([{
+        code: "custom",
+        path: ["primarySupplierId"],
+        message: "Supplier not found",
+      }]);
+    }
+
+    if (args.attributeDefinitionIds?.length) {
+      const foundIds = new Set(attributeDefinitions.map((item) => item.id));
+      const missingId = args.attributeDefinitionIds.find((id) => !foundIds.has(id));
+      if (missingId) {
+        throw new z.ZodError([{
+          code: "custom",
+          path: ["attributeLinks"],
+          message: `Attribute definition not found: ${missingId}`,
+        }]);
+      }
+    }
+  }
+
+  private validateVariants(args: {
+    basePrice?: number;
+    attributeLinks?: AdminProductAttributeLinkInput[];
+    variants?: AdminProductVariantInput[];
+  }) {
+    const variants = args.variants ?? [];
+    if (variants.length === 0) {
+      return;
+    }
+
+    const variantAxisIds = new Set((args.attributeLinks ?? []).filter((item) => item.isVariantAxis).map((item) => item.attributeDefinitionId));
+    const seenSku = new Set<string>();
+    const seenSlug = new Set<string>();
+    let defaultCount = 0;
+
+    for (const variant of variants) {
+      if (seenSku.has(variant.sku)) {
+        throw new z.ZodError([{ code: "custom", path: ["variants"], message: `Duplicate variant SKU: ${variant.sku}` }]);
+      }
+      if (seenSlug.has(variant.slug)) {
+        throw new z.ZodError([{ code: "custom", path: ["variants"], message: `Duplicate variant slug: ${variant.slug}` }]);
+      }
+      seenSku.add(variant.sku);
+      seenSlug.add(variant.slug);
+
+      if (variant.isDefault) {
+        defaultCount += 1;
+      }
+
+      const attributeIds = variant.attributes.map((attribute) => attribute.attributeDefinitionId);
+      for (const attributeId of attributeIds) {
+        if (!variantAxisIds.has(attributeId)) {
+          throw new z.ZodError([{ code: "custom", path: ["variants"], message: "Variant attributes must use selected variant axes" }]);
+        }
+      }
+
+      if (variant.compareAtPriceOverride != null) {
+        const effectivePrice = variant.priceOverride ?? args.basePrice ?? 0;
+        if (variant.compareAtPriceOverride <= effectivePrice) {
+          throw new z.ZodError([{ code: "custom", path: ["variants"], message: "Variant compare-at price must be greater than sale price" }]);
+        }
+      }
+    }
+
+    if (defaultCount > 1) {
+      throw new z.ZodError([{ code: "custom", path: ["variants"], message: "Only one default variant is allowed" }]);
+    }
+  }
+
   private async assertValidParentAssignment(categoryId: string | null, parentId: string | null | undefined) {
     if (parentId == null) {
       return;
@@ -377,11 +764,15 @@ export class CatalogAdminService {
       this.repository.countProducts({
         search: parsed.search,
         categoryId: parsed.categoryId,
+        status: parsed.status,
+        brandId: parsed.brandId,
+        supplierId: parsed.supplierId,
       }),
     ]);
+    const salesSummary = await this.repository.summarizeProductSales(products.map((item) => item.id));
 
     return {
-      items: products.map(mapProduct),
+      items: products.map((product) => mapProduct(product, salesSummary.get(product.id))),
       page: parsed.page,
       pageSize: parsed.pageSize,
       total,
@@ -391,6 +782,20 @@ export class CatalogAdminService {
 
   async createProduct(input: AdminCreateProductInput): Promise<AdminProductListItem> {
     const parsed = createProductSchema.parse(input);
+    await this.assertProductRelations({
+      brandId: parsed.brandId ?? null,
+      categoryId: parsed.categoryId ?? null,
+      primarySupplierId: parsed.primarySupplierId ?? null,
+      attributeDefinitionIds: Array.from(new Set([
+        ...(parsed.attributeLinks ?? []).map((item) => item.attributeDefinitionId),
+        ...(parsed.variants ?? []).flatMap((item) => item.attributes.map((attribute) => attribute.attributeDefinitionId)),
+      ])),
+    });
+    this.validateVariants({
+      basePrice: parsed.price,
+      attributeLinks: parsed.attributeLinks,
+      variants: parsed.variants,
+    });
     const created = await this.repository.createProduct({
       description: encodeProductDescriptionWithFeatures(parsed.description, sanitizeFeatures(parsed.features ?? [])),
       slug: parsed.slug,
@@ -398,6 +803,7 @@ export class CatalogAdminService {
       barcode: parsed.barcode ?? null,
       name: parsed.name,
       productType: parsed.productType,
+      status: parsed.status,
       unitType: parsed.unitType,
       price: parsed.price,
       purchasePrice: parsed.purchasePrice,
@@ -405,11 +811,19 @@ export class CatalogAdminService {
       currency: parsed.currency,
       vatRate: parsed.vatRate,
       stockTrackingEnabled: parsed.stockTrackingEnabled,
+      salesEnabled: parsed.salesEnabled,
+      purchaseEnabled: parsed.purchaseEnabled,
+      internalNote: parsed.internalNote ?? null,
+      searchKeywords: normalizeKeywordList(parsed.searchKeywords ?? []),
+      brandId: parsed.brandId ?? null,
+      primarySupplierId: parsed.primarySupplierId ?? null,
       preferredSalesWarehouseId: parsed.preferredSalesWarehouseId,
       preferredPurchaseWarehouseId: parsed.preferredPurchaseWarehouseId,
       imageUrl: parsed.imageUrl,
       imageUrls: parsed.imageUrls,
       categoryId: parsed.categoryId,
+      attributeLinks: parsed.attributeLinks,
+      variants: parsed.variants,
     });
     await inventoryService.syncProductInventoryState({
       productId: created.id,
@@ -443,6 +857,22 @@ export class CatalogAdminService {
 
     const existingProduct = existing;
 
+    await this.assertProductRelations({
+      brandId: parsed.brandId ?? null,
+      categoryId: parsed.categoryId ?? null,
+      primarySupplierId: parsed.primarySupplierId ?? null,
+      attributeDefinitionIds: Array.from(new Set([
+        ...(parsed.attributeLinks ?? []).map((item) => item.attributeDefinitionId),
+        ...(parsed.variants ?? []).flatMap((item) => item.attributes.map((attribute) => attribute.attributeDefinitionId)),
+      ])),
+      skipMissingValues: true,
+    });
+    this.validateVariants({
+      basePrice: parsed.price ?? existingProduct?.price.toNumber(),
+      attributeLinks: parsed.attributeLinks,
+      variants: parsed.variants,
+    });
+
     if (parsed.price !== undefined || parsed.compareAtPrice !== undefined) {
       if (!existingProduct) {
         throw new Error("Product not found");
@@ -471,6 +901,7 @@ export class CatalogAdminService {
       barcode: parsed.barcode,
       name: parsed.name,
       productType: parsed.productType,
+      status: parsed.status,
       unitType: parsed.unitType,
       price: parsed.price,
       purchasePrice: parsed.purchasePrice,
@@ -478,11 +909,19 @@ export class CatalogAdminService {
       currency: parsed.currency,
       vatRate: parsed.vatRate,
       stockTrackingEnabled: parsed.stockTrackingEnabled,
+      salesEnabled: parsed.salesEnabled,
+      purchaseEnabled: parsed.purchaseEnabled,
+      internalNote: parsed.internalNote,
+      searchKeywords: parsed.searchKeywords ? normalizeKeywordList(parsed.searchKeywords) : undefined,
+      brandId: parsed.brandId,
+      primarySupplierId: parsed.primarySupplierId,
       preferredSalesWarehouseId: parsed.preferredSalesWarehouseId,
       preferredPurchaseWarehouseId: parsed.preferredPurchaseWarehouseId,
       imageUrl: parsed.imageUrl,
       imageUrls: parsed.imageUrls,
       categoryId: parsed.categoryId,
+      attributeLinks: parsed.attributeLinks,
+      variants: parsed.variants,
       ...(parsed.features !== undefined || parsed.description !== undefined
         ? {
             description: encodeProductDescriptionWithFeatures(
@@ -532,6 +971,76 @@ export class CatalogAdminService {
   async softDeleteProduct(productId: string, deletedUserId: string) {
     await this.repository.softDeleteProduct(productId, deletedUserId);
     await invalidateCatalogCache();
+  }
+
+  async listBrands(): Promise<AdminBrandItem[]> {
+    const rows = await this.repository.listBrands();
+    return rows.map(mapBrand);
+  }
+
+  async listSuppliers(): Promise<AdminSupplierItem[]> {
+    const rows = await this.repository.listSuppliers();
+    return rows.map(mapSupplier);
+  }
+
+  async createBrand(input: AdminCreateBrandInput): Promise<AdminBrandItem> {
+    const parsed = createBrandSchema.parse(input);
+    const created = await this.repository.createBrand(parsed);
+    return mapBrand(created);
+  }
+
+  async createSupplier(input: AdminCreateSupplierInput): Promise<AdminSupplierItem> {
+    const parsed = createSupplierSchema.parse(input);
+    const created = await this.repository.createSupplier(parsed);
+    return mapSupplier(created);
+  }
+
+  async listAttributeDefinitions(): Promise<AdminProductAttributeDefinitionItem[]> {
+    const rows = await this.repository.listAttributeDefinitions();
+    return rows.map(mapAttributeDefinition);
+  }
+
+  async createAttributeDefinition(input: AdminCreateProductAttributeDefinitionInput): Promise<AdminProductAttributeDefinitionItem> {
+    const parsed = createAttributeDefinitionSchema.parse(input);
+    const created = await this.repository.createAttributeDefinition(parsed);
+    return mapAttributeDefinition(created);
+  }
+
+  async updateAttributeDefinition(input: AdminUpdateProductAttributeDefinitionInput): Promise<AdminProductAttributeDefinitionItem> {
+    const parsed = updateAttributeDefinitionSchema.parse(input);
+    const existing = await this.repository.findAttributeDefinitionById(parsed.id);
+
+    if (!existing) {
+      throw new Error("Attribute definition not found");
+    }
+
+    const updated = await this.repository.updateAttributeDefinition(parsed);
+    return mapAttributeDefinition(updated);
+  }
+
+  async deleteAttributeDefinition(id: string): Promise<AdminProductAttributeDefinitionItem> {
+    const existing = await this.repository.findAttributeDefinitionById(id);
+
+    if (!existing) {
+      throw new Error("Attribute definition not found");
+    }
+
+    if (existing._count.productLinks > 0) {
+      throw new Error("Bu varyant ekseni aktif ürünlerde kullanıldığı için silinemez.");
+    }
+
+    const deleted = await this.repository.deleteAttributeDefinition(id);
+    return mapAttributeDefinition(deleted);
+  }
+
+  async listWarehousesForProductAdmin() {
+    const warehouses = await inventoryService.listWarehouses();
+    return warehouses.map((warehouse) => ({
+      id: warehouse.id,
+      code: warehouse.code,
+      name: warehouse.name,
+      isActive: warehouse.isActive,
+    }));
   }
 
   async listCategories(query: AdminCategoryListQuery): Promise<AdminCategoryListResult> {

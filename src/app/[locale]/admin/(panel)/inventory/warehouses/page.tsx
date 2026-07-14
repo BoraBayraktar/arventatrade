@@ -30,11 +30,10 @@ export default async function AdminInventoryWarehousesPage({
       query={context.query}
       labels={context.labels}
       overviewPath={`/${context.locale}/admin/inventory`}
-      inventoryListPath={`/${context.locale}/admin/inventory`}
+      inventoryListPath={`/${context.locale}/admin/inventory/products`}
       transactionListPath={`/${context.locale}/admin/inventory/transactions`}
       stockCountsPath={`/${context.locale}/admin/inventory/counts`}
       warehousesPath={`/${context.locale}/admin/inventory/warehouses`}
-      exportsPath={`/${context.locale}/admin/inventory/exports`}
       externalEventsPath={`/${context.locale}/admin/inventory/external-events`}
       pageVariant="warehouses"
       initialSectionGroup="definitions"

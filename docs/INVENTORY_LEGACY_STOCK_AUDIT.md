@@ -14,6 +14,7 @@ Bu doküman, `Product.stock` alanının nerelerde kullanılmasının kabul edile
 - Storefront ve katalog görünümünde özet stok göstergesi
 - Geçiş dönemi tutarlılık raporları
 - Summary senkronizasyonu
+- Kod içinde açıkça isimlendirilmiş `legacy summary fallback` kullanımları
 
 ## Storefront Kararı
 
@@ -32,3 +33,12 @@ Bu doküman, `Product.stock` alanının nerelerde kullanılmasının kabul edile
 
 Sprint 10 itibarıyla inventory ve commerce yazma akışlarında `Product.stock` doğrudan otorite olarak kullanılmamalıdır.
 Kalan kullanımlar belge/fallback/summary niteliğinde kalmalıdır.
+
+## Sprint 1 Tamamlama Notu
+
+Sprint 1 sonunda aşağıdaki yüzeyler kontrollü kabul edilir:
+
+- `catalog.service`: aggregate varsa onu, yoksa legacy summary fallback
+- `catalog-admin.service`: aggregate varsa onu, yoksa legacy summary fallback
+- `inventory.service#getProductAvailability`: aggregate varsa onu, yoksa legacy summary fallback
+- `commerce.repository`: aggregate bootstrap dışında sipariş otoritesi olarak legacy summary kullanmaz

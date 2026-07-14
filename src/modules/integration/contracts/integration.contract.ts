@@ -1,6 +1,6 @@
-export type IntegrationChannel = "TRENDYOL" | "N11";
-export type IntegrationJobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC";
-export type IntegrationEntityType = "PRODUCT";
+export type IntegrationChannel = "TRENDYOL" | "N11" | "EDOCS_MOCK";
+export type IntegrationJobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
+export type IntegrationEntityType = "PRODUCT" | "BUSINESS_DOCUMENT";
 export type IntegrationJobStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
 
 export type AdminIntegrationListQuery = {
@@ -42,7 +42,7 @@ export type DispatchIntegrationJobsInput = {
   entityType: IntegrationEntityType;
   entityIds: string[];
   maxAttempts?: number;
-  payload?: Record<string, string | number | boolean | null>;
+  payload?: Record<string, unknown>;
   idempotencySuffix?: string;
 };
 

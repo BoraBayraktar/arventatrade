@@ -62,6 +62,12 @@ export async function POST(
       }, { status: 409 });
     }
 
+    if (error instanceof Error && error.message === "SERIALIZABLE_TRANSACTION_FAILED") {
+      return NextResponse.json({
+        message: "Sayım uygulanırken eşzamanlı stok değişikliği algılandı. Sayımı yenileyip tekrar deneyin.",
+      }, { status: 409 });
+    }
+
     return NextResponse.json({ message: "Beklenmeyen bir hata oluştu." }, { status: 500 });
   }
 }

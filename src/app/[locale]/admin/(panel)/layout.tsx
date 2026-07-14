@@ -40,14 +40,41 @@ export default async function AdminPanelLayout({
 
   const menuItems: MenuItem[] = [
     { href: `/${locale}/admin/products`, label: dictionary.admin.productManager },
-    { href: `/${locale}/admin/inventory`, label: `${dictionary.admin.inventoryManager} / Genel Bakış` },
-    { href: `/${locale}/admin/inventory/transactions`, label: dictionary.admin.inventoryTransactionsTitle },
-    { href: `/${locale}/admin/inventory/counts`, label: dictionary.admin.inventoryStockCountTitle },
-    { href: `/${locale}/admin/inventory/warehouses`, label: dictionary.admin.inventoryWarehousesTitle },
+    {
+      href: `/${locale}/admin/inventory`,
+      label: dictionary.admin.inventoryManager,
+      children: [
+        { href: `/${locale}/admin/inventory`, label: "Genel Bakış" },
+        { href: `/${locale}/admin/inventory/quick-actions`, label: "Hızlı Barkod İşlemleri" },
+        { href: `/${locale}/admin/inventory/products`, label: "Ürün Stokları" },
+        { href: `/${locale}/admin/inventory/transactions`, label: dictionary.admin.inventoryTransactionsTitle },
+        { href: `/${locale}/admin/inventory/counts`, label: dictionary.admin.inventoryStockCountTitle },
+        { href: `/${locale}/admin/inventory/warehouses`, label: dictionary.admin.inventoryWarehousesTitle },
+        { href: `/${locale}/admin/inventory/exports`, label: "Dışa Aktarım Geçmişi" },
+        { href: `/${locale}/admin/inventory/external-events`, label: "Harici Stok Eventleri" },
+      ],
+    },
     { href: `/${locale}/admin/product-questions`, label: dictionary.admin.questionManager },
     { href: `/${locale}/admin/categories`, label: dictionary.admin.categoryManager },
     { href: `/${locale}/admin/storefront`, label: dictionary.admin.storefrontManager },
     { href: `/${locale}/admin/orders`, label: dictionary.admin.orderManager },
+    {
+      href: `/${locale}/admin/documents`,
+      label: dictionary.admin.documentManager,
+      children: [
+        { href: `/${locale}/admin/documents`, label: dictionary.admin.documentsMenuOverview },
+        { href: `/${locale}/admin/documents/pending-invoices`, label: dictionary.admin.documentsMenuPendingInvoices },
+        { href: `/${locale}/admin/documents/providers`, label: dictionary.admin.documentsMenuProviders },
+        { href: `/${locale}/admin/documents/webhooks`, label: dictionary.admin.documentsMenuWebhooks },
+      ],
+    },
+    {
+      href: `/${locale}/admin/finance`,
+      label: dictionary.admin.financeManager,
+      children: [
+        { href: `/${locale}/admin/finance/payables`, label: dictionary.admin.financeMenuSupplierPayables },
+      ],
+    },
     { href: `/${locale}/admin/integrations`, label: dictionary.admin.integrationManager },
     ...adminMenuItems,
   ];

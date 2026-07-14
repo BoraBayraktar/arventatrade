@@ -208,6 +208,8 @@
 		"inventoryManager": "Inventory Management",
 		"questionManager": "Product Question Moderation",
 		"orderManager": "Order Management",
+		"documentManager": "Document Management",
+		"financeManager": "Finance Management",
 		"integrationManager": "Integration Management",
 		"integrationSubtitle": "Monitor product, price, and stock sync jobs; manage manual dispatch and queue operations in drawer forms.",
 		"integrationCreateJob": "Create job",
@@ -263,13 +265,88 @@
 		"productList": "Product List",
 		"slug": "Slug",
 		"sku": "SKU",
+		"brand": "Brand",
 		"barcode": "Barcode",
 		"description": "Description",
 		"productType": "Product type",
+		"supplier": "Supplier",
 		"unitType": "Unit",
 		"purchasePrice": "Purchase price",
 		"vatRate": "VAT rate",
 		"stockTrackingEnabled": "Stock tracking enabled",
+		"salesEnabled": "Available for sales",
+		"purchaseEnabled": "Available for purchasing",
+		"internalNote": "Internal note",
+		"searchKeywords": "Search keywords",
+		"searchKeywordsHint": "Add comma-separated keywords to improve internal product search.",
+		"allStatuses": "All statuses",
+		"allBrands": "All brands",
+		"allSuppliers": "All suppliers",
+		"createBrand": "Create brand",
+		"createSupplier": "Create supplier",
+		"createAttributeDefinition": "Create attribute definition",
+		"attributesTitle": "Variant Attribute Definitions",
+		"attributeName": "Attribute name",
+		"attributeDisplayType": "Display type",
+		"attributeDisplayText": "Text",
+		"attributeDisplayColor": "Color",
+		"attributeDisplayNumber": "Number",
+		"variantAxes": "Variant axes",
+		"variantAxesHint": "Select the axes that variants should use, then define the matching values on each variant.",
+		"variantsTitle": "Variants",
+		"variantsHint": "You can override SKU, price and images for each variant separately.",
+		"addVariant": "Add variant",
+		"variantTitle": "Variant title",
+		"variantOptionSummary": "Option summary",
+		"variantPriceOverride": "Price override",
+		"variantPurchasePriceOverride": "Purchase price override",
+		"variantCompareAtPriceOverride": "Compare-at price override",
+		"variantImageUrl": "Variant image URL",
+		"variantStockOverride": "Stock override",
+		"variantDefault": "Default variant",
+		"variantSalesEnabled": "Available for sales",
+		"variantAttributeValue": "Attribute value",
+		"variantDetails": "Edit details",
+		"variantEmptyState": "No variants yet. Select axes first, then create variants.",
+		"variantAxisDeleteConfirm": "Are you sure you want to delete this variant axis definition?",
+		"variantAxisDeleteBlocked": "This variant axis cannot be deleted right now.",
+		"variantAxisUsageCount": "Usage",
+		"selectedVariantAxes": "Selected variant axes",
+		"generateVariants": "Bulk generate",
+		"generateVariantsTitle": "Generate variant combinations",
+		"generateVariantsHint": "Enter comma-separated values for each axis. The system will generate all combinations and skip ones that already exist.",
+		"generateVariantsValues": "Example: Black, White, Red",
+		"generateVariantsApply": "Create variants",
+		"generateVariantsEmptyAxes": "Select at least one variant axis before bulk generating variants.",
+		"generateVariantsSuggestions": "Suggested values:",
+		"generateVariantsUseAllSuggestions": "Fill all suggestions",
+		"orderCount": "Orders",
+		"soldQuantity": "Units sold",
+		"grossRevenue": "Revenue",
+		"averageUnitCost": "Average cost",
+		"lastPurchaseUnitCost": "Last purchase cost",
+		"stockValue": "Stock value",
+		"grossProfit": "Gross profit",
+		"grossMarginRate": "Gross margin",
+		"lastOrderedAt": "Last order",
+		"decisionAlerts": "Decision signals",
+		"alertLowMargin": "Margin looks low. Reviewing price or cost structure may help.",
+		"alertSlowSales": "The item is in stock but sales velocity is weak. Campaign, visibility, or pricing should be reviewed.",
+		"alertStockRisk": "Stock value may be high relative to sales pace. Rebalance supply and warehouse decisions.",
+		"alertHealthy": "The product looks balanced. Current sales and stock structure appears healthy.",
+		"reviewInventory": "Review stock",
+		"reviewTransactions": "Review movements",
+		"brandName": "Brand name",
+		"supplierName": "Supplier name",
+		"supplierTaxNumber": "Tax number",
+		"supplierEmail": "Email",
+		"supplierPhone": "Phone",
+		"importCsv": "Import CSV",
+		"exportCsv": "Export CSV",
+		"productImportHint": "Use CSV import for bulk product creation and export to download the current product list.",
+		"productImportSuccess": "Imported products:",
+		"productImportFailed": "Product import failed.",
+		"productExportFailed": "Product export failed.",
 		"preferredPurchaseWarehouse": "Default purchase warehouse",
 		"preferredSalesWarehouse": "Default sales warehouse",
 		"stock": "Stock",
@@ -297,7 +374,10 @@
 		"validationCompareAtPrice": "Compare-at price must be greater than the sale price.",
 		"validationImageUrl": "Please enter a valid image URL.",
 		"validationImageUrls": "All additional image URLs must be valid.",
-		"validationImageUrlsLimit": "You can add up to 6 images in total."
+		"validationImageUrlsLimit": "You can add up to 6 images in total.",
+		"validationVariantRequired": "Please fill title, slug, SKU and option summary for each variant.",
+		"validationVariantAttributes": "Please enter values for all selected variant axes on each variant.",
+		"validationVariantImageUrl": "Please enter a valid image URL for the variant."
 		,"sort": "Sort"
 		,"sortPriority": "Priority"
 		,"sortLatest": "Latest"
@@ -325,6 +405,9 @@
 		,"addFeature": "Add Feature"
 		,"removeFeature": "Remove"
 		,"status": "Status"
+		,"productStatusDraft": "Draft"
+		,"productStatusActive": "Active"
+		,"productStatusArchived": "Archived"
 		,"statusAll": "All"
 		,"statusPending": "Pending"
 		,"statusAnswered": "Answered"
@@ -393,6 +476,81 @@
 		,"bulkAnswer": "Bulk Answer"
 		,"bulkDelete": "Bulk Remove"
 		,"bulkAnswerPlaceholder": "Bulk answer for selected questions"
+		,"documentsDescription": "Manage e-invoice, e-dispatch, purchase, and inventory-linked documents in one place."
+		,"documentsCreateTitle": "Create document"
+		,"documentsDocumentNumber": "Document number"
+		,"documentsDocumentType": "Document type"
+		,"documentsDocumentStatus": "Document status"
+		,"documentsIssueDate": "Issue date"
+		,"documentsCounterparty": "Counterparty"
+		,"documentsExternalReference": "External reference"
+		,"documentsExternalSystemStatus": "External system status"
+		,"documentsOrderNumber": "Order number"
+		,"documentsInventoryTransactionNumber": "Inventory transaction number"
+		,"documentsNote": "Document note"
+		,"documentsCreateAction": "Save document"
+		,"documentsSearch": "Search document, counterparty, order, or transaction"
+		,"documentsNoResults": "No documents found."
+		,"documentsViewLines": "View lines"
+		,"documentsQueueDispatch": "Queue outbound"
+		,"documentsQueueing": "Queueing"
+		,"documentsQueueStatusSync": "Sync status"
+		,"documentsStatusSyncing": "Syncing"
+		,"documentsDispatchHistory": "Dispatch history"
+		,"documentsDispatchProvider": "Provider"
+		,"documentsDispatchError": "Error"
+		,"documentsDispatchQueuedAt": "Queued at"
+		,"documentsNoDispatchHistory": "No dispatch history yet."
+		,"documentsProviderConfigsTitle": "Document provider settings"
+		,"documentsProviderCode": "Provider code"
+		,"documentsProviderDisplayName": "Provider name"
+		,"documentsProviderEndpointUrl": "Service URL"
+		,"documentsProviderSenderLabel": "Sender label"
+		,"documentsProviderSenderVkn": "Sender tax id"
+		,"documentsProviderUsername": "Username"
+		,"documentsProviderSecret": "Secret key"
+		,"documentsProviderWebhookSecret": "Webhook secret"
+		,"documentsProviderCompanyName": "Company name"
+		,"documentsProviderSupportsStatusSync": "Supports status sync"
+		,"documentsProviderIsActive": "Active"
+		,"documentsProviderIsDefault": "Default"
+		,"documentsProviderSave": "Save provider"
+		,"documentsProviderSaved": "Provider saved"
+		,"documentsProviderSelection": "Document provider"
+		,"documentsProviderNone": "No provider selected"
+		,"documentsDrawerClose": "Close"
+		,"documentsMenuOverview": "Documents"
+		,"documentsMenuPendingInvoices": "Pending Invoice Delivery Notes"
+		,"documentsMenuProviders": "Providers"
+		,"documentsMenuWebhooks": "Webhooks"
+		,"documentsPendingInvoicesTitle": "Pending Invoice Delivery Notes"
+		,"documentsPendingInvoicesDescription": "Track delivery notes that have not yet been converted into e-invoices on a dedicated operational route. List and detail stay on the same route without mixing modules."
+		,"documentsPendingInvoicesEmpty": "No delivery notes waiting for invoicing."
+		,"documentsPendingInvoicesDetailAction": "Open detail"
+		,"documentsPendingInvoicesSource": "Source record"
+		,"documentsPendingInvoicesCreateInvoice": "Create e-invoice"
+		,"documentsPendingInvoicesCreatingInvoice": "Creating"
+		,"documentsPendingInvoicesCreateAndQueueInvoice": "Create and queue"
+		,"documentsPendingInvoicesCreatingAndQueueInvoice": "Creating and queueing"
+		,"documentsPendingInvoicesCreateInvoiceSuccess": "E-invoice created. Refreshing the list."
+		,"documentsPendingInvoicesCreateInvoiceFailed": "E-invoice could not be created."
+		,"documentsPendingInvoicesQueueInvoiceSuccess": "E-invoice created and queued for dispatch."
+		,"documentsPendingInvoicesQueueInvoiceFailed": "E-invoice was created but could not be queued for dispatch."
+		,"documentsProvidersDescription": "Manage document providers on a separate surface; define credentials, the default provider, and status sync support here."
+		,"documentsWebhooksDescription": "See provider callback endpoints and the webhook flow in one place. This keeps operational forms lighter and technical details separate."
+		,"documentsWebhookEndpoint": "Webhook endpoint"
+		,"documentsWebhookTitle": "Webhook validation"
+		,"documentsWebhookHint": "When the real provider arrives, callback requests will be processed through this signed webhook flow."
+		,"financeMenuSupplierPayables": "Supplier Payables"
+		,"financeSupplierPayablesTitle": "Supplier Payables"
+		,"financeSupplierPayablesDescription": "Build an operational payables view by grouping purchase, delivery note, and e-invoice records from the document module through the service layer."
+		,"financeSupplierPayablesSearch": "Search supplier, document, order, or inventory transaction"
+		,"financeSupplierPayablesEmpty": "No supplier payable summary found."
+		,"financeSupplierPayablesTotalAmount": "Total document amount"
+		,"financeSupplierPayablesDocumentCount": "Document count"
+		,"financeSupplierPayablesDraftCount": "Draft documents"
+		,"financeSupplierPayablesLastIssueDate": "Last issue date"
+		,"financeSupplierPayablesDetailAction": "Open payable detail"
 		,"inventorySummaryTitle": "Inventory Summary"
 		,"inventoryReservations": "Reservations"
 		,"inventoryReservedQuantity": "Reserved Quantity"
@@ -507,7 +665,36 @@
 		,"inventoryActiveAlerts": "Active alerts"
 		,"inventoryReportsTitle": "Inventory reports"
 		,"inventoryReportsDescription": "Track warehouse distribution, stock valuation, movement summary, and 30-day trend at a glance."
+		,"inventoryQuickActionTitle": "Hızlı barkod işlemi"
+		,"inventoryQuickActionDescription": "Mobilde kameraya yakın barkod akışı, masaüstünde barkod okuyucu ve manuel SKU girişi için tek hızlı işlem alanı."
+		,"inventoryQuickActionInputLabel": "Barkod veya SKU"
+		,"inventoryQuickActionInputPlaceholder": "Barkod okutun veya SKU girin"
+		,"inventoryQuickActionOpen": "Kartı aç"
+		,"inventoryQuickActionLookup": "Ürünü bul"
+		,"inventoryQuickActionSearching": "Aranıyor..."
+		,"inventoryQuickActionStartCamera": "Kamerayı aç"
+		,"inventoryQuickActionStopCamera": "Kamerayı kapat"
+		,"inventoryQuickActionCameraReady": "Kamera hazır"
+		,"inventoryQuickActionCameraUnsupported": "Bu cihaz veya tarayıcı kamera ile barkod okuma özelliğini desteklemiyor."
+		,"inventoryQuickActionCameraDenied": "Kamera izni verilmedi veya kamera açılamadı."
+		,"inventoryQuickActionNoMatch": "Bu barkod veya SKU için eşleşen ürün bulunamadı."
+		,"inventoryQuickActionMatchBarcode": "Barkod eşleşmesi"
+		,"inventoryQuickActionMatchSku": "SKU eşleşmesi"
+		,"inventoryQuickActionMatchName": "Yakın ürün eşleşmesi"
+		,"inventoryQuickActionScannerHint": "Telefon, USB barkod okuyucu ve manuel klavye girişi aynı alan üzerinden desteklenir. Okuyucu Enter gönderiyorsa işlem doğrudan tetiklenir."
+		,"inventoryQuickActionRememberedMode": "Son seçilen hızlı işlem modu hatırlanır."
+		,"inventoryQuickActionAutoOpenHint": "Kamera barkodu okuduğunda ürün seçilen modda otomatik açılır."
+		,"inventoryQuickActionFastModeTitle": "Ultra hızlı uygulama"
+		,"inventoryQuickActionFastModeDescription": "Ürünü drawer açmadan miktar girip doğrudan işle."
+		,"inventoryQuickActionQuantityLabel": "Miktar / Hedef stok"
+		,"inventoryQuickActionApplyNow": "Hemen uygula"
+		,"inventoryQuickActionApplySuccess": "Hızlı işlem uygulandı."
+		,"inventoryQuickActionApplyFailed": "Hızlı işlem uygulanamadı."
+		,"inventoryQuickActionTargetWarehouseLabel": "Hedef depo"
+		,"inventoryQuickActionSerialMode": "Seri operatör modu"
+		,"inventoryQuickActionSerialModeHint": "Başarılı işlemden sonra alan temizlenir ve bir sonraki barkod için odak geri gelir."
 		,"inventorySectionsTitle": "Quick navigation"
+		,"inventorySectionQuickActions": "Hızlı işlem"
 		,"inventorySectionReports": "Reports"
 		,"inventorySectionSync": "Sync"
 		,"inventorySectionCritical": "Critical stock"
@@ -545,14 +732,24 @@
 		,"inventoryLowStockReport": "Low stock report"
 		,"inventoryMovementSummaryTitle": "Movement summary"
 		,"inventoryTrendTitle": "30-day inventory trend"
+		,"inventoryReportFiltersTitle": "Rapor filtreleri"
+		,"inventoryReportFiltersDescription": "Rapor kartlarını kategori, ürün tipi, depo, stok durumu, rezervasyon ve hareket tipine göre daraltın."
 		,"inventoryReportPeriod": "Rapor dönemi"
 		,"inventoryReportComparePrevious": "Önceki dönem kıyası"
 		,"inventoryReportCostingMethod": "Maliyet görünümü"
+		,"inventoryReportCategoryFilter": "Kategori"
+		,"inventoryReportProductTypeFilter": "Ürün tipi"
+		,"inventoryReportWarehouseFilter": "Depo"
+		,"inventoryReportStockStatusFilter": "Stok durumu"
+		,"inventoryReportReservationFilter": "Rezervasyon"
+		,"inventoryReportMovementTypeFilter": "Hareket tipi"
 		,"inventoryReportPeriod7Days": "7 gün"
 		,"inventoryReportPeriod30Days": "30 gün"
 		,"inventoryReportPeriod90Days": "90 gün"
 		,"inventoryReportCostAverage": "Ağırlıklı ortalama"
 		,"inventoryReportCostLastPurchase": "Son alış maliyeti"
+		,"inventoryReportOfficialCostingMethod": "Resmî maliyet yöntemi"
+		,"inventoryReportComparisonCostingMode": "Görünen maliyet modu"
 		,"inventoryReportCurrentPeriod": "Geçerli dönem"
 		,"inventoryReportPreviousPeriod": "Önceki dönem"
 		,"inventoryReportDifference": "Dönem farkı"

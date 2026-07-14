@@ -15,6 +15,9 @@ export async function GET(request: Request) {
     const products = await catalogAdminService.listProducts({
       search: searchParams.get("search") ?? undefined,
       categoryId: searchParams.get("categoryId") ?? undefined,
+      status: searchParams.get("status") as "all" | "DRAFT" | "ACTIVE" | "ARCHIVED" | null ?? undefined,
+      brandId: searchParams.get("brandId") ?? undefined,
+      supplierId: searchParams.get("supplierId") ?? undefined,
       page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
       pageSize: searchParams.get("pageSize") ? Number(searchParams.get("pageSize")) : 10,
     });

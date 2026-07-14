@@ -8,6 +8,7 @@ export type AdminProductListItem = {
   name: string;
   description: string;
   productType: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   unitType: "PIECE" | "KILOGRAM" | "GRAM" | "LITER" | "MILLILITER" | "METER" | "CENTIMETER" | "BOX" | "PACK";
   price: number;
   purchasePrice: number | null;
@@ -18,6 +19,14 @@ export type AdminProductListItem = {
   currency: string;
   vatRate: number;
   stockTrackingEnabled: boolean;
+  salesEnabled: boolean;
+  purchaseEnabled: boolean;
+  internalNote: string | null;
+  searchKeywords: string[];
+  brandId: string | null;
+  brandName: string | null;
+  primarySupplierId: string | null;
+  primarySupplierName: string | null;
   preferredSalesWarehouseId: string | null;
   preferredPurchaseWarehouseId: string | null;
   imageUrl: string;
@@ -25,11 +34,27 @@ export type AdminProductListItem = {
   features: ProductFeature[];
   categoryId: string | null;
   categoryName: string | null;
+  variantCount: number;
+  variantAxisCount: number;
+  orderCount: number;
+  soldQuantity: number;
+  grossRevenue: number;
+  averageUnitCost: number | null;
+  lastPurchaseUnitCost: number | null;
+  stockValue: number;
+  grossProfit: number;
+  grossMarginRate: number | null;
+  lastOrderedAt: string | null;
+  attributeLinks: AdminProductAttributeLinkItem[];
+  variants: AdminProductVariantItem[];
 };
 
 export type AdminProductListQuery = {
   search?: string;
   categoryId?: string;
+  status?: "all" | "DRAFT" | "ACTIVE" | "ARCHIVED";
+  brandId?: string;
+  supplierId?: string;
   page?: number;
   pageSize?: number;
 };
@@ -49,6 +74,7 @@ export type AdminCreateProductInput = {
   name: string;
   description: string;
   productType?: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  status?: "DRAFT" | "ACTIVE" | "ARCHIVED";
   unitType?: "PIECE" | "KILOGRAM" | "GRAM" | "LITER" | "MILLILITER" | "METER" | "CENTIMETER" | "BOX" | "PACK";
   price: number;
   purchasePrice?: number | null;
@@ -57,12 +83,20 @@ export type AdminCreateProductInput = {
   currency?: string;
   vatRate?: number;
   stockTrackingEnabled?: boolean;
+  salesEnabled?: boolean;
+  purchaseEnabled?: boolean;
+  internalNote?: string | null;
+  searchKeywords?: string[];
+  brandId?: string | null;
+  primarySupplierId?: string | null;
   preferredSalesWarehouseId?: string | null;
   preferredPurchaseWarehouseId?: string | null;
   imageUrl: string;
   imageUrls?: string[];
   features?: ProductFeature[];
   categoryId?: string | null;
+  attributeLinks?: AdminProductAttributeLinkInput[];
+  variants?: AdminProductVariantInput[];
 };
 
 export type AdminUpdateProductInput = {
@@ -73,6 +107,7 @@ export type AdminUpdateProductInput = {
   name?: string;
   description?: string;
   productType?: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  status?: "DRAFT" | "ACTIVE" | "ARCHIVED";
   unitType?: "PIECE" | "KILOGRAM" | "GRAM" | "LITER" | "MILLILITER" | "METER" | "CENTIMETER" | "BOX" | "PACK";
   price?: number;
   purchasePrice?: number | null;
@@ -81,12 +116,158 @@ export type AdminUpdateProductInput = {
   currency?: string;
   vatRate?: number;
   stockTrackingEnabled?: boolean;
+  salesEnabled?: boolean;
+  purchaseEnabled?: boolean;
+  internalNote?: string | null;
+  searchKeywords?: string[];
+  brandId?: string | null;
+  primarySupplierId?: string | null;
   preferredSalesWarehouseId?: string | null;
   preferredPurchaseWarehouseId?: string | null;
   imageUrl?: string;
   imageUrls?: string[];
   features?: ProductFeature[];
   categoryId?: string | null;
+  attributeLinks?: AdminProductAttributeLinkInput[];
+  variants?: AdminProductVariantInput[];
+};
+
+export type AdminProductAttributeDefinitionItem = {
+  id: string;
+  slug: string;
+  name: string;
+  displayType: "TEXT" | "COLOR" | "NUMBER";
+  sortOrder: number;
+  isActive: boolean;
+  productCount: number;
+};
+
+export type AdminCreateProductAttributeDefinitionInput = {
+  slug: string;
+  name: string;
+  displayType?: "TEXT" | "COLOR" | "NUMBER";
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
+export type AdminUpdateProductAttributeDefinitionInput = {
+  id: string;
+  slug?: string;
+  name?: string;
+  displayType?: "TEXT" | "COLOR" | "NUMBER";
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
+export type AdminProductAttributeLinkInput = {
+  attributeDefinitionId: string;
+  isVariantAxis: boolean;
+  sortOrder?: number;
+};
+
+export type AdminProductVariantAttributeValueInput = {
+  attributeDefinitionId: string;
+  value: string;
+};
+
+export type AdminProductVariantInput = {
+  id?: string;
+  slug: string;
+  sku: string;
+  barcode?: string | null;
+  title: string;
+  optionSummary: string;
+  priceOverride?: number | null;
+  purchasePriceOverride?: number | null;
+  compareAtPriceOverride?: number | null;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  stockOverride?: number | null;
+  salesEnabled?: boolean;
+  isDefault?: boolean;
+  sortOrder?: number;
+  attributes: AdminProductVariantAttributeValueInput[];
+};
+
+export type AdminProductAttributeLinkItem = AdminProductAttributeLinkInput;
+
+export type AdminProductVariantItem = AdminProductVariantInput & {
+  id: string;
+};
+
+export type AdminBrandItem = {
+  id: string;
+  slug: string;
+  name: string;
+  isActive: boolean;
+  productCount: number;
+};
+
+export type AdminSupplierItem = {
+  id: string;
+  slug: string;
+  name: string;
+  taxNumber: string | null;
+  email: string | null;
+  phone: string | null;
+  isActive: boolean;
+  productCount: number;
+};
+
+export type AdminCreateBrandInput = {
+  slug: string;
+  name: string;
+  isActive?: boolean;
+};
+
+export type AdminCreateSupplierInput = {
+  slug: string;
+  name: string;
+  taxNumber?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  isActive?: boolean;
+};
+
+export type AdminProductImportRow = {
+  slug: string;
+  sku: string;
+  barcode?: string | null;
+  name: string;
+  description: string;
+  productType?: "PHYSICAL" | "SERVICE" | "RAW_MATERIAL" | "SEMI_FINISHED";
+  status?: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  unitType?: "PIECE" | "KILOGRAM" | "GRAM" | "LITER" | "MILLILITER" | "METER" | "CENTIMETER" | "BOX" | "PACK";
+  price: number;
+  purchasePrice?: number | null;
+  compareAtPrice?: number | null;
+  stock?: number;
+  currency?: string;
+  vatRate?: number;
+  stockTrackingEnabled?: boolean;
+  salesEnabled?: boolean;
+  purchaseEnabled?: boolean;
+  internalNote?: string | null;
+  searchKeywords?: string[];
+  brandSlug?: string | null;
+  brandName?: string | null;
+  supplierSlug?: string | null;
+  supplierName?: string | null;
+  preferredSalesWarehouseCode?: string | null;
+  preferredPurchaseWarehouseCode?: string | null;
+  imageUrl: string;
+  imageUrls?: string[];
+  categorySlug?: string | null;
+  featurePairs?: ProductFeature[];
+};
+
+export type AdminProductImportResult = {
+  createdCount: number;
+  failedCount: number;
+  errors: Array<{
+    rowNumber: number;
+    message: string;
+  }>;
 };
 
 export type AdminCategoryListItem = {

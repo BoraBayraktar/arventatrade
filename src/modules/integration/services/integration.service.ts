@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { redisCache } from "@/lib/redis";
+import { documentDispatchLifecycleService } from "@/modules/documents/services/document-dispatch-lifecycle.service";
 import type {
   AdminIntegrationJobItem,
   AdminIntegrationJobListResult,
@@ -15,25 +16,26 @@ import type {
   StockSyncDashboardResult,
 } from "@/modules/integration/contracts/integration.contract";
 import type { ChannelConnector } from "@/modules/integration/connectors/channel.connector";
+import { EDocsMockConnector } from "@/modules/integration/connectors/edocs-mock.connector";
 import { N11Connector } from "@/modules/integration/connectors/n11.connector";
 import { TrendyolConnector } from "@/modules/integration/connectors/trendyol.connector";
 import { IntegrationRepository } from "@/modules/integration/repositories/integration.repository";
 
 const listQuerySchema = z.object({
-  channel: z.enum(["TRENDYOL", "N11"]).optional(),
-  jobType: z.enum(["PRODUCT_SYNC", "PRICE_SYNC", "STOCK_SYNC"]).optional(),
+  channel: z.enum(["TRENDYOL", "N11", "EDOCS_MOCK"]).optional(),
+  jobType: z.enum(["PRODUCT_SYNC", "PRICE_SYNC", "STOCK_SYNC", "DOCUMENT_OUTBOUND", "DOCUMENT_STATUS_SYNC"]).optional(),
   status: z.enum(["PENDING", "PROCESSING", "SUCCESS", "FAILED", "DEAD_LETTER"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 const dispatchSchema = z.object({
-  channel: z.enum(["TRENDYOL", "N11"]),
-  jobType: z.enum(["PRODUCT_SYNC", "PRICE_SYNC", "STOCK_SYNC"]),
-  entityType: z.enum(["PRODUCT"]),
+  channel: z.enum(["TRENDYOL", "N11", "EDOCS_MOCK"]),
+  jobType: z.enum(["PRODUCT_SYNC", "PRICE_SYNC", "STOCK_SYNC", "DOCUMENT_OUTBOUND", "DOCUMENT_STATUS_SYNC"]),
+  entityType: z.enum(["PRODUCT", "BUSINESS_DOCUMENT"]),
   entityIds: z.array(z.string().trim().min(1)).min(1).max(100),
   maxAttempts: z.coerce.number().int().min(1).max(10).optional(),
-  payload: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
   idempotencySuffix: z.string().trim().min(1).max(120).optional(),
 });
 
@@ -46,9 +48,10 @@ const retrySchema = z.object({
   resolvedByUserId: z.string().trim().min(1),
 });
 
-const connectors: Record<"TRENDYOL" | "N11", ChannelConnector> = {
+const connectors: Record<"TRENDYOL" | "N11" | "EDOCS_MOCK", ChannelConnector> = {
   TRENDYOL: new TrendyolConnector(),
   N11: new N11Connector(),
+  EDOCS_MOCK: new EDocsMockConnector(),
 };
 
 async function invalidateIntegrationCache() {
@@ -58,9 +61,9 @@ async function invalidateIntegrationCache() {
 function mapJob(item: {
   id: string;
   idempotencyKey: string;
-  channel: "TRENDYOL" | "N11";
-  jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC";
-  entityType: "PRODUCT";
+  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
+  entityType: "PRODUCT" | "BUSINESS_DOCUMENT";
   entityId: string;
   status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
   attemptCount: number;
@@ -92,9 +95,9 @@ function mapJob(item: {
 function mapDeadLetter(item: {
   id: string;
   jobId: string;
-  channel: "TRENDYOL" | "N11";
-  jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC";
-  entityType: "PRODUCT";
+  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
+  entityType: "PRODUCT" | "BUSINESS_DOCUMENT";
   entityId: string;
   lastError: string;
   attemptCount: number;
@@ -163,7 +166,7 @@ export class IntegrationService {
     for (const job of reserved) {
       try {
         const connector = connectors[job.channel];
-        await connector.dispatch({
+        const dispatchResult = await connector.dispatch({
           id: job.id,
           channel: job.channel,
           jobType: job.jobType,
@@ -173,6 +176,32 @@ export class IntegrationService {
         });
 
         await this.repository.markJobSuccess(job.id);
+
+        if (job.entityType === "BUSINESS_DOCUMENT" && job.jobType === "DOCUMENT_OUTBOUND") {
+          await documentDispatchLifecycleService.markSuccess({
+            documentId: job.entityId,
+            integrationJobId: job.id,
+            providerKey: dispatchResult?.providerKey ?? "unknown-provider",
+            externalReference: dispatchResult?.externalReference ?? null,
+            responsePayload: dispatchResult?.responsePayload ?? null,
+          });
+        }
+
+        if (job.entityType === "BUSINESS_DOCUMENT" && job.jobType === "DOCUMENT_STATUS_SYNC") {
+          const nextStatus = dispatchResult?.responsePayload?.documentStatus;
+          await documentDispatchLifecycleService.markStatusSynced({
+            documentId: job.entityId,
+            externalSystemStatus: nextStatus === "FAILED"
+              ? "FAILED"
+              : nextStatus === "QUEUED"
+                ? "QUEUED"
+                : nextStatus === "NOT_SENT"
+                  ? "NOT_SENT"
+                  : "SENT",
+            externalReference: dispatchResult?.externalReference ?? undefined,
+          });
+        }
+
         success += 1;
       } catch (error) {
         const message = error instanceof Error ? error.message : "UNKNOWN_CONNECTOR_ERROR";
@@ -183,6 +212,16 @@ export class IntegrationService {
           maxAttempts: job.maxAttempts,
           retryDelayMinutes: 1,
         });
+
+        if (job.entityType === "BUSINESS_DOCUMENT" && job.jobType === "DOCUMENT_OUTBOUND") {
+          await documentDispatchLifecycleService.markFailure({
+            documentId: job.entityId,
+            integrationJobId: job.id,
+            providerKey: job.channel === "EDOCS_MOCK" ? "mock-edocs-provider" : "unknown-provider",
+            errorMessage: message,
+            responsePayload: null,
+          });
+        }
 
         if (next.status === "DEAD_LETTER") {
           deadLetter += 1;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Download, Maximize2, Minimize2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,13 +13,50 @@ import type {
   AdminInventoryListResult,
   AdminInventoryListPreferences,
   AdminInventoryOperationHistoryItem,
+  AdminInventoryQuickLookupResult,
   AdminInventoryReportsResult,
   AdminStockCountItem,
   AdminInventoryTransactionListResult,
   AdminWarehouseItem,
   BulkOperationResult,
-  InventoryListColumnPreference,
 } from "@/modules/inventory/contracts/inventory.contract";
+import {
+  alertTypeLabel,
+  formatCurrency,
+  getInventoryPageMeta,
+  getSectionPanelClass,
+  inventoryListPreferenceKey,
+  inventorySectionAnchors,
+  inventorySectionGroups,
+  normalizeInventoryListPreferences,
+  quickActionPreferenceKey,
+  quickActionSerialModePreferenceKey,
+} from "@/ui/admin/inventory-manager.shared";
+import type {
+  DrawerMode,
+  InventoryListColumn,
+  InventoryPageVariant,
+  InventorySectionGroupId,
+  InventorySectionId,
+  StockCountDrawerMode,
+  TransactionDrawerItem,
+  WarehouseDrawerMode,
+} from "@/ui/admin/inventory-manager.shared";
+import {
+  InventoryDrawerDistributionPanel,
+  InventoryDrawerMovementsPanel,
+  InventoryDrawerOperationPanel,
+  InventoryDrawerOverviewPanel,
+  InventoryCriticalPanel,
+  InventoryCountsPanel,
+  InventoryExportsPanel,
+  InventoryListResultsPanel,
+  InventoryQuickActionsPanel,
+  InventoryReportsPanel,
+  InventorySyncPanel,
+  InventoryTransactionsPanel,
+  InventoryWarehousesPanel,
+} from "@/ui/admin/inventory-manager-panels";
 
 type Labels = {
   title: string;
@@ -103,7 +140,36 @@ type Labels = {
   activeAlerts: string;
   reportsTitle: string;
   reportsDescription: string;
+  quickActionTitle: string;
+  quickActionDescription: string;
+  quickActionInputLabel: string;
+  quickActionInputPlaceholder: string;
+  quickActionOpen: string;
+  quickActionLookup: string;
+  quickActionSearching: string;
+  quickActionStartCamera: string;
+  quickActionStopCamera: string;
+  quickActionCameraReady: string;
+  quickActionCameraUnsupported: string;
+  quickActionCameraDenied: string;
+  quickActionNoMatch: string;
+  quickActionMatchBarcode: string;
+  quickActionMatchSku: string;
+  quickActionMatchName: string;
+  quickActionScannerHint: string;
+  quickActionRememberedMode: string;
+  quickActionAutoOpenHint: string;
+  quickActionFastModeTitle: string;
+  quickActionFastModeDescription: string;
+  quickActionQuantityLabel: string;
+  quickActionApplyNow: string;
+  quickActionApplySuccess: string;
+  quickActionApplyFailed: string;
+  quickActionTargetWarehouseLabel: string;
+  quickActionSerialMode: string;
+  quickActionSerialModeHint: string;
   sectionsTitle: string;
+  sectionQuickActions: string;
   sectionReports: string;
   sectionSync: string;
   sectionCritical: string;
@@ -141,14 +207,27 @@ type Labels = {
   lowStockReport: string;
   movementSummaryTitle: string;
   trendTitle: string;
+  category: string;
+  productType: string;
   reportPeriod: string;
   reportComparePrevious: string;
   reportCostingMethod: string;
+  reportCategoryFilter: string;
+  reportProductTypeFilter: string;
+  reportWarehouseFilter: string;
+  reportStockStatusFilter: string;
+  reportReservationFilter: string;
+  reportMovementTypeFilter: string;
+  reportFiltersTitle: string;
+  reportFiltersDescription: string;
+  reportClearFilters: string;
   reportPeriod7Days: string;
   reportPeriod30Days: string;
   reportPeriod90Days: string;
   reportCostAverage: string;
   reportCostLastPurchase: string;
+  reportOfficialCostingMethod: string;
+  reportComparisonCostingMode: string;
   reportCurrentPeriod: string;
   reportPreviousPeriod: string;
   reportDifference: string;
@@ -401,85 +480,6 @@ function stockCountStatusClass(status: AdminStockCountItem["status"]) {
   return "bg-neutral-100 text-neutral-700";
 }
 
-function alertTypeLabel(type: "LOW_STOCK" | "OUT_OF_STOCK", labels: Labels) {
-  return type === "OUT_OF_STOCK" ? labels.alertTypeOutOfStock : labels.alertTypeLowStock;
-}
-
-type DrawerMode = "view" | "edit" | "transfer" | "stock_in" | "stock_out";
-type WarehouseDrawerMode = "create" | "edit";
-type TransactionDrawerItem = AdminInventoryTransactionListResult["items"][number];
-type StockCountDrawerMode = "create" | "edit";
-type InventoryPageVariant = "overview" | "transactions" | "counts" | "warehouses" | "exports" | "external-events";
-type InventoryListColumn = InventoryListColumnPreference;
-
-const inventoryListPreferenceKey = "inventory-manager:list-preferences:v1";
-
-function getDefaultVisibleColumns(): Record<InventoryListColumn, boolean> {
-  return {
-    warehouse: true,
-    stock: true,
-    movement: true,
-    reservation: true,
-    preference: false,
-  };
-}
-
-function getDefaultInventoryListPreferences(): AdminInventoryListPreferences {
-  return {
-    compactInventoryList: false,
-    visibleColumns: getDefaultVisibleColumns(),
-  };
-}
-
-function normalizeInventoryListPreferences(
-  preferences?: Partial<AdminInventoryListPreferences> | null,
-): AdminInventoryListPreferences {
-  const fallback = getDefaultInventoryListPreferences();
-
-  if (!preferences) {
-    return fallback;
-  }
-
-  return {
-    compactInventoryList: Boolean(preferences.compactInventoryList),
-    visibleColumns: {
-      ...fallback.visibleColumns,
-      ...preferences.visibleColumns,
-    },
-  };
-}
-
-function loadInventoryListPreferences(): AdminInventoryListPreferences {
-  const fallback = getDefaultInventoryListPreferences();
-
-  if (typeof window === "undefined") {
-    return fallback;
-  }
-
-  const raw = window.localStorage.getItem(inventoryListPreferenceKey);
-  if (!raw) {
-    return fallback;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as {
-      compactInventoryList?: boolean;
-      visibleColumns?: Partial<Record<InventoryListColumn, boolean>>;
-    };
-
-    return {
-      compactInventoryList: Boolean(parsed.compactInventoryList),
-      visibleColumns: {
-        ...fallback.visibleColumns,
-        ...parsed.visibleColumns,
-      },
-    };
-  } catch {
-    window.localStorage.removeItem(inventoryListPreferenceKey);
-    return fallback;
-  }
-}
-
 type Props = {
   locale: Locale;
   result: AdminInventoryListResult;
@@ -514,7 +514,7 @@ type Props = {
     successCount: number;
     recentJobs: Array<{
       id: string;
-      channel: "TRENDYOL" | "N11";
+      channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
       status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
       entityId: string;
       createdAt: string;
@@ -541,6 +541,12 @@ type Props = {
     reportPeriodDays: string;
     reportComparePrevious: string;
     reportCostingMethod: string;
+    reportCategoryFilter: string;
+    reportProductTypeFilter: string;
+    reportWarehouseFilter: string;
+    reportStockStatusFilter: string;
+    reportReservationFilter: string;
+    reportMovementTypeFilter: string;
   };
   labels: Labels;
   overviewPath: string;
@@ -548,154 +554,11 @@ type Props = {
   transactionListPath: string;
   stockCountsPath: string;
   warehousesPath: string;
-  exportsPath: string;
   externalEventsPath: string;
   pageVariant?: InventoryPageVariant;
   initialSectionGroup?: InventorySectionGroupId;
   initialSection?: InventorySectionId;
 };
-
-function formatCurrency(value: number, locale: Locale) {
-  return new Intl.NumberFormat(locale === "tr" ? "tr-TR" : "tr-TR", {
-    style: "currency",
-    currency: "TRY",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatDelta(value: number | null) {
-  if (value === null) {
-    return "Kıyas kapalı";
-  }
-
-  if (value > 0) {
-    return `+${value}`;
-  }
-
-  return String(value);
-}
-
-const inventorySectionAnchors = [
-  { id: "inventory-reports", key: "sectionReports" as const },
-  { id: "inventory-sync", key: "sectionSync" as const },
-  { id: "inventory-critical", key: "sectionCritical" as const },
-  { id: "inventory-counts", key: "sectionCounts" as const },
-  { id: "inventory-warehouses", key: "sectionWarehouses" as const },
-  { id: "inventory-transactions", key: "sectionTransactions" as const },
-  { id: "inventory-exports", key: "sectionTransactions" as const },
-  { id: "inventory-list", key: "sectionInventoryList" as const },
-];
-
-const inventorySectionGroups = [
-  {
-    id: "overview",
-    label: "Genel Bakış",
-    sections: ["inventory-reports", "inventory-critical"] as const,
-  },
-  {
-    id: "operations",
-    label: "Operasyonlar",
-    sections: ["inventory-list", "inventory-counts", "inventory-sync"] as const,
-  },
-  {
-    id: "definitions",
-    label: "Tanımlar",
-    sections: ["inventory-warehouses"] as const,
-  },
-  {
-    id: "history",
-    label: "Geçmiş",
-    sections: ["inventory-transactions", "inventory-exports"] as const,
-  },
-] as const;
-
-type InventorySectionId = (typeof inventorySectionAnchors)[number]["id"];
-type InventorySectionGroupId = (typeof inventorySectionGroups)[number]["id"];
-
-function getSectionPanelClass(activeSection: InventorySectionId, sectionId: InventorySectionId) {
-  return activeSection === sectionId ? "border-b border-neutral-200 bg-white/90 p-5" : "hidden";
-}
-
-function EmptyStateCard({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50/80 p-5 text-sm">
-      <p className="font-semibold text-neutral-900">{title}</p>
-      <p className="mt-1 text-neutral-500">{description}</p>
-    </div>
-  );
-}
-
-function getInventoryPageMeta(pageVariant: InventoryPageVariant) {
-  if (pageVariant === "transactions") {
-    return {
-      badge: "Stok Hareketleri",
-      shortTitle: "Islemler",
-      breadcrumbCurrent: "Stok Islemleri",
-      accentClass: "from-sky-500/15 via-cyan-500/10 to-transparent",
-    };
-  }
-
-  if (pageVariant === "counts") {
-    return {
-      badge: "Sayim Operasyonu",
-      shortTitle: "Sayimlar",
-      breadcrumbCurrent: "Stok Sayimlari",
-      accentClass: "from-amber-500/15 via-orange-500/10 to-transparent",
-    };
-  }
-
-  if (pageVariant === "warehouses") {
-    return {
-      badge: "Depo Tanimlari",
-      shortTitle: "Depolar",
-      breadcrumbCurrent: "Depo Yonetimi",
-      accentClass: "from-emerald-500/15 via-teal-500/10 to-transparent",
-    };
-  }
-
-  if (pageVariant === "exports") {
-    return {
-      badge: "Dışa Aktarım Geçmişi",
-      shortTitle: "Dışa Aktarımlar",
-      breadcrumbCurrent: "Dışa Aktarım Geçmişi",
-      accentClass: "from-fuchsia-500/15 via-sky-500/10 to-transparent",
-    };
-  }
-
-  if (pageVariant === "external-events") {
-    return {
-      badge: "Harici Eventler",
-      shortTitle: "Harici Eventler",
-      breadcrumbCurrent: "Harici Stok Eventleri",
-      accentClass: "from-cyan-500/15 via-sky-500/10 to-transparent",
-    };
-  }
-
-  return {
-    badge: "Merkezi Gorunum",
-    shortTitle: "Genel Bakis",
-    breadcrumbCurrent: "Stok Genel Bakis",
-    accentClass: "from-violet-500/15 via-sky-500/10 to-transparent",
-  };
-}
-
-function formatFilterSummary(filters: AdminInventoryExportHistoryItem["filters"]) {
-  const parts = [
-    filters.search ? `Arama: ${filters.search}` : null,
-    filters.stockStatusFilter && filters.stockStatusFilter !== "all" ? `Stok durumu: ${filters.stockStatusFilter}` : null,
-    filters.reservationFilter && filters.reservationFilter !== "all" ? `Rezervasyon: ${filters.reservationFilter}` : null,
-    filters.warehouseFilter && filters.warehouseFilter !== "all" ? `Depo: ${filters.warehouseFilter}` : null,
-    filters.movementTypeFilter && filters.movementTypeFilter !== "all" ? `Hareket: ${filters.movementTypeFilter}` : null,
-  ].filter(Boolean);
-
-  return parts.length > 0 ? parts.join(" • ") : "Filtre kullanılmadan dışa aktarılmış.";
-}
 
 function formatSourceDocument(source: {
   type: string | null;
@@ -715,6 +578,10 @@ function formatSourceDocument(source: {
     RETURN: "Iade",
     INVOICE: "Fatura",
     WAYBILL: "Irsaliye",
+    PURCHASE_DOCUMENT: "Satin Alma Belgesi",
+    DELIVERY_NOTE: "Irsaliye",
+    E_INVOICE: "E-Fatura",
+    E_DISPATCH: "E-Irsaliye",
   };
 
   const typeLabel = source.type ? (typeLabelMap[source.type] ?? source.type) : "Belge";
@@ -724,11 +591,20 @@ function formatSourceDocument(source: {
 function formatSourceDocumentMeta(source: {
   date: string | null;
   externalReference: string | null;
+  externalSystemStatus: string | null;
   counterpartyName: string | null;
 }, locale: Locale, fallback: string) {
+  const externalStatusLabelMap: Record<string, string> = {
+    NOT_SENT: "Dis sisteme gonderilmedi",
+    QUEUED: "Dis sistem kuyrugunda",
+    SENT: "Dis sisteme gonderildi",
+    FAILED: "Dis sistem hatasi",
+  };
+
   const parts = [
     source.counterpartyName,
     source.externalReference ? `Harici ref: ${source.externalReference}` : null,
+    source.externalSystemStatus ? (externalStatusLabelMap[source.externalSystemStatus] ?? source.externalSystemStatus) : null,
     source.date ? formatDate(source.date, locale, fallback) : null,
   ].filter(Boolean);
 
@@ -759,6 +635,57 @@ function formatUnitType(value: string) {
   };
 
   return labelMap[value] ?? value;
+}
+
+type BarcodeDetectorLike = {
+  detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue?: string }>>;
+};
+
+type BarcodeDetectorConstructorLike = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
+
+function stopMediaStream(stream: MediaStream | null) {
+  if (!stream) {
+    return;
+  }
+
+  for (const track of stream.getTracks()) {
+    track.stop();
+  }
+}
+
+function isQuickActionCameraSupported() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const detector = (window as Window & {
+    BarcodeDetector?: BarcodeDetectorConstructorLike;
+  }).BarcodeDetector;
+
+  return Boolean(
+    detector
+    && navigator.mediaDevices
+    && typeof navigator.mediaDevices.getUserMedia === "function",
+  );
+}
+
+function subscribeQuickActionCameraSupport(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  window.addEventListener("focus", onStoreChange);
+  return () => {
+    window.removeEventListener("focus", onStoreChange);
+  };
+}
+
+function subscribeNoop() {
+  return () => {};
+}
+
+function getCurrentDateTimeLocalValue() {
+  return new Date().toISOString().slice(0, 16);
 }
 
 function formatTransactionType(
@@ -863,13 +790,17 @@ export function InventoryManager({
   transactionListPath,
   stockCountsPath,
   warehousesPath,
-  exportsPath,
   externalEventsPath,
   pageVariant = "overview",
   initialSectionGroup = "overview",
   initialSection = "inventory-reports",
 }: Props) {
   const router = useRouter();
+  const defaultDateTimeLocal = useSyncExternalStore(
+    subscribeNoop,
+    getCurrentDateTimeLocalValue,
+    () => "",
+  );
   const pageMeta = getInventoryPageMeta(pageVariant);
   const [activeSectionGroup, setActiveSectionGroup] = useState<InventorySectionGroupId>(initialSectionGroup);
   const [activeSection, setActiveSection] = useState<InventorySectionId>(initialSection);
@@ -888,12 +819,26 @@ export function InventoryManager({
   const [drawerMovementQuantity, setDrawerMovementQuantity] = useState("1");
   const [drawerPurchaseDocumentNumber, setDrawerPurchaseDocumentNumber] = useState("");
   const [drawerPurchaseSupplierName, setDrawerPurchaseSupplierName] = useState("");
-  const [drawerPurchaseDocumentDate, setDrawerPurchaseDocumentDate] = useState(new Date().toISOString().slice(0, 16));
+  const [drawerPurchaseDocumentDate, setDrawerPurchaseDocumentDate] = useState("");
+  const [drawerPurchaseDocumentType, setDrawerPurchaseDocumentType] = useState<"PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH">("PURCHASE_DOCUMENT");
   const [drawerPurchaseReference, setDrawerPurchaseReference] = useState("");
+  const [drawerPurchaseExternalStatus, setDrawerPurchaseExternalStatus] = useState<"NOT_SENT" | "QUEUED" | "SENT" | "FAILED">("NOT_SENT");
   const [drawerPurchaseUnitCost, setDrawerPurchaseUnitCost] = useState("");
   const [drawerTransferWarehouseCode, setDrawerTransferWarehouseCode] = useState("");
   const [drawerTransferQuantity, setDrawerTransferQuantity] = useState("1");
   const [drawerTransferNote, setDrawerTransferNote] = useState("");
+  const [quickActionQuery, setQuickActionQuery] = useState("");
+  const [quickActionMode, setQuickActionMode] = useState<DrawerMode>("view");
+  const [pendingQuickAction, setPendingQuickAction] = useState(false);
+  const [quickActionResult, setQuickActionResult] = useState<AdminInventoryQuickLookupResult | null>(null);
+  const [quickActionSerialModeEnabled, setQuickActionSerialModeEnabled] = useState(false);
+  const quickActionCameraSupported = useSyncExternalStore(
+    subscribeQuickActionCameraSupport,
+    isQuickActionCameraSupported,
+    () => false,
+  );
+  const [quickActionCameraActive, setQuickActionCameraActive] = useState(false);
+  const [quickActionCameraMessage, setQuickActionCameraMessage] = useState<string | null>(null);
   const [warehouseDrawerMode, setWarehouseDrawerMode] = useState<WarehouseDrawerMode | null>(null);
   const [warehouseDraft, setWarehouseDraft] = useState<AdminWarehouseItem | null>(null);
   const [warehouseCode, setWarehouseCode] = useState("");
@@ -910,8 +855,15 @@ export function InventoryManager({
   const [transactionDrawerItem, setTransactionDrawerItem] = useState<TransactionDrawerItem | null>(null);
   const [stockCountDrawerMode, setStockCountDrawerMode] = useState<StockCountDrawerMode | null>(null);
   const [stockCountDrawerItem, setStockCountDrawerItem] = useState<AdminStockCountItem | null>(null);
+  const [stockCountDrawerStep, setStockCountDrawerStep] = useState<"preparation" | "preview" | "result">("preparation");
+  const [stockCountApplyResult, setStockCountApplyResult] = useState<null | {
+    appliedLines: number;
+    varianceLines: number;
+    pendingLines: number;
+    appliedAt: string;
+  }>(null);
   const [stockCountWarehouseCode, setStockCountWarehouseCode] = useState("all");
-  const [stockCountDate, setStockCountDate] = useState(new Date().toISOString().slice(0, 16));
+  const [stockCountDate, setStockCountDate] = useState("");
   const [stockCountNote, setStockCountNote] = useState("");
   const [stockCountSearch, setStockCountSearch] = useState("");
   const [pendingStockCount, setPendingStockCount] = useState(false);
@@ -922,8 +874,13 @@ export function InventoryManager({
   const [bulkStockCountCsv, setBulkStockCountCsv] = useState("");
   const [bulkOperationPending, setBulkOperationPending] = useState<null | "adjust" | "warehouse" | "stock-count">(null);
   const [bulkOperationResult, setBulkOperationResult] = useState<BulkOperationResult | null>(null);
-  const [reportViewMode, setReportViewMode] = useState<"executive" | "analytics">("executive");
   const [bulkToolsExpanded, setBulkToolsExpanded] = useState(false);
+  const [activeBulkToolTab, setActiveBulkToolTab] = useState<"adjust" | "warehouse" | "history">("adjust");
+  const quickActionVideoRef = useRef<HTMLVideoElement | null>(null);
+  const quickActionInputRef = useRef<HTMLInputElement | null>(null);
+  const quickActionStreamRef = useRef<MediaStream | null>(null);
+  const quickActionScanFrameRef = useRef<number | null>(null);
+  const quickActionBarcodeDetectorRef = useRef<BarcodeDetectorLike | null>(null);
   const [bulkOperationHistory, setBulkOperationHistory] = useState<Array<{
     id: string;
     type: "adjust" | "warehouse" | "stock-count";
@@ -932,21 +889,58 @@ export function InventoryManager({
     successCount: number;
     failureCount: number;
   }>>([]);
-  const [inventoryListPreferences, setInventoryListPreferences] = useState<AdminInventoryListPreferences>(() => {
-    const serverPreferences = normalizeInventoryListPreferences(inventoryPreferences);
-
-    if (typeof window === "undefined") {
-      return serverPreferences;
-    }
-
-    const localPreferences = loadInventoryListPreferences();
-    const hasLocalCustomization = JSON.stringify(localPreferences) !== JSON.stringify(getDefaultInventoryListPreferences());
-
-    return hasLocalCustomization ? normalizeInventoryListPreferences(localPreferences) : serverPreferences;
-  });
+  const [inventoryListPreferences, setInventoryListPreferences] = useState<AdminInventoryListPreferences>(
+    () => normalizeInventoryListPreferences(inventoryPreferences),
+  );
   const inventoryPreferencesInitializedRef = useRef(false);
   const compactInventoryList = inventoryListPreferences.compactInventoryList;
   const visibleColumns = inventoryListPreferences.visibleColumns;
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const detector = (window as Window & {
+      BarcodeDetector?: BarcodeDetectorConstructorLike;
+    }).BarcodeDetector;
+
+    if (quickActionCameraSupported && detector && !quickActionBarcodeDetectorRef.current) {
+      quickActionBarcodeDetectorRef.current = new detector({
+        formats: ["ean_13", "ean_8", "code_128", "code_39", "upc_a", "upc_e", "qr_code"],
+      });
+    }
+  }, [quickActionCameraSupported]);
+
+  useEffect(() => (
+    () => {
+      if (quickActionScanFrameRef.current !== null) {
+        cancelAnimationFrame(quickActionScanFrameRef.current);
+      }
+
+      stopMediaStream(quickActionStreamRef.current);
+      quickActionStreamRef.current = null;
+    }
+  ), []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(quickActionPreferenceKey, quickActionMode);
+  }, [quickActionMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      quickActionSerialModePreferenceKey,
+      quickActionSerialModeEnabled ? "1" : "0",
+    );
+  }, [quickActionSerialModeEnabled]);
+
   const bulkFailureSummary = useMemo(() => {
     if (!bulkOperationResult) {
       return [];
@@ -1135,6 +1129,26 @@ export function InventoryManager({
       };
     }
 
+    if (pageVariant === "quick-actions") {
+      return {
+        title: labels.quickActionTitle,
+        description: "Barkod, SKU ve seri operatör akışıyla hızlı stok işlemlerini tek odaklı ekranda yönet.",
+        groups: ["overview"] as InventorySectionGroupId[],
+        sections: ["quick-actions"] as InventorySectionId[],
+        showSummaryCards: false,
+      };
+    }
+
+    if (pageVariant === "inventory-list") {
+      return {
+        title: "Ürün Stokları",
+        description: "Ürün bazlı stok dağılımını, filtreleri ve drawer işlemlerini odaklı bir listede yönet.",
+        groups: ["operations"] as InventorySectionGroupId[],
+        sections: ["inventory-list"] as InventorySectionId[],
+        showSummaryCards: false,
+      };
+    }
+
     if (pageVariant === "warehouses") {
       return {
         title: labels.warehousesTitle,
@@ -1148,7 +1162,7 @@ export function InventoryManager({
     if (pageVariant === "exports") {
       return {
         title: "Dışa Aktarım Geçmişi",
-        description: "Stok ekranından alınan CSV çıktılarının kim tarafından ve hangi filtrelerle üretildiğini izle.",
+        description: "Stok ekranından alınan dışa aktarımların kim tarafından ve hangi filtrelerle üretildiğini izle.",
         groups: ["history"] as InventorySectionGroupId[],
         sections: ["inventory-exports"] as InventorySectionId[],
         showSummaryCards: false,
@@ -1157,8 +1171,8 @@ export function InventoryManager({
 
     if (pageVariant === "external-events") {
       return {
-        title: "Harici Stok Eventleri",
-        description: "Entegrasyonlardan gelen stok eventlerinin uygulama ve hata akışını izle.",
+        title: "Harici Stok Olayları",
+        description: "Entegrasyonlardan gelen stok olaylarının uygulama, eşleme ve hata akışını izle.",
         groups: ["operations"] as InventorySectionGroupId[],
         sections: ["inventory-sync"] as InventorySectionId[],
         showSummaryCards: false,
@@ -1166,15 +1180,17 @@ export function InventoryManager({
     }
 
     return {
-      title: labels.inventoryList,
-      description: labels.inventorySummary,
-      groups: ["overview", "operations"] as InventorySectionGroupId[],
-      sections: ["inventory-reports", "inventory-critical", "inventory-list", "inventory-sync"] as InventorySectionId[],
+      title: "Genel Bakış",
+      description: "Stok operasyonlarını tek ekranda toplamak yerine, özet durumu izle ve doğru çalışma alanına geç.",
+      groups: ["overview"] as InventorySectionGroupId[],
+      sections: [
+        "inventory-reports",
+        "inventory-critical",
+      ] as InventorySectionId[],
       showSummaryCards: true,
     };
   }, [
-    labels.inventoryList,
-    labels.inventorySummary,
+    labels.quickActionTitle,
     labels.stockCountDescription,
     labels.stockCountTitle,
     labels.transactionsDescription,
@@ -1201,17 +1217,242 @@ export function InventoryManager({
     [pageConfig.sections],
   );
 
-  const topNavigationItems = useMemo(
-    () => [
-      { href: overviewPath, label: "Genel Bakis", isActive: pageVariant === "overview" },
-      { href: transactionListPath, label: "Islemler", isActive: pageVariant === "transactions" },
-      { href: stockCountsPath, label: "Sayimlar", isActive: pageVariant === "counts" },
-      { href: warehousesPath, label: "Depolar", isActive: pageVariant === "warehouses" },
-      { href: exportsPath, label: "Dışa Aktarımlar", isActive: pageVariant === "exports" },
-      { href: externalEventsPath, label: "Harici Eventler", isActive: pageVariant === "external-events" },
-    ],
-    [exportsPath, externalEventsPath, overviewPath, pageVariant, stockCountsPath, transactionListPath, warehousesPath],
+  const visibleActiveSections = useMemo(
+    () => inventorySectionAnchors
+      .filter((section) => visibleSectionIds.has(section.id) && (activeGroupSections as readonly string[]).includes(section.id)),
+    [activeGroupSections, visibleSectionIds],
   );
+
+  const heroStatCards = useMemo(() => {
+    if (pageVariant === "overview") {
+      return [
+        {
+          label: "Aktif Depo",
+          value: String(warehouses.filter((warehouse) => warehouse.isActive).length),
+          cardClassName: "border-neutral-200 bg-white/85",
+          valueClassName: "text-neutral-950",
+        },
+        {
+          label: "Açık Sayım",
+          value: String(stockCounts.filter((count) => count.status !== "APPLIED").length),
+          cardClassName: "border-sky-200 bg-sky-50/80",
+          valueClassName: "text-sky-700",
+        },
+        {
+          label: "Bekleyen Entegrasyon",
+          value: String(integrationSummary.pendingCount),
+          cardClassName: "border-amber-200 bg-amber-50/80",
+          valueClassName: "text-amber-700",
+        },
+      ];
+    }
+
+    if (pageVariant === "quick-actions") {
+      return [
+        {
+          label: "Okuyucu Hazırlığı",
+          value: quickActionCameraSupported ? "Hazır" : "Sınırlı",
+          cardClassName: quickActionCameraSupported ? "border-emerald-200 bg-emerald-50/80" : "border-amber-200 bg-amber-50/80",
+          valueClassName: quickActionCameraSupported ? "text-emerald-700" : "text-amber-700",
+        },
+        {
+          label: "Seri Operatör",
+          value: quickActionSerialModeEnabled ? "Açık" : "Kapalı",
+          cardClassName: quickActionSerialModeEnabled ? "border-sky-200 bg-sky-50/80" : "border-neutral-200 bg-white/85",
+          valueClassName: quickActionSerialModeEnabled ? "text-sky-700" : "text-neutral-950",
+        },
+        {
+          label: "Son Eşleşme",
+          value: quickActionResult?.item?.sku ?? "Henüz yok",
+          cardClassName: quickActionResult?.item ? "border-neutral-200 bg-white/85" : "border-neutral-200 bg-neutral-50/80",
+          valueClassName: quickActionResult?.item ? "text-neutral-950" : "text-neutral-500",
+        },
+      ];
+    }
+
+    if (pageVariant === "inventory-list") {
+      return [
+        {
+          label: "Toplam Kayıt",
+          value: String(result.total),
+          cardClassName: "border-neutral-200 bg-white/85",
+          valueClassName: "text-neutral-950",
+        },
+        {
+          label: "Kritik Stok",
+          value: String(result.summary.lowStockCount + result.summary.outOfStockCount),
+          cardClassName: "border-amber-200 bg-amber-50/80",
+          valueClassName: "text-amber-700",
+        },
+        {
+          label: "Rezervasyonlu Satır",
+          value: String(result.summary.rowsWithReservations),
+          cardClassName: "border-cyan-200 bg-cyan-50/80",
+          valueClassName: "text-cyan-700",
+        },
+      ];
+    }
+
+    if (pageVariant === "transactions") {
+      const documentLinkedCount = transactionResult.items.filter((item) => item.sourceDocument.id || item.sourceDocument.number).length;
+      const transferCount = transactionResult.items.filter((item) => item.type === "TRANSFER").length;
+      return [
+        {
+          label: "Toplam İşlem",
+          value: String(transactionResult.total),
+          cardClassName: "border-neutral-200 bg-white/85",
+          valueClassName: "text-neutral-950",
+        },
+        {
+          label: "Belge Bağlantılı",
+          value: String(documentLinkedCount),
+          cardClassName: "border-indigo-200 bg-indigo-50/80",
+          valueClassName: "text-indigo-700",
+        },
+        {
+          label: "Transfer İşlemi",
+          value: String(transferCount),
+          cardClassName: "border-amber-200 bg-amber-50/80",
+          valueClassName: "text-amber-700",
+        },
+      ];
+    }
+
+    if (pageVariant === "counts") {
+      return [
+        {
+          label: "Toplam Sayım",
+          value: String(stockCounts.length),
+          cardClassName: "border-neutral-200 bg-white/85",
+          valueClassName: "text-neutral-950",
+        },
+        {
+          label: "Açık Sayım",
+          value: String(stockCounts.filter((count) => count.status !== "APPLIED").length),
+          cardClassName: "border-sky-200 bg-sky-50/80",
+          valueClassName: "text-sky-700",
+        },
+        {
+          label: "Varyanslı Sayım",
+          value: String(stockCounts.filter((count) => count.varianceLineCount > 0).length),
+          cardClassName: "border-amber-200 bg-amber-50/80",
+          valueClassName: "text-amber-700",
+        },
+      ];
+    }
+
+    if (pageVariant === "warehouses") {
+      return [
+        {
+          label: "Aktif Depo",
+          value: String(warehouses.filter((warehouse) => warehouse.isActive).length),
+          cardClassName: "border-neutral-200 bg-white/85",
+          valueClassName: "text-neutral-950",
+        },
+        {
+          label: "Varsayılan Depo",
+          value: warehouses.find((warehouse) => warehouse.isDefault)?.code ?? labels.notSpecified,
+          cardClassName: "border-teal-200 bg-teal-50/80",
+          valueClassName: "text-teal-700",
+        },
+        {
+          label: "Toplam Depo",
+          value: String(warehouses.length),
+          cardClassName: "border-sky-200 bg-sky-50/80",
+          valueClassName: "text-sky-700",
+        },
+      ];
+    }
+
+    if (pageVariant === "exports") {
+      return [
+        {
+          label: "Dışa Aktarım",
+          value: String(exportHistory.length),
+          cardClassName: "border-neutral-200 bg-white/85",
+          valueClassName: "text-neutral-950",
+        },
+        {
+          label: "Son Oluşturan",
+          value: exportHistory[0]?.actorLabel ?? labels.notSpecified,
+          cardClassName: "border-emerald-200 bg-emerald-50/80",
+          valueClassName: "text-emerald-700",
+        },
+        {
+          label: "Filtreli Kayıt",
+          value: String(exportHistory.filter((item) => item.hasFilters).length),
+          cardClassName: "border-amber-200 bg-amber-50/80",
+          valueClassName: "text-amber-700",
+        },
+      ];
+    }
+
+    if (pageVariant === "external-events") {
+      return [
+        {
+          label: "Hatalı Olay",
+          value: String(externalEventMonitoring.failedCount),
+          cardClassName: "border-rose-200 bg-rose-50/80",
+          valueClassName: "text-rose-700",
+        },
+        {
+          label: "Çözülmemiş",
+          value: String(externalEventMonitoring.unresolvedCount),
+          cardClassName: "border-amber-200 bg-amber-50/80",
+          valueClassName: "text-amber-700",
+        },
+        {
+          label: "Bekleyen İş",
+          value: String(integrationSummary.pendingCount),
+          cardClassName: "border-neutral-200 bg-white/85",
+          valueClassName: "text-neutral-950",
+        },
+      ];
+    }
+
+    return [
+      {
+        label: labels.totalProducts,
+        value: String(result.summary.totalProducts),
+        cardClassName: "border-neutral-200 bg-white/85",
+        valueClassName: "text-neutral-950",
+      },
+      {
+        label: labels.lowStockCount,
+        value: String(result.summary.lowStockCount),
+        cardClassName: "border-amber-200 bg-amber-50/80",
+        valueClassName: "text-amber-700",
+      },
+      {
+        label: labels.outOfStockCount,
+        value: String(result.summary.outOfStockCount),
+        cardClassName: "border-rose-200 bg-rose-50/80",
+        valueClassName: "text-rose-700",
+      },
+    ];
+  }, [
+    labels.lowStockCount,
+    labels.notSpecified,
+    labels.outOfStockCount,
+    labels.totalProducts,
+    exportHistory,
+    externalEventMonitoring.failedCount,
+    externalEventMonitoring.unresolvedCount,
+    integrationSummary.pendingCount,
+    pageVariant,
+    quickActionCameraSupported,
+    quickActionResult,
+    quickActionSerialModeEnabled,
+    result.total,
+    result.summary.rowsWithReservations,
+    result.summary.lowStockCount,
+    result.summary.outOfStockCount,
+    result.summary.totalProducts,
+    stockCounts,
+    transactionResult.items,
+    transactionResult.total,
+    warehouses,
+  ]);
 
   function createOverviewParams() {
     const params = new URLSearchParams();
@@ -1260,11 +1501,23 @@ export function InventoryManager({
     reportPeriodDays?: string;
     reportComparePrevious?: string;
     reportCostingMethod?: string;
+    reportCategoryFilter?: string;
+    reportProductTypeFilter?: string;
+    reportWarehouseFilter?: string;
+    reportStockStatusFilter?: string;
+    reportReservationFilter?: string;
+    reportMovementTypeFilter?: string;
   }) {
     const params = createOverviewParams();
     const periodDays = overrides?.reportPeriodDays ?? query.reportPeriodDays;
     const comparePrevious = overrides?.reportComparePrevious ?? query.reportComparePrevious;
     const costingMethod = overrides?.reportCostingMethod ?? query.reportCostingMethod;
+    const categoryFilter = overrides?.reportCategoryFilter ?? query.reportCategoryFilter;
+    const productTypeFilter = overrides?.reportProductTypeFilter ?? query.reportProductTypeFilter;
+    const warehouseFilter = overrides?.reportWarehouseFilter ?? query.reportWarehouseFilter;
+    const stockStatusFilter = overrides?.reportStockStatusFilter ?? query.reportStockStatusFilter;
+    const reservationFilter = overrides?.reportReservationFilter ?? query.reportReservationFilter;
+    const movementTypeFilter = overrides?.reportMovementTypeFilter ?? query.reportMovementTypeFilter;
 
     if (periodDays && periodDays !== "30") {
       params.set("reportPeriodDays", periodDays);
@@ -1274,6 +1527,24 @@ export function InventoryManager({
     }
     if (costingMethod && costingMethod !== "AVERAGE_COST") {
       params.set("reportCostingMethod", costingMethod);
+    }
+    if (categoryFilter && categoryFilter !== "all") {
+      params.set("reportCategoryFilter", categoryFilter);
+    }
+    if (productTypeFilter && productTypeFilter !== "all") {
+      params.set("reportProductTypeFilter", productTypeFilter);
+    }
+    if (warehouseFilter && warehouseFilter !== "all") {
+      params.set("reportWarehouseFilter", warehouseFilter);
+    }
+    if (stockStatusFilter && stockStatusFilter !== "all") {
+      params.set("reportStockStatusFilter", stockStatusFilter);
+    }
+    if (reservationFilter && reservationFilter !== "all") {
+      params.set("reportReservationFilter", reservationFilter);
+    }
+    if (movementTypeFilter && movementTypeFilter !== "all") {
+      params.set("reportMovementTypeFilter", movementTypeFilter);
     }
 
     const qs = params.toString();
@@ -1290,6 +1561,24 @@ export function InventoryManager({
     }
     if (query.reportCostingMethod && query.reportCostingMethod !== "AVERAGE_COST") {
       params.set("reportCostingMethod", query.reportCostingMethod);
+    }
+    if (query.reportCategoryFilter && query.reportCategoryFilter !== "all") {
+      params.set("reportCategoryFilter", query.reportCategoryFilter);
+    }
+    if (query.reportProductTypeFilter && query.reportProductTypeFilter !== "all") {
+      params.set("reportProductTypeFilter", query.reportProductTypeFilter);
+    }
+    if (query.reportWarehouseFilter && query.reportWarehouseFilter !== "all") {
+      params.set("reportWarehouseFilter", query.reportWarehouseFilter);
+    }
+    if (query.reportStockStatusFilter && query.reportStockStatusFilter !== "all") {
+      params.set("reportStockStatusFilter", query.reportStockStatusFilter);
+    }
+    if (query.reportReservationFilter && query.reportReservationFilter !== "all") {
+      params.set("reportReservationFilter", query.reportReservationFilter);
+    }
+    if (query.reportMovementTypeFilter && query.reportMovementTypeFilter !== "all") {
+      params.set("reportMovementTypeFilter", query.reportMovementTypeFilter);
     }
     if (page > 1) {
       params.set("page", String(page));
@@ -1362,23 +1651,6 @@ export function InventoryManager({
     router.push(params.toString() ? `${inventoryListPath}?${params.toString()}` : inventoryListPath);
   }
 
-  function goToTransactionsWithFilters(filters: {
-    sku?: string;
-    warehouseCode?: string;
-  }) {
-    const params = new URLSearchParams();
-
-    if (filters.sku) {
-      params.set("transactionSku", filters.sku);
-    }
-
-    if (filters.warehouseCode) {
-      params.set("transactionWarehouse", filters.warehouseCode);
-    }
-
-    router.push(params.toString() ? `${transactionListPath}?${params.toString()}` : transactionListPath);
-  }
-
   const prevPage = result.page > 1 ? result.page - 1 : null;
   const nextPage = result.page < result.totalPages ? result.page + 1 : null;
 
@@ -1401,8 +1673,10 @@ export function InventoryManager({
     setDrawerMovementQuantity("1");
     setDrawerPurchaseDocumentNumber("");
     setDrawerPurchaseSupplierName("");
-    setDrawerPurchaseDocumentDate(new Date().toISOString().slice(0, 16));
+    setDrawerPurchaseDocumentDate("");
+    setDrawerPurchaseDocumentType("PURCHASE_DOCUMENT");
     setDrawerPurchaseReference("");
+    setDrawerPurchaseExternalStatus("NOT_SENT");
     setDrawerPurchaseUnitCost(item.purchasePrice !== null ? String(item.purchasePrice) : "");
     setDrawerTransferWarehouseCode("");
     setDrawerTransferQuantity("1");
@@ -1429,12 +1703,144 @@ export function InventoryManager({
     setDrawerMovementQuantity("1");
     setDrawerPurchaseDocumentNumber("");
     setDrawerPurchaseSupplierName("");
-    setDrawerPurchaseDocumentDate(new Date().toISOString().slice(0, 16));
+    setDrawerPurchaseDocumentDate("");
+    setDrawerPurchaseDocumentType("PURCHASE_DOCUMENT");
     setDrawerPurchaseReference("");
+    setDrawerPurchaseExternalStatus("NOT_SENT");
     setDrawerPurchaseUnitCost("");
     setDrawerTransferWarehouseCode("");
     setDrawerTransferQuantity("1");
     setDrawerTransferNote("");
+  }
+
+  async function submitQuickActionLookup(overrideQuery?: string) {
+    const normalizedQuery = (overrideQuery ?? quickActionQuery).trim();
+    if (!normalizedQuery) {
+      setFeedback({ type: "error", message: labels.quickActionNoMatch });
+      setQuickActionResult(null);
+      return;
+    }
+
+    setPendingQuickAction(true);
+    setFeedback(null);
+
+    try {
+      const response = await fetch(`/api/admin/inventory/quick-lookup?query=${encodeURIComponent(normalizedQuery)}`, {
+        method: "GET",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setFeedback({ type: "error", message: payload?.message ?? labels.quickActionNoMatch });
+        setQuickActionResult(null);
+        return;
+      }
+
+      const payload = await response.json() as AdminInventoryQuickLookupResult;
+      setQuickActionResult(payload);
+      if (!payload.item) {
+        setFeedback({ type: "error", message: labels.quickActionNoMatch });
+        return;
+      }
+
+      openDrawer(payload.item, quickActionMode, performance.now());
+      setFeedback({
+        type: "success",
+        message: `${labels.quickActionOpen}: ${payload.item.name}`,
+      });
+    } catch {
+      setFeedback({ type: "error", message: labels.quickActionNoMatch });
+      setQuickActionResult(null);
+    } finally {
+      setPendingQuickAction(false);
+    }
+  }
+
+  function stopQuickActionCamera() {
+    if (quickActionScanFrameRef.current !== null) {
+      cancelAnimationFrame(quickActionScanFrameRef.current);
+      quickActionScanFrameRef.current = null;
+    }
+
+    stopMediaStream(quickActionStreamRef.current);
+    quickActionStreamRef.current = null;
+
+    if (quickActionVideoRef.current) {
+      quickActionVideoRef.current.srcObject = null;
+    }
+
+    setQuickActionCameraActive(false);
+  }
+
+  function updateQuickActionMode(mode: DrawerMode) {
+    setQuickActionMode(mode);
+  }
+
+  async function startQuickActionCamera() {
+    if (!quickActionCameraSupported) {
+      setQuickActionCameraMessage(labels.quickActionCameraUnsupported);
+      return;
+    }
+
+    try {
+      setQuickActionCameraMessage(labels.quickActionCameraReady);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: {
+            ideal: "environment",
+          },
+        },
+        audio: false,
+      });
+
+      quickActionStreamRef.current = stream;
+      setQuickActionCameraActive(true);
+
+      if (quickActionVideoRef.current) {
+        quickActionVideoRef.current.srcObject = stream;
+        await quickActionVideoRef.current.play();
+      }
+
+      const scanFrame = async () => {
+        const video = quickActionVideoRef.current;
+        const detector = quickActionBarcodeDetectorRef.current;
+
+        if (!video || !detector || video.readyState < 2) {
+          quickActionScanFrameRef.current = requestAnimationFrame(() => {
+            void scanFrame();
+          });
+          return;
+        }
+
+        try {
+          const detections = await detector.detect(video);
+          const firstValue = detections.find((item) => item.rawValue?.trim())?.rawValue?.trim();
+
+      if (firstValue) {
+            setQuickActionQuery(firstValue);
+            setQuickActionCameraMessage(`${labels.quickActionCameraReady}: ${firstValue}`);
+            stopQuickActionCamera();
+            void submitQuickActionLookup(firstValue);
+            return;
+          }
+        } catch {
+          setQuickActionCameraMessage(labels.quickActionCameraUnsupported);
+          stopQuickActionCamera();
+          return;
+        }
+
+        quickActionScanFrameRef.current = requestAnimationFrame(() => {
+          void scanFrame();
+        });
+      };
+
+      quickActionScanFrameRef.current = requestAnimationFrame(() => {
+        void scanFrame();
+      });
+    } catch {
+      setQuickActionCameraMessage(labels.quickActionCameraDenied);
+      stopQuickActionCamera();
+    }
   }
 
   function updateDrawerDateRange(value: string, timestamp: number) {
@@ -1487,6 +1893,8 @@ export function InventoryManager({
   function openStockCountDrawer(mode: StockCountDrawerMode, item?: AdminStockCountItem) {
     setStockCountDrawerMode(mode);
     setStockCountDrawerItem(item ?? null);
+    setStockCountDrawerStep(mode === "create" ? "preparation" : "preview");
+    setStockCountApplyResult(null);
     setStockCountWarehouseCode(item?.warehouseCode ?? "all");
     setStockCountDate((item?.countedAt ?? new Date().toISOString()).slice(0, 16));
     setStockCountNote(item?.note ?? "");
@@ -1509,8 +1917,10 @@ export function InventoryManager({
 
     setStockCountDrawerMode(null);
     setStockCountDrawerItem(null);
+    setStockCountDrawerStep("preparation");
+    setStockCountApplyResult(null);
     setStockCountWarehouseCode("all");
-    setStockCountDate(new Date().toISOString().slice(0, 16));
+    setStockCountDate("");
     setStockCountNote("");
     setStockCountSearch("");
     setStockCountDrafts({});
@@ -1546,6 +1956,17 @@ export function InventoryManager({
 
     router.push(`${transactionListPath}?${params.toString()}`);
     closeDrawer();
+  }
+
+  function startStockCountFromDrawer() {
+    if (!drawerItem) {
+      return;
+    }
+
+    openStockCountDrawer("create");
+    setStockCountWarehouseCode(drawerItem.warehouseCode ?? "all");
+    setStockCountSearch(drawerItem.sku);
+    setStockCountNote(`${drawerItem.name} için ürün kartından başlatıldı.`);
   }
 
   async function exportVisibleRowsCsv() {
@@ -1778,10 +2199,12 @@ export function InventoryManager({
           note: drawerNote.trim() || (mode === "stock_in" ? "Inventory manager stock in" : "Inventory manager stock out"),
           ...(mode === "stock_in" && drawerPurchaseDocumentNumber.trim()
             ? {
+                documentType: drawerPurchaseDocumentType,
                 sourceDocumentNumber: drawerPurchaseDocumentNumber.trim(),
                 sourceDocumentSupplier: drawerPurchaseSupplierName.trim() || undefined,
                 sourceDocumentDate: drawerPurchaseDocumentDate ? new Date(drawerPurchaseDocumentDate).toISOString() : undefined,
                 sourceDocumentReference: drawerPurchaseReference.trim() || undefined,
+                externalSystemStatus: drawerPurchaseExternalStatus,
                 unitCost: drawerPurchaseUnitCost.trim() ? Number(drawerPurchaseUnitCost) : null,
               }
             : {}),
@@ -1952,7 +2375,13 @@ export function InventoryManager({
 
       setPendingStockCount(false);
       setFeedback({ type: "success", message: labels.stockCountApplied });
-      closeStockCountDrawer();
+      setStockCountApplyResult({
+        appliedLines: stockCountDrawerItem.lineCount,
+        varianceLines: stockCountDrawerItem.varianceLineCount,
+        pendingLines: stockCountSummary.pending,
+        appliedAt: new Date().toISOString(),
+      });
+      setStockCountDrawerStep("result");
       router.refresh();
     } catch {
       setFeedback({ type: "error", message: labels.stockCountApplyFailed });
@@ -2063,56 +2492,22 @@ export function InventoryManager({
       <div className={`border-b border-neutral-200 bg-[radial-gradient(circle_at_top_right,_rgba(14,116,144,0.15),_transparent_55%),radial-gradient(circle_at_left,_rgba(245,158,11,0.10),_transparent_45%),linear-gradient(135deg,white,rgba(250,250,250,0.92))] p-6`}>
         <div className={`rounded-3xl border border-neutral-200 bg-gradient-to-r ${pageMeta.accentClass} p-5`}>
           <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-              <Link href={overviewPath} className="font-medium text-neutral-600 transition hover:text-neutral-950">
-                Stok Yonetimi
-              </Link>
-              <span>/</span>
-              <span className="font-semibold text-neutral-900">{pageMeta.breadcrumbCurrent}</span>
-            </div>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <span className="inline-flex rounded-full border border-neutral-200 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-600">
-                  {pageMeta.badge}
-                </span>
-                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.title}</p>
+              <div className="max-w-3xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.title}</p>
                 <h2 className="mt-2 text-3xl font-semibold tracking-tight text-neutral-950">{pageConfig.title}</h2>
                 <p className="mt-2 max-w-3xl text-sm text-neutral-600">{pageConfig.description}</p>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                <article className="rounded-2xl border border-neutral-200 bg-white/80 px-4 py-3 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Sayfa</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{pageMeta.shortTitle}</p>
-                </article>
-                <article className="rounded-2xl border border-neutral-200 bg-white/80 px-4 py-3 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.totalProducts}</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{result.summary.totalProducts}</p>
-                </article>
-                <article className="rounded-2xl border border-neutral-200 bg-white/80 px-4 py-3 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.lowStockCount}</p>
-                  <p className="mt-1 text-sm font-semibold text-amber-700">{result.summary.lowStockCount}</p>
-                </article>
-                <article className="rounded-2xl border border-neutral-200 bg-white/80 px-4 py-3 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.outOfStockCount}</p>
-                  <p className="mt-1 text-sm font-semibold text-rose-700">{result.summary.outOfStockCount}</p>
-                </article>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {topNavigationItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={item.isActive ? "page" : undefined}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                    item.isActive
-                      ? "bg-neutral-950 text-white shadow-sm"
-                      : "border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {heroStatCards.length > 0 ? (
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {heroStatCards.map((card) => (
+                    <article key={card.label} className={`rounded-2xl border px-4 py-3 shadow-sm ${card.cardClassName}`}>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{card.label}</p>
+                      <p className={`mt-1 text-sm font-semibold ${card.valueClassName}`}>{card.value}</p>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -2147,73 +2542,119 @@ export function InventoryManager({
         </div>
       ) : null}
 
-      {!pageConfig.showSummaryCards ? (
-        <div className="border-b border-neutral-200 bg-neutral-50/70 p-5">
-          <div className="grid gap-3 md:grid-cols-3">
-            <article className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
-                {pageVariant === "transactions" ? "Toplam işlem" : pageVariant === "counts" ? "Açık sayım" : "Aktif depo"}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-neutral-950">
-                {pageVariant === "transactions"
-                  ? transactionResult.total
-                  : pageVariant === "counts"
-                    ? stockCounts.filter((count) => count.status !== "APPLIED").length
-                    : warehouses.filter((warehouse) => warehouse.isActive).length}
-              </p>
-            </article>
-            <article className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
-                {pageVariant === "transactions" ? "Belge bağlantılı işlem" : pageVariant === "counts" ? "Varyanslı fiş" : "Varsayılan depo"}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-neutral-950">
-                {pageVariant === "transactions"
-                  ? transactionResult.items.filter((item) => item.sourceDocument.id || item.sourceDocument.number).length
-                  : pageVariant === "counts"
-                    ? stockCounts.filter((count) => count.varianceLineCount > 0).length
-                    : warehouses.find((warehouse) => warehouse.isDefault)?.name ?? labels.notSpecified}
-              </p>
-            </article>
-            <article className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Odak</p>
-              <p className="mt-1 text-sm font-semibold text-neutral-950">
-                {pageVariant === "transactions"
-                  ? "Belge ve hareket geçmişini incele"
-                  : pageVariant === "counts"
-                    ? "Sayım farklarını uygulama öncesi doğrula"
-                    : "Depo tanımlarını ve önceliklerini yönet"}
-              </p>
-            </article>
+      {pageVariant === "overview" ? (
+        <div className="border-b border-neutral-200 bg-[linear-gradient(180deg,rgba(250,250,250,0.95),rgba(255,255,255,1))] p-5">
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-4">
+              <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Operasyon Merkezleri</p>
+                  <h3 className="text-lg font-semibold text-neutral-950">İşine göre doğru çalışma alanını aç</h3>
+                  <p className="text-sm text-neutral-600">Genel bakış sadece yönetsel özet ve doğru operasyon ekranına geçiş için kullanılır. Aşağıdaki alanlardan doğrudan ilgili çalışma sayfasını aç.</p>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <Link href={`${overviewPath}/quick-actions`} className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 transition hover:bg-emerald-100/80">
+                    <p className="text-sm font-semibold text-neutral-950">Hızlı Barkod İşlemleri</p>
+                    <p className="mt-1 text-sm text-neutral-600">Stok girişi, çıkışı, transfer ve seri operatör akışı.</p>
+                  </Link>
+                  <Link href={`${overviewPath}/products`} className="rounded-2xl border border-sky-200 bg-sky-50/80 p-4 transition hover:bg-sky-100/80">
+                    <p className="text-sm font-semibold text-neutral-950">Ürün Stokları</p>
+                    <p className="mt-1 text-sm text-neutral-600">Filtrele, karşılaştır ve ürün kartını drawer ile yönet.</p>
+                  </Link>
+                  <Link href={transactionListPath} className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 transition hover:bg-indigo-100/80">
+                    <p className="text-sm font-semibold text-neutral-950">İşlemler</p>
+                    <p className="mt-1 text-sm text-neutral-600">Hareket geçmişi, belge bağlantıları ve işlem detayları.</p>
+                  </Link>
+                  <Link href={stockCountsPath} className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 transition hover:bg-amber-100/80">
+                    <p className="text-sm font-semibold text-neutral-950">Sayımlar</p>
+                    <p className="mt-1 text-sm text-neutral-600">Açık sayımları takip et, farkları uygula.</p>
+                  </Link>
+                  <Link href={warehousesPath} className="rounded-2xl border border-teal-200 bg-teal-50/80 p-4 transition hover:bg-teal-100/80">
+                    <p className="text-sm font-semibold text-neutral-950">Depolar</p>
+                    <p className="mt-1 text-sm text-neutral-600">Depo tanımları, öncelik ve varsayılan depo ayarları.</p>
+                  </Link>
+                  <Link href={externalEventsPath} className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50/80 p-4 transition hover:bg-fuchsia-100/80">
+                    <p className="text-sm font-semibold text-neutral-950">Harici Stok Olayları</p>
+                    <p className="mt-1 text-sm text-neutral-600">Entegrasyon olay akışı, eşleme durumu ve hatalı kayıtları izle.</p>
+                  </Link>
+                </div>
+              </section>
+
+              <section className="rounded-3xl border border-neutral-200 bg-[linear-gradient(180deg,rgba(250,250,250,0.92),rgba(255,255,255,1))] p-5 shadow-sm">
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Hızlı Başlat</p>
+                  <h3 className="text-lg font-semibold text-neutral-950">En sık yapılan işleri doğrudan başlat</h3>
+                  <p className="text-sm text-neutral-600">Operasyon ekranlarını aramadan en yaygın aksiyonlara tek tıkla geç.</p>
+                </div>
+                <div className="mt-4 grid gap-3">
+                  <Link href={`${overviewPath}/quick-actions`} className="rounded-2xl border border-neutral-200 bg-white p-4 transition hover:bg-neutral-50">
+                    <p className="text-sm font-semibold text-neutral-950">Barkod ile hızlı işlem</p>
+                    <p className="mt-1 text-sm text-neutral-600">Mobilden veya masaüstünden ürünü bulup hızlı stok hareketi başlat.</p>
+                  </Link>
+                  <Link href={stockCountsPath} className="rounded-2xl border border-neutral-200 bg-white p-4 transition hover:bg-neutral-50">
+                    <p className="text-sm font-semibold text-neutral-950">Yeni sayım başlat</p>
+                    <p className="mt-1 text-sm text-neutral-600">Açık sayımları takip et veya yeni bir depo sayımı oluştur.</p>
+                  </Link>
+                  <Link href={transactionListPath} className="rounded-2xl border border-neutral-200 bg-white p-4 transition hover:bg-neutral-50">
+                    <p className="text-sm font-semibold text-neutral-950">İşlem geçmişini incele</p>
+                    <p className="mt-1 text-sm text-neutral-600">Belge bağlantılı hareketleri ve stok akışını doğrula.</p>
+                  </Link>
+                </div>
+                <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Yönetim Özeti</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <p className="text-[11px] font-medium text-neutral-500">Toplam aktif depo</p>
+                      <p className="mt-1 text-sm font-semibold text-neutral-950">{warehouses.filter((warehouse) => warehouse.isActive).length}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-neutral-500">Açık sayım</p>
+                      <p className="mt-1 text-sm font-semibold text-neutral-950">{stockCounts.filter((count) => count.status !== "APPLIED").length}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-neutral-500">Hatalı harici event</p>
+                      <p className="mt-1 text-sm font-semibold text-neutral-950">{externalEventMonitoring.failedCount}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-neutral-500">Bekleyen entegrasyon işi</p>
+                      <p className="mt-1 text-sm font-semibold text-neutral-950">{integrationSummary.pendingCount}</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Bugün Öncelikli</p>
+                <h3 className="text-lg font-semibold text-neutral-950">İlk bakılması gereken başlıklar</h3>
+                <p className="text-sm text-neutral-600">Ekrana ilk girişte operasyon sırasını buradan belirleyebilirsin.</p>
+              </div>
+              <div className="mt-4 grid gap-3">
+                <article className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+                  <p className="text-sm font-semibold text-neutral-950">Kritik stok uyarıları</p>
+                  <p className="mt-1 text-sm text-neutral-600">{alertResult.summary.activeCount} aktif uyarı var. Düşük ve tükenen ürünleri önceliklendir.</p>
+                </article>
+                <article className="rounded-2xl border border-sky-200 bg-sky-50/80 p-4">
+                  <p className="text-sm font-semibold text-neutral-950">Açık sayımlar</p>
+                  <p className="mt-1 text-sm text-neutral-600">{stockCounts.filter((count) => count.status !== "APPLIED").length} sayım henüz kapanmadı.</p>
+                </article>
+                <article className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4">
+                  <p className="text-sm font-semibold text-neutral-950">Harici stok hataları</p>
+                  <p className="mt-1 text-sm text-neutral-600">{externalEventMonitoring.failedCount} hatalı event, {externalEventMonitoring.unresolvedCount} çözülmemiş kayıt bulunuyor.</p>
+                </article>
+                <article className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4">
+                  <p className="text-sm font-semibold text-neutral-950">Entegrasyon kuyruğu</p>
+                  <p className="mt-1 text-sm text-neutral-600">{integrationSummary.pendingCount} bekleyen, {integrationSummary.processingCount} işlenen stok entegrasyon işi var.</p>
+                </article>
+              </div>
+            </section>
           </div>
         </div>
       ) : null}
 
       <div className="sticky top-0 z-30 border-b border-neutral-200 bg-white/95 p-5 backdrop-blur">
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-neutral-950">{labels.sectionsTitle}</h3>
-              <p className="text-sm text-neutral-600">
-                {pageVariant === "overview"
-                  ? "Genel bakış ekranında rapor, kritik stok, stok listesi ve entegrasyon alanları birlikte sunulur."
-                  : "Bu sayfada yalnızca ilgili operasyon alanı gösterilir. Böylece kullanım daha sade ve odaklı kalır."}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 text-xs">
-              <Link href={overviewPath} className="rounded-full border border-neutral-300 bg-white px-3 py-1.5 font-medium text-neutral-700 transition hover:bg-neutral-100">
-                Genel Bakis
-              </Link>
-              <Link href={transactionListPath} className="rounded-full border border-neutral-300 bg-white px-3 py-1.5 font-medium text-neutral-700 transition hover:bg-neutral-100">
-                Islemler
-              </Link>
-              <Link href={stockCountsPath} className="rounded-full border border-neutral-300 bg-white px-3 py-1.5 font-medium text-neutral-700 transition hover:bg-neutral-100">
-                Sayimlar
-              </Link>
-              <Link href={warehousesPath} className="rounded-full border border-neutral-300 bg-white px-3 py-1.5 font-medium text-neutral-700 transition hover:bg-neutral-100">
-                Depolar
-              </Link>
-            </div>
-          </div>
           {availableSectionGroups.length > 1 ? (
             <div className="flex flex-wrap gap-2">
               {availableSectionGroups.map((group) => (
@@ -2235,12 +2676,10 @@ export function InventoryManager({
               ))}
             </div>
           ) : null}
-          {activeGroupSections.length > 1 ? (
+          {visibleActiveSections.length > 1 ? (
             <div className="sticky top-0 z-20 -mx-2 overflow-x-auto px-2 pb-1 [scrollbar-width:none]">
               <div className="flex min-w-max gap-2 rounded-2xl border border-neutral-200 bg-white/95 p-2 shadow-sm backdrop-blur">
-                {inventorySectionAnchors
-                  .filter((section) => visibleSectionIds.has(section.id) && (activeGroupSections as readonly string[]).includes(section.id))
-                  .map((section) => (
+                {visibleActiveSections.map((section) => (
                     <button
                       key={section.id}
                       type="button"
@@ -2260,1178 +2699,305 @@ export function InventoryManager({
         </div>
       </div>
 
-      <div id="inventory-reports" className={getSectionPanelClass(activeSection, "inventory-reports")}>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex flex-col gap-2">
-            <h3 className="text-lg font-semibold text-neutral-950">{labels.reportsTitle}</h3>
-            <p className="text-sm text-neutral-600">{labels.reportsDescription}</p>
-          </div>
-          <div className="inline-flex rounded-2xl border border-neutral-200 bg-neutral-50 p-1">
-            <button
-              type="button"
-              onClick={() => setReportViewMode("executive")}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                reportViewMode === "executive" ? "bg-white text-neutral-950 shadow-sm" : "text-neutral-600 hover:text-neutral-900"
-              }`}
-            >
-              Yonetici Ozet
-            </button>
-            <button
-              type="button"
-              onClick={() => setReportViewMode("analytics")}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                reportViewMode === "analytics" ? "bg-white text-neutral-950 shadow-sm" : "text-neutral-600 hover:text-neutral-900"
-              }`}
-            >
-              Analiz
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <section className="rounded-2xl border border-neutral-200 bg-[linear-gradient(135deg,rgba(248,250,252,0.95),rgba(255,255,255,0.98))] p-4 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">{labels.reportRange}</p>
-                <p className="mt-2 text-sm text-neutral-600">
-                  {labels.reportCurrentPeriod}: {formatDate(reports.comparison.current.startDate, locale, labels.notSpecified)} - {formatDate(reports.comparison.current.endDate, locale, labels.notSpecified)}
-                </p>
-                <p className="mt-1 text-sm text-neutral-600">{labels.reportCostingMethod}: {reports.overview.costingMethodLabel}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { value: "7", label: labels.reportPeriod7Days },
-                  { value: "30", label: labels.reportPeriod30Days },
-                  { value: "90", label: labels.reportPeriod90Days },
-                ].map((option) => (
-                  <button
-                    key={`report-period-${option.value}`}
-                    type="button"
-                    onClick={() => router.push(getOverviewHref({ reportPeriodDays: option.value }))}
-                    className={`inline-flex h-10 items-center justify-center rounded-xl border px-4 text-sm font-medium transition ${
-                      query.reportPeriodDays === option.value
-                        ? "border-neutral-900 bg-neutral-900 text-white"
-                        : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+      {pageVariant === "overview" ? (
+        <div className="space-y-6">
+          <section className="rounded-3xl border border-neutral-200 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(250,250,250,0.92))] p-5 shadow-sm">
+            <div className="mb-5 flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Yönetsel İzleme</p>
+              <h3 className="text-lg font-semibold text-neutral-950">Önce durumu izle, sonra aksiyona geç</h3>
+              <p className="text-sm text-neutral-600">Bu bölüm yalnızca karar özeti içindir. Detaylı tablo ve operasyon ekranlarına gerektiğinde alt sayfalardan geç.</p>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <label className="flex flex-col gap-2 rounded-2xl border border-neutral-200 bg-white p-3 text-sm">
-                <span className="font-medium text-neutral-700">{labels.reportCostingMethod}</span>
-                <select
-                  value={query.reportCostingMethod}
-                  onChange={(event) => {
-                    router.push(getOverviewHref({ reportCostingMethod: event.target.value }));
-                  }}
-                  className="h-11 rounded-xl border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none transition focus:border-neutral-500"
-                >
-                  <option value="AVERAGE_COST">{labels.reportCostAverage}</option>
-                  <option value="LAST_PURCHASE_COST">{labels.reportCostLastPurchase}</option>
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-2 rounded-2xl border border-neutral-200 bg-white p-3 text-sm">
-                <span className="font-medium text-neutral-700">{labels.reportComparePrevious}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    router.push(
-                      getOverviewHref({
-                        reportComparePrevious: query.reportComparePrevious === "0" ? "1" : "0",
-                      }),
-                    );
-                  }}
-                  className={`inline-flex h-11 items-center justify-between rounded-xl border px-4 text-sm font-medium transition ${
-                    query.reportComparePrevious === "0"
-                      ? "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100"
-                      : "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                  }`}
-                >
-                  <span>{query.reportComparePrevious === "0" ? "Kapalı" : "Açık"}</span>
-                  <span>{query.reportComparePrevious === "0" ? labels.reportPreviousPeriod : labels.reportDifference}</span>
-                </button>
-              </label>
-
-              <article className="rounded-2xl border border-neutral-200 bg-white p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.reportPeriod}</p>
-                <p className="mt-2 text-lg font-semibold text-neutral-950">{reports.periodDays} gün</p>
-                <p className="mt-1 text-sm text-neutral-600">{labels.reportMovementCount}: {reports.comparison.current.movementCount}</p>
-              </article>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-neutral-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.85),rgba(255,255,255,0.98))] p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h4 className="text-base font-semibold text-neutral-950">{labels.reportDifference}</h4>
-                <p className="text-sm text-neutral-600">{labels.reportPreviousPeriod}</p>
-              </div>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm">{reports.periodDays} gün</span>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <article className="rounded-2xl border border-emerald-200 bg-white p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.trendStockIn}</p>
-                <p className="mt-2 text-lg font-semibold text-emerald-700">{reports.comparison.current.totalStockInQuantity}</p>
-                <p className="mt-1 text-sm text-neutral-600">{formatDelta(reports.comparison.stockInDelta)}</p>
-              </article>
-              <article className="rounded-2xl border border-rose-200 bg-white p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.trendStockOut}</p>
-                <p className="mt-2 text-lg font-semibold text-rose-700">{reports.comparison.current.totalStockOutQuantity}</p>
-                <p className="mt-1 text-sm text-neutral-600">{formatDelta(reports.comparison.stockOutDelta)}</p>
-              </article>
-              <article className="rounded-2xl border border-sky-200 bg-white p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.trendNet}</p>
-                <p className={`mt-2 text-lg font-semibold ${reports.comparison.current.netQuantity >= 0 ? "text-sky-700" : "text-rose-700"}`}>
-                  {reports.comparison.current.netQuantity}
-                </p>
-                <p className="mt-1 text-sm text-neutral-600">{formatDelta(reports.comparison.netDelta)}</p>
-              </article>
-              <article className="rounded-2xl border border-amber-200 bg-white p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.reportMovementCount}</p>
-                <p className="mt-2 text-lg font-semibold text-amber-700">{reports.comparison.current.movementCount}</p>
-                <p className="mt-1 text-sm text-neutral-600">{formatDelta(reports.comparison.movementCountDelta)}</p>
-              </article>
-            </div>
-          </section>
-        </div>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <article className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.totalOnHandUnits}</p>
-            <p className="mt-2 text-lg font-semibold text-neutral-950">{reports.overview.totalOnHandUnits}</p>
-          </article>
-          <article className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.totalCostValue}</p>
-            <p className="mt-2 text-lg font-semibold text-cyan-700">{formatCurrency(reports.overview.totalCostValue, locale)}</p>
-          </article>
-          <article className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.totalSalesValue}</p>
-            <p className="mt-2 text-lg font-semibold text-emerald-700">{formatCurrency(reports.overview.totalSalesValue, locale)}</p>
-          </article>
-          <article className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.totalPotentialProfit}</p>
-            <p className="mt-2 text-lg font-semibold text-amber-700">{formatCurrency(reports.overview.totalPotentialProfit, locale)}</p>
-          </article>
-        </div>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <article className="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.averageCoverageDays}</p>
-            <p className="mt-2 text-lg font-semibold text-indigo-700">
-              {reports.overview.averageCoverageDays === null ? labels.notSpecified : `${reports.overview.averageCoverageDays} gun`}
-            </p>
-          </article>
-          <article className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.stockTurnoverRate}</p>
-            <p className="mt-2 text-lg font-semibold text-sky-700">{reports.overview.stockTurnoverRate.toFixed(2)}x</p>
-          </article>
-          <article className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.legacyStockFallbackCount}</p>
-            <p className="mt-2 text-lg font-semibold text-rose-700">{reports.overview.legacyStockFallbackCount}</p>
-          </article>
-          <article className="rounded-2xl border border-orange-200 bg-orange-50/70 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.stockMismatchCount}</p>
-            <p className="mt-2 text-lg font-semibold text-orange-700">{reports.overview.stockMismatchCount}</p>
-          </article>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => goToInventoryWithFilters({ stockStatusFilter: "low_stock" })}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
-          >
-            {labels.reviewLowStock}
-          </button>
-          <button
-            type="button"
-            onClick={() => goToInventoryWithFilters({ search: reports.slowMoving[0]?.sku })}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
-          >
-            {labels.reviewSlowMoving}
-          </button>
-          <button
-            type="button"
-            onClick={() => openStockCountDrawer("create")}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800"
-          >
-            {labels.startStockCount}
-          </button>
-        </div>
-
-        <div className="mt-4 grid gap-4 xl:grid-cols-3">
-          <article className="rounded-2xl border border-amber-200 bg-[linear-gradient(135deg,rgba(254,243,199,0.9),rgba(255,255,255,0.95))] p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Öncelik 1</p>
-            <h4 className="mt-2 text-base font-semibold text-neutral-950">Kritik stok aksiyonu</h4>
-            <p className="mt-2 text-sm text-neutral-600">
-              {reports.overview.lowStockRowCount} satır düşük stokta. Önce kritik ürünleri filtreleyip giriş veya transfer planlayın.
-            </p>
-            <button
-              type="button"
-              onClick={() => goToInventoryWithFilters({ stockStatusFilter: "low_stock" })}
-              className="mt-4 inline-flex h-10 items-center justify-center rounded-xl border border-amber-300 bg-white px-4 text-sm font-medium text-amber-900 transition hover:bg-amber-50"
-            >
-              Düşük stok listesini aç
-            </button>
-          </article>
-
-          <article className="rounded-2xl border border-sky-200 bg-[linear-gradient(135deg,rgba(224,242,254,0.92),rgba(255,255,255,0.95))] p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Öncelik 2</p>
-            <h4 className="mt-2 text-base font-semibold text-neutral-950">Sayım farkı takibi</h4>
-            <p className="mt-2 text-sm text-neutral-600">
-              {stockCounts.filter((count) => count.status !== "APPLIED").length} açık sayım fişi var. Farklı sayımları tamamlayıp uygulayarak sistem stoklarını netleştirin.
-            </p>
-            <button
-              type="button"
-              onClick={() => setActiveSection("inventory-counts")}
-              className="mt-4 inline-flex h-10 items-center justify-center rounded-xl border border-sky-300 bg-white px-4 text-sm font-medium text-sky-900 transition hover:bg-sky-50"
-            >
-              Sayım operasyonuna git
-            </button>
-          </article>
-
-          <article className="rounded-2xl border border-rose-200 bg-[linear-gradient(135deg,rgba(255,228,230,0.92),rgba(255,255,255,0.95))] p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-700">Öncelik 3</p>
-            <h4 className="mt-2 text-base font-semibold text-neutral-950">Tutarsız stok izlemesi</h4>
-            <p className="mt-2 text-sm text-neutral-600">
-              {reports.consistency.length} ürün için legacy stok ile aggregate stok arasında fark var. Bu liste audit ve düzeltme için ilk kontrol noktasıdır.
-            </p>
-            <button
-              type="button"
-              onClick={() => setReportViewMode("executive")}
-              className="mt-4 inline-flex h-10 items-center justify-center rounded-xl border border-rose-300 bg-white px-4 text-sm font-medium text-rose-900 transition hover:bg-rose-50"
-            >
-              Tutarlılık özetini incele
-            </button>
-          </article>
-        </div>
-
-        {reportViewMode === "executive" ? (
-          <>
-            <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_1fr]">
-          <section className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <h4 className="text-base font-semibold text-neutral-950">{labels.warehousePerformance}</h4>
-              <span className="rounded-full bg-neutral-900 px-2 py-1 text-[11px] font-semibold text-white">{labels.warehouseCount}: {reports.overview.warehouseCount}</span>
-            </div>
-            <div className="mt-4 space-y-3">
-              {reports.warehouses.map((warehouse) => (
-                <article key={`warehouse-report-${warehouse.warehouseCode}`} className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-neutral-950">{warehouse.warehouseName}</p>
-                      <p className="mt-1 text-xs text-neutral-500">{warehouse.warehouseCode} • {labels.totalProducts}: {warehouse.skuCount}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-neutral-950">{formatCurrency(warehouse.salesValue, locale)}</p>
-                      <p className="text-xs text-neutral-500">{labels.salesValue}</p>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-sm text-neutral-600 sm:grid-cols-4">
-                    <p>{labels.totalOnHandUnits}: {warehouse.onHandUnits}</p>
-                    <p>{labels.availableStock}: {warehouse.availableUnits}</p>
-                    <p>{labels.costValue}: {formatCurrency(warehouse.costValue, locale)}</p>
-                    <p>{labels.salesValue}: {formatCurrency(warehouse.salesValue, locale)}</p>
-                  </div>
-                  <div className="mt-3">
-                    <button
-                      type="button"
-                      onClick={() => goToInventoryWithFilters({ warehouseFilter: warehouse.warehouseCode })}
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
-                    >
-                      {labels.focusWarehouse}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <h4 className="text-base font-semibold text-neutral-950">{labels.lowStockReport}</h4>
-              <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700">{labels.lowStockRows}: {reports.overview.lowStockRowCount}</span>
-            </div>
-            <div className="mt-4 space-y-3">
-              {reports.lowStock.length === 0 ? (
-                <EmptyStateCard
-                  title="Dusuk stok riski gorunmuyor"
-                  description={labels.noAlerts}
-                />
-              ) : reports.lowStock.map((item) => (
-                <article key={`low-stock-${item.productId}-${item.warehouseCode}`} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-neutral-950">{item.productName}</p>
-                      <p className="mt-1 text-xs text-neutral-500">{labels.sku}: {item.sku} • {item.warehouseCode}</p>
-                      <p className="mt-2 text-xs text-neutral-600">
-                        {item.availableUnits <= 0 ? "Stok çıkışı durmuş görünüyor." : "Yeniden sipariş veya transfer planı gerekli."}
-                      </p>
-                    </div>
-                    <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${item.availableUnits <= 0 ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
-                      {item.availableUnits <= 0 ? labels.alertTypeOutOfStock : labels.alertTypeLowStock}
-                    </span>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.availableStock}</p>
-                      <p className="mt-1 text-sm font-semibold text-neutral-950">{item.availableUnits}</p>
-                    </article>
-                    <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.reorderPoint}</p>
-                      <p className="mt-1 text-sm font-semibold text-neutral-950">{item.reorderPoint}</p>
-                    </article>
-                    <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.safetyStock}</p>
-                      <p className="mt-1 text-sm font-semibold text-neutral-950">{item.safetyStock}</p>
-                    </article>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => goToInventoryWithFilters({ search: item.sku, warehouseFilter: item.warehouseCode, stockStatusFilter: item.availableUnits <= 0 ? "out_of_stock" : "low_stock" })}
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
-                    >
-                      {labels.viewInInventory}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => goToTransactionsWithFilters({ sku: item.sku, warehouseCode: item.warehouseCode })}
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-neutral-900 px-3 text-xs font-medium text-white transition hover:bg-neutral-800"
-                    >
-                      {labels.openInTransactions}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-            </div>
-
-            <section className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-base font-semibold text-neutral-950">{labels.consistencyTitle}</h4>
-                  <p className="text-sm text-neutral-600">{labels.consistencyDescription}</p>
-                </div>
-                <span className="rounded-full bg-neutral-900 px-2 py-1 text-[11px] font-semibold text-white">{reports.consistency.length}</span>
-              </div>
-              <div className="mt-4 space-y-3">
-                {reports.consistency.length === 0 ? (
-                  <EmptyStateCard
-                    title="Tutarsizlik bulunmadi"
-                    description={labels.noConsistencyIssues}
-                  />
-                ) : reports.consistency.map((item) => (
-                  <article key={`consistency-${item.productId}`} className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-neutral-950">{item.productName}</p>
-                        <p className="mt-1 text-xs text-neutral-500">{labels.sku}: {item.sku}</p>
-                      </div>
-                      <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${item.hasInventoryLevels ? "bg-orange-100 text-orange-700" : "bg-rose-100 text-rose-700"}`}>
-                        {item.hasInventoryLevels ? labels.stockMismatchCount : labels.legacyStockFallbackCount}
-                      </span>
-                    </div>
-                    <div className="mt-3 grid gap-2 text-sm text-neutral-600 sm:grid-cols-3">
-                      <p>{labels.legacyStockLabel}: {item.legacyStock}</p>
-                      <p>{labels.aggregateStockLabel}: {item.aggregateAvailableStock}</p>
-                      <p>{labels.differenceLabel}: {item.difference}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          </>
-        ) : (
-          <>
-            <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_1.1fr]">
-              <section className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <h4 className="text-base font-semibold text-neutral-950">{labels.movementSummaryTitle}</h4>
-                  <span className="rounded-full bg-neutral-200 px-2 py-1 text-[11px] font-semibold text-neutral-700">{labels.totalQuantityLabel}</span>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {reports.movementSummary.map((item) => (
-                    <article key={`movement-summary-${item.movementType}`} className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${movementTypeClass(item.movementType)}`}>
-                          {movementTypeLabel(item.movementType, labels)}
-                        </span>
-                        <p className="text-sm font-semibold text-neutral-950">{item.totalQuantity}</p>
-                      </div>
-                      <div className="mt-3 grid gap-2 text-sm text-neutral-600 sm:grid-cols-2">
-                        <p>{labels.movementCount}: {item.movementCount}</p>
-                        <p>{labels.lastMovementAt}: {formatDate(item.lastMovementAt, locale, labels.notSpecified)}</p>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-
-              <section className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <h4 className="text-base font-semibold text-neutral-950">{labels.trendTitle}</h4>
-                  <span className="rounded-full bg-neutral-200 px-2 py-1 text-[11px] font-semibold text-neutral-700">{reports.periodDays}g</span>
-                </div>
-                <div className="mt-4 grid gap-2">
-                  {reports.trend.slice(-10).map((point) => (
-                    <article key={`trend-${point.date}`} className="grid gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-600 sm:grid-cols-[120px_1fr_1fr_1fr] sm:items-center">
-                      <p className="font-medium text-neutral-900">{point.date}</p>
-                      <p>{labels.trendStockIn}: {point.stockInQuantity}</p>
-                      <p>{labels.trendStockOut}: {point.stockOutQuantity}</p>
-                      <p className={point.netQuantity >= 0 ? "font-semibold text-emerald-700" : "font-semibold text-rose-700"}>
-                        {labels.trendNet}: {point.netQuantity}
-                      </p>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            </div>
-
-            <div className="mt-4 grid gap-4 xl:grid-cols-3">
-              <section className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 shadow-sm xl:col-span-1">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h4 className="text-base font-semibold text-neutral-950">{labels.abcTitle}</h4>
-                <p className="text-sm text-neutral-600">{labels.abcDescription}</p>
-              </div>
-            </div>
-            <div className="mt-4 space-y-3">
-              {reports.abcSegments.map((segment) => (
-                <article key={`abc-${segment.segment}`} className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex rounded-full bg-neutral-900 px-2 py-1 text-xs font-semibold text-white">
-                      {labels.segment} {segment.segment}
-                    </span>
-                    <p className="text-sm font-semibold text-neutral-950">{segment.productCount} urun</p>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-sm text-neutral-600">
-                    <p>{labels.sharePercent}: %{segment.sharePercent}</p>
-                    <p>{labels.salesValue}: {formatCurrency(segment.estimatedSalesValue, locale)}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-              </section>
-
-              <section className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 shadow-sm xl:col-span-1">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h4 className="text-base font-semibold text-neutral-950">{labels.velocityTitle}</h4>
-                <p className="text-sm text-neutral-600">{labels.velocityDescription}</p>
-              </div>
-            </div>
-            <div className="mt-4 space-y-3">
-              {reports.velocity.length === 0 ? (
-                <EmptyStateCard
-                  title="Devir verisi bulunmuyor"
-                  description={labels.noAlerts}
-                />
-              ) : reports.velocity.map((item) => (
-                <article key={`velocity-${item.productId}`} className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-neutral-950">{item.productName}</p>
-                      <p className="mt-1 text-xs text-neutral-500">{labels.sku}: {item.sku}</p>
-                    </div>
-                    <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
-                      {item.turnoverRate.toFixed(2)}x
-                    </span>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-sm text-neutral-600">
-                    <p>{labels.reportPeriod} çıkışı: {item.last30DayOutboundUnits}</p>
-                    <p>{labels.availableStock}: {item.availableUnits}</p>
-                    <p>{labels.coverageDays}: {item.coverageDays === null ? labels.notSpecified : `${item.coverageDays} gun`}</p>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => goToInventoryWithFilters({ search: item.sku })}
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
-                    >
-                      {labels.viewInInventory}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => goToTransactionsWithFilters({ sku: item.sku })}
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-neutral-900 px-3 text-xs font-medium text-white transition hover:bg-neutral-800"
-                    >
-                      {labels.openInTransactions}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-              </section>
-
-              <section className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 shadow-sm xl:col-span-1">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h4 className="text-base font-semibold text-neutral-950">{labels.slowMovingTitle}</h4>
-                <p className="text-sm text-neutral-600">{labels.slowMovingDescription}</p>
-              </div>
-            </div>
-            <div className="mt-4 space-y-3">
-              {reports.slowMoving.length === 0 ? (
-                <EmptyStateCard
-                  title="Yavas hareket eden stok bulunmuyor"
-                  description={labels.noAlerts}
-                />
-              ) : reports.slowMoving.map((item) => (
-                <article key={`slow-moving-${item.productId}`} className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-neutral-950">{item.productName}</p>
-                      <p className="mt-1 text-xs text-neutral-500">{labels.sku}: {item.sku}</p>
-                    </div>
-                    <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
-                      {item.inactivityDays === null ? "30+ gun" : `${item.inactivityDays} gun`}
-                    </span>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-sm text-neutral-600">
-                    <p>{labels.availableStock}: {item.availableUnits}</p>
-                    <p>{labels.salesValue}: {formatCurrency(item.salesValue, locale)}</p>
-                    <p>{labels.inactivityDays}: {item.inactivityDays === null ? labels.notSpecified : item.inactivityDays}</p>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => goToInventoryWithFilters({ search: item.sku })}
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
-                    >
-                      {labels.viewInInventory}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => goToTransactionsWithFilters({ sku: item.sku })}
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-neutral-900 px-3 text-xs font-medium text-white transition hover:bg-neutral-800"
-                    >
-                      {labels.openInTransactions}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-              </section>
-            </div>
-          </>
-        )}
-      </div>
-
-      <div id="inventory-sync" className={getSectionPanelClass(activeSection, "inventory-sync")}>
-        <div className="flex flex-col gap-2">
-          <h3 className="text-lg font-semibold text-neutral-950">{labels.integrationTitle}</h3>
-          <p className="text-sm text-neutral-600">{labels.integrationDescription}</p>
-        </div>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <article className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.syncPending}</p>
-            <p className="mt-2 text-lg font-semibold text-neutral-950">{integrationSummary.pendingCount}</p>
-            <p className="mt-2 text-xs text-neutral-500">Sırada bekleyen eşitleme işleri.</p>
-          </article>
-          <article className="rounded-2xl border border-sky-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.syncProcessing}</p>
-            <p className="mt-2 text-lg font-semibold text-sky-700">{integrationSummary.processingCount}</p>
-            <p className="mt-2 text-xs text-neutral-500">Şu anda çalışan entegrasyon akışları.</p>
-          </article>
-          <article className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.syncSuccess}</p>
-            <p className="mt-2 text-lg font-semibold text-emerald-700">{integrationSummary.successCount}</p>
-            <p className="mt-2 text-xs text-neutral-500">Sorunsuz tamamlanan işler.</p>
-          </article>
-          <article className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.syncFailed}</p>
-            <p className="mt-2 text-lg font-semibold text-amber-700">{integrationSummary.failedCount}</p>
-            <p className="mt-2 text-xs text-neutral-500">Tekrar denenmesi gereken hatalı işler.</p>
-          </article>
-          <article className="rounded-2xl border border-rose-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.syncDeadLetter}</p>
-            <p className="mt-2 text-lg font-semibold text-rose-700">{integrationSummary.deadLetterCount}</p>
-            <p className="mt-2 text-xs text-neutral-500">Manuel müdahale gerektiren kayıtlar.</p>
-          </article>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          <h4 className="text-base font-semibold text-neutral-950">{labels.syncRecentJobs}</h4>
-          {integrationSummary.recentJobs.length === 0 ? (
-            <EmptyStateCard
-              title="Bekleyen entegrasyon isi yok"
-              description={labels.empty}
-            />
-          ) : integrationSummary.recentJobs.map((job) => (
-            <article key={job.id} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-neutral-950">{job.channel} • {job.entityId}</p>
-                  <p className="mt-1 text-xs text-neutral-500">{formatDate(job.createdAt, locale, labels.notSpecified)}</p>
-                  <p className="mt-2 text-xs text-neutral-600">
-                    {job.status === "SUCCESS"
-                      ? "Eşitleme tamamlandı."
-                      : job.status === "PROCESSING"
-                        ? "İşleniyor, kısa süre içinde sonuçlanır."
-                        : job.status === "FAILED"
-                          ? "İş yeniden denemeye aday."
-                          : job.status === "DEAD_LETTER"
-                            ? "Kayıt manuel inceleme bekliyor."
-                            : "İş kuyruğa alındı."}
-                  </p>
-                </div>
-                <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${
-                  job.status === "SUCCESS"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : job.status === "DEAD_LETTER"
-                      ? "bg-rose-100 text-rose-700"
-                      : job.status === "FAILED"
-                        ? "bg-amber-100 text-amber-700"
-                        : job.status === "PROCESSING"
-                          ? "bg-sky-100 text-sky-700"
-                          : "bg-neutral-100 text-neutral-700"
-                }`}>
-                  {job.status}
-                </span>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Kanal</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{job.channel}</p>
-                </article>
-                <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Kayıt</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{job.entityId}</p>
-                </article>
-              </div>
-              {job.lastError ? (
-                <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{labels.syncLastError}: {job.lastError}</p>
-              ) : null}
-            </article>
-          ))}
-        </div>
-
-        <div className="mt-6">
-          <div className="flex flex-col gap-2">
-            <h4 className="text-base font-semibold text-neutral-950">Harici stok event akışı</h4>
-            <p className="text-sm text-neutral-600">Inbound eventlerin eşleme, uygulama ve hata durumlarını son kayıtlar üzerinden izle.</p>
-          </div>
-
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <article className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Alındı</p>
-              <p className="mt-2 text-lg font-semibold text-neutral-950">{externalEventMonitoring.receivedCount}</p>
-            </article>
-            <article className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Uygulandı</p>
-              <p className="mt-2 text-lg font-semibold text-emerald-700">{externalEventMonitoring.appliedCount}</p>
-            </article>
-            <article className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Başarısız</p>
-              <p className="mt-2 text-lg font-semibold text-amber-700">{externalEventMonitoring.failedCount}</p>
-            </article>
-            <article className="rounded-2xl border border-fuchsia-200 bg-white p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Tekrarlı</p>
-              <p className="mt-2 text-lg font-semibold text-fuchsia-700">{externalEventMonitoring.duplicateCount}</p>
-            </article>
-          </div>
-
-          {externalEventMonitoring.latestFailedMessage ? (
-            <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Son hata: {externalEventMonitoring.latestFailedMessage}
-            </p>
-          ) : null}
-
-          <div className="mt-4 grid gap-3">
-            {externalEventMonitoring.items.length === 0 ? (
-              <EmptyStateCard
-                title="Harici stok event kaydı bulunmuyor"
-                description="Entegrasyonlardan event geldikçe bu alanda son durum ve hata akışı görünür."
+            <div id="inventory-reports" className={getSectionPanelClass(activeSection, "inventory-reports")}>
+              <InventoryReportsPanel
+                labels={labels}
+                locale={locale}
+                reports={reports}
+                stockCounts={stockCounts}
+                activePeriodDays={query.reportPeriodDays}
+                onPeriodChange={(value) => router.push(getOverviewHref({ reportPeriodDays: value }))}
+                onReviewLowStock={() => goToInventoryWithFilters({ stockStatusFilter: "low_stock" })}
+                onReviewSlowMoving={(sku) => goToInventoryWithFilters({ search: sku })}
+                onStartStockCount={() => router.push(stockCountsPath)}
+                formatDate={formatDate}
               />
-            ) : externalEventMonitoring.items.slice(0, 6).map((item) => (
-              <article key={item.id} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+            </div>
+
+            <div id="inventory-critical" className={getSectionPanelClass(activeSection, "inventory-critical")}>
+              <InventoryCriticalPanel
+                labels={labels}
+                locale={locale}
+                alertResult={alertResult}
+                formatDate={formatDate}
+                alertTypeLabel={alertTypeLabel}
+              />
+            </div>
+
+            <div className="mt-6 grid gap-4 xl:grid-cols-2">
+              <article className="rounded-3xl border border-fuchsia-200 bg-fuchsia-50/60 p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-neutral-950">{item.channel} • {item.productSku ?? item.externalSku ?? "Eşleşmemiş kayıt"}</p>
-                    <p className="mt-1 text-xs text-neutral-500">{formatDate(item.createdAt, locale, labels.notSpecified)}</p>
-                    <p className="mt-2 text-xs text-neutral-600">
-                      Depo: {item.warehouseCode ?? item.externalWarehouseCode ?? labels.notSpecified} • Miktar: {item.quantity}
-                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fuchsia-700">Operasyon İzleme</p>
+                    <h4 className="mt-2 text-base font-semibold text-neutral-950">Harici stok olayları</h4>
+                    <p className="mt-1 text-sm text-neutral-600">Hata, eşleme ve projection detayları için özel ekrana geç.</p>
                   </div>
-                  <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${
-                    item.status === "APPLIED"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : item.status === "FAILED"
-                        ? "bg-amber-100 text-amber-700"
-                        : item.status === "DUPLICATE"
-                          ? "bg-fuchsia-100 text-fuchsia-700"
-                          : "bg-neutral-100 text-neutral-700"
-                  }`}>
-                    {item.status}
-                  </span>
-                </div>
-                {item.errorMessage ? (
-                  <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{item.errorMessage}</p>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div id="inventory-critical" className={getSectionPanelClass(activeSection, "inventory-critical")}>
-        <div className="flex flex-col gap-2">
-          <h3 className="text-lg font-semibold text-neutral-950">{labels.criticalStockTitle}</h3>
-          <p className="text-sm text-neutral-600">{labels.criticalStockDescription}</p>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <article className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.activeAlerts}</p>
-            <p className="mt-2 text-lg font-semibold text-neutral-950">{alertResult.summary.activeCount}</p>
-          </article>
-          <article className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.alertTypeOutOfStock}</p>
-            <p className="mt-2 text-lg font-semibold text-rose-700">{alertResult.summary.outOfStockCount}</p>
-          </article>
-          <article className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.alertTypeLowStock}</p>
-            <p className="mt-2 text-lg font-semibold text-amber-700">{alertResult.summary.lowStockCount}</p>
-          </article>
-        </div>
-
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {alertResult.items.length === 0 ? (
-            <EmptyStateCard
-              title="Aktif kritik stok uyarisi yok"
-              description={labels.noAlerts}
-            />
-          ) : alertResult.items.map((alert) => (
-            <article key={alert.id} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{alert.warehouseCode}</p>
-                  <h4 className="mt-1 text-base font-semibold text-neutral-950">{alert.productName}</h4>
-                  <p className="mt-2 text-sm text-neutral-600">{alert.message}</p>
-                </div>
-                <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${alert.type === "OUT_OF_STOCK" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
-                  {alertTypeLabel(alert.type, labels)}
-                </span>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.availableStock}</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{alert.availableStock}</p>
-                </article>
-                <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.reorderPoint}</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{alert.reorderPoint}</p>
-                </article>
-                <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.safetyStock}</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{alert.safetyStock}</p>
-                </article>
-              </div>
-              <p className="mt-3 text-xs text-neutral-500">{labels.alertCreatedAt}: {formatDate(alert.createdAt, locale, labels.notSpecified)}</p>
-            </article>
-          ))}
-        </div>
-      </div>
-
-      <div id="inventory-counts" className={getSectionPanelClass(activeSection, "inventory-counts")}>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-neutral-950">{labels.stockCountTitle}</h3>
-            <p className="mt-1 text-sm text-neutral-600">{labels.stockCountDescription}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => openStockCountDrawer("create")}
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800"
-          >
-            {labels.createStockCount}
-          </button>
-        </div>
-
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
-          {stockCounts.length === 0 ? (
-            <EmptyStateCard
-              title="Olusturulmus sayim bulunmuyor"
-              description="Yeni bir stok sayimi baslatarak varyans takibini buradan yonetebilirsin."
-            />
-          ) : stockCounts.map((count) => (
-            <article key={count.id} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-wide text-neutral-500">{count.countNumber}</p>
-                  <h4 className="mt-1 text-base font-semibold text-neutral-950">{count.warehouseCode ?? labels.allWarehouses}</h4>
-                  <p className="mt-2 text-xs text-neutral-600">
-                    {count.status === "APPLIED"
-                      ? "Sayım sisteme işlendi."
-                      : count.varianceLineCount > 0
-                        ? "Farklı satırlar kontrol bekliyor."
-                        : "Sayım satırları gözden geçirilmeye hazır."}
-                  </p>
-                </div>
-                <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${stockCountStatusClass(count.status)}`}>
-                  {stockCountStatusLabel(count.status, labels)}
-                </span>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.stockCountLineCount}</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{count.lineCount}</p>
-                </article>
-                <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.stockCountVarianceCount}</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{count.varianceLineCount}</p>
-                </article>
-                <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.stockCountDate}</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{formatDate(count.countedAt, locale, labels.notSpecified)}</p>
-                </article>
-              </div>
-              <button
-                type="button"
-                onClick={() => openStockCountDrawer("edit", count)}
-                className="mt-4 inline-flex h-10 items-center justify-center rounded-xl border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-800 transition hover:bg-neutral-100"
-              >
-                {labels.viewDetails}
-              </button>
-            </article>
-          ))}
-        </div>
-      </div>
-
-      <div id="inventory-warehouses" className={getSectionPanelClass(activeSection, "inventory-warehouses")}>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-neutral-950">{labels.warehousesTitle}</h3>
-            <p className="mt-1 text-sm text-neutral-600">{labels.warehousesDescription}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => openWarehouseDrawer("create")}
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800"
-          >
-            {labels.createWarehouse}
-          </button>
-        </div>
-
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
-          {warehouses.length === 0 ? (
-            <EmptyStateCard
-              title="Tanimli depo bulunmuyor"
-              description="Ilk depoyu ekledikten sonra stok hareketleri depo bazli izlenir."
-            />
-          ) : warehouses.map((warehouse) => (
-            <article key={warehouse.id} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-wide text-neutral-500">{warehouse.code}</p>
-                  <h4 className="mt-1 text-base font-semibold text-neutral-950">{warehouse.name}</h4>
-                  <p className="mt-2 text-xs text-neutral-600">
-                    {warehouse.isActive
-                      ? "Stok hareketlerine açık depo."
-                      : "Pasif durumda, yeni işlem almıyor."}
-                  </p>
-                </div>
-                {warehouse.isDefault ? (
-                  <span className="inline-flex rounded-full bg-neutral-900 px-2 py-1 text-[10px] font-semibold text-white">{labels.defaultLabel}</span>
-                ) : null}
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.warehouseStatus}</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{warehouse.isActive ? labels.active : labels.passive}</p>
-                </article>
-                <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{labels.levelCount}</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{warehouse.levelCount}</p>
-                </article>
-              </div>
-              {(warehouse.contactName || warehouse.contactPhone || warehouse.address) ? (
-                <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600">
-                  <p className="font-semibold text-neutral-800">İletişim</p>
-                  <p className="mt-1">{warehouse.contactName ?? "Yetkili tanımlı değil"}</p>
-                  <p>{warehouse.contactPhone ?? "Telefon tanımlı değil"}</p>
-                  <p className="mt-1">{warehouse.address ?? "Adres tanımlı değil"}</p>
-                </div>
-              ) : null}
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => goToInventoryWithFilters({ warehouseFilter: warehouse.code })}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-neutral-300 bg-neutral-50 px-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
-                >
-                  {labels.focusWarehouse}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openWarehouseDrawer("edit", warehouse)}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-800 transition hover:bg-neutral-100"
-                >
-                  {labels.editWarehouse}
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
-
-      <div id="inventory-transactions" className={getSectionPanelClass(activeSection, "inventory-transactions")}>
-        <div className="flex flex-col gap-2">
-          <h3 className="text-lg font-semibold text-neutral-950">{labels.transactionsTitle}</h3>
-          <p className="text-sm text-neutral-600">{labels.transactionsDescription}</p>
-        </div>
-
-        <form className="mt-4 grid gap-3 rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 md:grid-cols-2 xl:grid-cols-[1.2fr_220px_220px_180px_180px_auto]" aria-label="Stok işlemleri filtre formu">
-          <input
-            type="hidden"
-            name="search"
-            value={query.search}
-            readOnly
-          />
-          <input
-            type="hidden"
-            name="stockStatusFilter"
-            value={query.stockStatusFilter}
-            readOnly
-          />
-          <input
-            type="hidden"
-            name="reservationFilter"
-            value={query.reservationFilter}
-            readOnly
-          />
-          <input
-            type="hidden"
-            name="warehouseFilter"
-            value={query.warehouseFilter}
-            readOnly
-          />
-          <input
-            type="hidden"
-            name="movementTypeFilter"
-            value={query.movementTypeFilter}
-            readOnly
-          />
-          <input
-            type="search"
-            name="transactionSearch"
-            defaultValue={query.transactionSearch}
-            placeholder={labels.transactionSearch}
-            aria-label={labels.transactionSearch}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          />
-          <select
-            name="transactionType"
-            defaultValue={query.transactionType}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          >
-            <option value="all">{labels.transactionFilterType}: {labels.all}</option>
-            <option value="MANUAL_ADJUSTMENT">{labels.transactionFilterType}: {labels.inventoryMovementManualAdjustment}</option>
-            <option value="STOCK_IN">{labels.transactionFilterType}: {labels.inventoryMovementPurchaseReceipt}</option>
-            <option value="STOCK_OUT">{labels.transactionFilterType}: {labels.inventoryMovementDamageWriteOff}</option>
-            <option value="TRANSFER">{labels.transactionFilterType}: {labels.transferStock}</option>
-            <option value="STOCK_COUNT">{labels.transactionFilterType}: {labels.stockCountTitle}</option>
-          </select>
-          <select
-            name="transactionWarehouse"
-            defaultValue={query.transactionWarehouse}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          >
-            <option value="all">{labels.transactionFilterWarehouse}: {labels.allWarehouses}</option>
-            {warehouses.map((warehouse) => (
-              <option key={`transaction-warehouse-${warehouse.id}`} value={warehouse.code}>
-                {labels.transactionFilterWarehouse}: {warehouse.code}
-              </option>
-            ))}
-          </select>
-          <input
-            type="search"
-            name="transactionSku"
-            defaultValue={query.transactionSku}
-            placeholder={labels.transactionFilterSku}
-            aria-label={labels.transactionFilterSku}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          />
-          <input
-            type="date"
-            name="transactionStartDate"
-            defaultValue={query.transactionStartDate}
-            aria-label={labels.transactionFilterStartDate}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          />
-          <input
-            type="date"
-            name="transactionEndDate"
-            defaultValue={query.transactionEndDate}
-            aria-label={labels.transactionFilterEndDate}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          />
-          <button type="submit" className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800">
-            {labels.search}
-          </button>
-        </form>
-
-        <div className="mt-4 grid gap-3">
-          {transactionResult.items.length === 0 ? (
-            <EmptyStateCard
-              title="Listelenecek stok işlemi bulunmadı"
-              description="Arama veya filtreleri değiştirerek daha geniş bir hareket listesi görebilirsin."
-            />
-          ) : transactionResult.items.map((transaction) => (
-            <article key={transaction.id} className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${getTransactionBadgeClass(transaction.type)}`}>
-                      {formatTransactionType(transaction.type, labels)}
-                    </span>
-                    <span className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[11px] font-semibold text-neutral-700">
-                      {transaction.lines.length} satır
-                    </span>
-                  </div>
-                  <h4 className="mt-3 text-base font-semibold text-neutral-950">{transaction.transactionNumber}</h4>
-                  <p className="mt-1 text-xs text-neutral-500">{formatDate(transaction.createdAt, locale, labels.notSpecified)}</p>
-                  <p className="mt-3 text-sm text-neutral-600">{transaction.note ?? transaction.reference ?? labels.notSpecified}</p>
-                  {formatSourceDocument({
-                    type: transaction.sourceDocument.type,
-                    number: transaction.sourceDocument.number,
-                  }) ? (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-xs font-medium text-neutral-500">
-                        Kaynak belge: {formatSourceDocument({
-                          type: transaction.sourceDocument.type,
-                          number: transaction.sourceDocument.number,
-                        })}
-                      </p>
-                      {formatSourceDocumentMeta(transaction.sourceDocument, locale, labels.notSpecified) ? (
-                        <p className="text-xs text-neutral-500">{formatSourceDocumentMeta(transaction.sourceDocument, locale, labels.notSpecified)}</p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {transaction.lines.slice(0, 3).map((line) => (
-                      <span
-                        key={line.id}
-                        className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-700"
-                      >
-                        {line.inventoryItemName} • {line.quantity}
-                      </span>
-                    ))}
-                    {transaction.lines.length > 3 ? (
-                      <span className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-500">
-                        +{transaction.lines.length - 3} satır daha
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3 xl:w-[340px] xl:grid-cols-1">
-                  <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Referans</p>
-                    <p className="mt-1 text-sm font-semibold text-neutral-950">{transaction.reference ?? labels.notSpecified}</p>
-                  </div>
-                  <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Belge</p>
-                    <p className="mt-1 text-sm font-semibold text-neutral-950">
-                      {formatSourceDocument({
-                        type: transaction.sourceDocument.type,
-                        number: transaction.sourceDocument.number,
-                      }) ?? labels.notSpecified}
-                    </p>
-                    {formatSourceDocumentMeta(transaction.sourceDocument, locale, labels.notSpecified) ? (
-                      <p className="mt-1 text-xs text-neutral-500">{formatSourceDocumentMeta(transaction.sourceDocument, locale, labels.notSpecified)}</p>
-                    ) : null}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => openTransactionDrawer(transaction)}
-                    className="h-12 rounded-2xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800"
+                  <Link
+                    href={externalEventsPath}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-fuchsia-300 bg-white px-4 text-sm font-medium text-fuchsia-800 transition hover:bg-fuchsia-100"
                   >
-                    {labels.viewDetails}
-                  </button>
+                    Ekranı aç
+                  </Link>
                 </div>
-              </div>
-            </article>
-          ))}
-        </div>
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <Link
-            href={getTransactionPageHref(Math.max(1, transactionResult.page - 1))}
-            className={`rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 ${transactionResult.page <= 1 ? "pointer-events-none opacity-50" : ""}`}
-          >
-            {labels.prev}
-          </Link>
-          <p className="text-sm text-neutral-500">{labels.page} {transactionResult.page}/{transactionResult.totalPages}</p>
-          <Link
-            href={getTransactionPageHref(Math.min(transactionResult.totalPages, transactionResult.page + 1))}
-            className={`rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 ${transactionResult.page >= transactionResult.totalPages ? "pointer-events-none opacity-50" : ""}`}
-          >
-            {labels.next}
-          </Link>
-        </div>
-      </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <article className="rounded-2xl border border-white/70 bg-white/90 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Başarısız olay</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-950">{externalEventMonitoring.failedCount}</p>
+                  </article>
+                  <article className="rounded-2xl border border-white/70 bg-white/90 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Çözülmemiş kayıt</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-950">{externalEventMonitoring.unresolvedCount}</p>
+                  </article>
+                  <article className="rounded-2xl border border-white/70 bg-white/90 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Bekleyen iş</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-950">{integrationSummary.pendingCount}</p>
+                  </article>
+                </div>
+              </article>
 
-      <div id="inventory-exports" className={getSectionPanelClass(activeSection, "inventory-exports")}>
-        <div className="flex flex-col gap-2">
-          <h3 className="text-lg font-semibold text-neutral-950">Dışa Aktarım Geçmişi</h3>
-          <p className="text-sm text-neutral-600">Stok ekranından alınan CSV çıktılarının kim tarafından ve hangi filtrelerle üretildiğini izle.</p>
-        </div>
+              <article className="rounded-3xl border border-sky-200 bg-sky-50/60 p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Kayıt ve Çıktı</p>
+                    <h4 className="mt-2 text-base font-semibold text-neutral-950">Dışa aktarım geçmişi</h4>
+                    <p className="mt-1 text-sm text-neutral-600">CSV geçmişini, kullanıcıyı ve kapsamı ayrı ekranda izle.</p>
+                  </div>
+                  <Link
+                    href={`${overviewPath}/exports`}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-sky-300 bg-white px-4 text-sm font-medium text-sky-800 transition hover:bg-sky-100"
+                  >
+                    Geçmişi aç
+                  </Link>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <article className="rounded-2xl border border-white/70 bg-white/90 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Toplam kayıt</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-950">{exportHistory.length}</p>
+                  </article>
+                  <article className="rounded-2xl border border-white/70 bg-white/90 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Filtreli çıktı</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-950">{exportHistory.filter((item) => item.hasFilters).length}</p>
+                  </article>
+                  <article className="rounded-2xl border border-white/70 bg-white/90 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Son kullanıcı</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-950">{exportHistory[0]?.actorLabel ?? labels.notSpecified}</p>
+                  </article>
+                </div>
+              </article>
+            </div>
+          </section>
 
-        <div className="mt-4 grid gap-3">
-          {exportHistory.length === 0 ? (
-            <EmptyStateCard
-              title="Henüz kayıtlı dışa aktarım bulunmuyor"
-              description="Stok listesinden CSV dışa aktarımı yapıldığında bu ekranda kalıcı geçmiş olarak görünecek."
+          <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+            <div className="mb-5 flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Operasyon Alanları</p>
+              <h3 className="text-lg font-semibold text-neutral-950">Günlük stok işlemlerini buradan yürüt</h3>
+              <p className="text-sm text-neutral-600">Hızlı işlem, sayım, depo ve hareket yönetimi için operasyonel çalışma alanları aşağıda sıralanır.</p>
+            </div>
+
+            <div id="quick-actions" className={getSectionPanelClass(activeSection, "quick-actions")}>
+              <InventoryQuickActionsPanel
+                labels={labels}
+                quickActionMode={quickActionMode}
+                onQuickActionModeChange={updateQuickActionMode}
+                quickActionInputRef={quickActionInputRef}
+                quickActionQuery={quickActionQuery}
+                onQuickActionQueryChange={setQuickActionQuery}
+                pendingQuickAction={pendingQuickAction}
+                onQuickActionLookup={() => submitQuickActionLookup()}
+                quickActionCameraSupported={quickActionCameraSupported}
+                quickActionCameraActive={quickActionCameraActive}
+                onQuickActionCameraToggle={() => {
+                  if (quickActionCameraActive) {
+                    stopQuickActionCamera();
+                    return;
+                  }
+
+                  return startQuickActionCamera();
+                }}
+                quickActionVideoRef={quickActionVideoRef}
+                quickActionCameraMessage={quickActionCameraMessage}
+                quickActionSerialModeEnabled={quickActionSerialModeEnabled}
+                onQuickActionSerialModeChange={setQuickActionSerialModeEnabled}
+                quickActionResult={quickActionResult}
+              />
+            </div>
+
+            <div id="inventory-counts" className={getSectionPanelClass(activeSection, "inventory-counts")}>
+              <InventoryCountsPanel
+                labels={labels}
+                locale={locale}
+                stockCounts={stockCounts}
+                formatDate={formatDate}
+                stockCountStatusClass={stockCountStatusClass}
+                stockCountStatusLabel={(status) => stockCountStatusLabel(status, labels)}
+                onOpenStockCountDrawer={openStockCountDrawer}
+              />
+            </div>
+
+            <div id="inventory-warehouses" className={getSectionPanelClass(activeSection, "inventory-warehouses")}>
+              <InventoryWarehousesPanel
+                labels={labels}
+                warehouses={warehouses}
+                onFocusWarehouse={(warehouseCode) => goToInventoryWithFilters({ warehouseFilter: warehouseCode })}
+                onOpenWarehouseDrawer={openWarehouseDrawer}
+              />
+            </div>
+
+            <div id="inventory-transactions" className={getSectionPanelClass(activeSection, "inventory-transactions")}>
+              <InventoryTransactionsPanel
+                labels={labels}
+                locale={locale}
+                query={query}
+                warehouses={warehouses}
+                transactionResult={transactionResult}
+                formatDate={formatDate}
+                formatSourceDocument={formatSourceDocument}
+                formatSourceDocumentMeta={formatSourceDocumentMeta}
+                formatTransactionType={(type) => formatTransactionType(type, labels)}
+                getTransactionBadgeClass={getTransactionBadgeClass}
+                onOpenTransactionDrawer={openTransactionDrawer}
+                getTransactionPageHref={getTransactionPageHref}
+              />
+            </div>
+          </section>
+        </div>
+      ) : (
+        <>
+          <div id="quick-actions" className={getSectionPanelClass(activeSection, "quick-actions")}>
+            <InventoryQuickActionsPanel
+              labels={labels}
+              quickActionMode={quickActionMode}
+              onQuickActionModeChange={updateQuickActionMode}
+              quickActionInputRef={quickActionInputRef}
+              quickActionQuery={quickActionQuery}
+              onQuickActionQueryChange={setQuickActionQuery}
+              pendingQuickAction={pendingQuickAction}
+              onQuickActionLookup={() => submitQuickActionLookup()}
+              quickActionCameraSupported={quickActionCameraSupported}
+              quickActionCameraActive={quickActionCameraActive}
+              onQuickActionCameraToggle={() => {
+                if (quickActionCameraActive) {
+                  stopQuickActionCamera();
+                  return;
+                }
+
+                return startQuickActionCamera();
+              }}
+              quickActionVideoRef={quickActionVideoRef}
+              quickActionCameraMessage={quickActionCameraMessage}
+              quickActionSerialModeEnabled={quickActionSerialModeEnabled}
+              onQuickActionSerialModeChange={setQuickActionSerialModeEnabled}
+              quickActionResult={quickActionResult}
             />
-          ) : exportHistory.map((item) => (
-            <article key={item.id} className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex rounded-full bg-fuchsia-100 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700">
-                      CSV Dışa Aktarımı
-                    </span>
-                    <span className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[11px] font-semibold text-neutral-700">
-                      {item.total} satır
-                    </span>
-                  </div>
-                  <p className="mt-3 text-base font-semibold text-neutral-950">{item.summary}</p>
-                  <p className="mt-2 text-sm text-neutral-600">{formatFilterSummary(item.filters)}</p>
-                </div>
+          </div>
 
-                <div className="grid gap-3 sm:grid-cols-2 xl:w-[360px] xl:grid-cols-1">
-                  <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Kullanıcı</p>
-                    <p className="mt-1 text-sm font-semibold text-neutral-950">{item.actorLabel ?? labels.notSpecified}</p>
-                  </div>
-                  <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Tarih</p>
-                    <p className="mt-1 text-sm font-semibold text-neutral-950">{formatDate(item.createdAt, locale, labels.notSpecified)}</p>
-                  </div>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
+          <div id="inventory-reports" className={getSectionPanelClass(activeSection, "inventory-reports")}>
+            <InventoryReportsPanel
+              labels={labels}
+              locale={locale}
+              reports={reports}
+              stockCounts={stockCounts}
+              activePeriodDays={query.reportPeriodDays}
+              onPeriodChange={(value) => router.push(getOverviewHref({ reportPeriodDays: value }))}
+              onReviewLowStock={() => goToInventoryWithFilters({ stockStatusFilter: "low_stock" })}
+              onReviewSlowMoving={(sku) => goToInventoryWithFilters({ search: sku })}
+              onStartStockCount={() => router.push(stockCountsPath)}
+              formatDate={formatDate}
+            />
+          </div>
 
+          <div id="inventory-sync" className={getSectionPanelClass(activeSection, "inventory-sync")}>
+            <InventorySyncPanel
+              labels={labels}
+              locale={locale}
+              integrationSummary={integrationSummary}
+              externalEventMonitoring={externalEventMonitoring}
+              formatDate={formatDate}
+            />
+          </div>
+
+          <div id="inventory-critical" className={getSectionPanelClass(activeSection, "inventory-critical")}>
+            <InventoryCriticalPanel
+              labels={labels}
+              locale={locale}
+              alertResult={alertResult}
+              formatDate={formatDate}
+              alertTypeLabel={alertTypeLabel}
+            />
+          </div>
+
+          <div id="inventory-counts" className={getSectionPanelClass(activeSection, "inventory-counts")}>
+            <InventoryCountsPanel
+              labels={labels}
+              locale={locale}
+              stockCounts={stockCounts}
+              formatDate={formatDate}
+              stockCountStatusClass={stockCountStatusClass}
+              stockCountStatusLabel={(status) => stockCountStatusLabel(status, labels)}
+              onOpenStockCountDrawer={openStockCountDrawer}
+            />
+          </div>
+
+          <div id="inventory-warehouses" className={getSectionPanelClass(activeSection, "inventory-warehouses")}>
+            <InventoryWarehousesPanel
+              labels={labels}
+              warehouses={warehouses}
+              onFocusWarehouse={(warehouseCode) => goToInventoryWithFilters({ warehouseFilter: warehouseCode })}
+              onOpenWarehouseDrawer={openWarehouseDrawer}
+            />
+          </div>
+
+          <div id="inventory-transactions" className={getSectionPanelClass(activeSection, "inventory-transactions")}>
+            <InventoryTransactionsPanel
+              labels={labels}
+              locale={locale}
+              query={query}
+              warehouses={warehouses}
+              transactionResult={transactionResult}
+              formatDate={formatDate}
+              formatSourceDocument={formatSourceDocument}
+              formatSourceDocumentMeta={formatSourceDocumentMeta}
+              formatTransactionType={(type) => formatTransactionType(type, labels)}
+              getTransactionBadgeClass={getTransactionBadgeClass}
+              onOpenTransactionDrawer={openTransactionDrawer}
+              getTransactionPageHref={getTransactionPageHref}
+            />
+          </div>
+
+          <div id="inventory-exports" className={getSectionPanelClass(activeSection, "inventory-exports")}>
+            <InventoryExportsPanel
+              labels={labels}
+              locale={locale}
+              exportHistory={exportHistory}
+              formatDate={formatDate}
+            />
+          </div>
+        </>
+      )}
+
+      {pageVariant === "inventory-list" ? (
+        <>
       <form id="inventory-list" className={getSectionPanelClass(activeSection, "inventory-list")} aria-label="Stok listesi filtre formu">
         <div className="mb-5 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Toplu Islem Alani</p>
-              <p className="mt-1 text-sm text-neutral-600">Toplu stok guncelleme ve tercih edilen depo atamalarini ihtiyac oldugunda ac.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Toplu İşlem Alanı</p>
             </div>
             <button
               type="button"
-              onClick={() => setBulkToolsExpanded((current) => !current)}
+              onClick={() => {
+                setBulkToolsExpanded((current) => !current);
+                setActiveBulkToolTab("adjust");
+              }}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
             >
               {bulkToolsExpanded ? "Toplu islemleri gizle" : "Toplu islemleri ac"}
@@ -3439,209 +3005,303 @@ export function InventoryManager({
           </div>
 
           {bulkToolsExpanded ? (
-            <div className="mt-4 grid gap-4 xl:grid-cols-2">
-              <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Toplu Stok Guncelleme</p>
-                    <p className="mt-1 text-sm text-neutral-600">Format: `SKU,DEPO_KODU,HEDEF_STOK,MIN_STOK,GUVENLIK_STOK,NOT`</p>
-                  </div>
+            <div className="mt-4 rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "adjust" as const, label: "Stok Güncelleme" },
+                  { id: "warehouse" as const, label: "Depo Atama" },
+                  { id: "history" as const, label: "Geçmiş" },
+                ].map((tab) => (
                   <button
+                    key={tab.id}
                     type="button"
-                    onClick={() => void submitBulkOperation("adjust")}
-                    disabled={bulkOperationPending !== null}
-                    className="h-10 rounded-xl border border-neutral-300 bg-neutral-900 px-3 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => setActiveBulkToolTab(tab.id)}
+                    className={`inline-flex h-10 items-center justify-center rounded-2xl border px-4 text-sm font-medium transition ${
+                      activeBulkToolTab === tab.id
+                        ? "border-neutral-900 bg-neutral-900 text-white"
+                        : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100"
+                    }`}
                   >
-                    Toplu Guncelle
+                    {tab.label}
                   </button>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => downloadBulkTemplate("adjust")}
-                    className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-neutral-50 px-3 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
-                  >
-                    Şablon indir
-                  </button>
-                </div>
-                <textarea
-                  value={bulkAdjustCsv}
-                  onChange={(event) => setBulkAdjustCsv(event.target.value)}
-                  rows={7}
-                  placeholder="SKU-001,MAIN,45,10,5,Sezon duzeltmesi"
-                  className="mt-4 w-full rounded-2xl border border-neutral-300 px-3 py-3 text-sm outline-none transition focus:border-neutral-500"
-                />
-              </section>
-
-              <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Toplu Tercihli Depo Atama</p>
-                    <p className="mt-1 text-sm text-neutral-600">Format: `SKU,TERCIH_EDILEN_SATIS_DEPOSU`</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void submitBulkOperation("warehouse")}
-                    disabled={bulkOperationPending !== null}
-                    className="h-10 rounded-xl border border-neutral-300 bg-neutral-900 px-3 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Toplu Ata
-                  </button>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => downloadBulkTemplate("warehouse")}
-                    className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-neutral-50 px-3 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
-                  >
-                    Şablon indir
-                  </button>
-                </div>
-                <textarea
-                  value={bulkWarehouseCsv}
-                  onChange={(event) => setBulkWarehouseCsv(event.target.value)}
-                  rows={7}
-                  placeholder="SKU-001,MAIN"
-                  className="mt-4 w-full rounded-2xl border border-neutral-300 px-3 py-3 text-sm outline-none transition focus:border-neutral-500"
-                />
-              </section>
-            </div>
-          ) : null}
-
-          {bulkOperationHistory.length > 0 ? (
-            <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Toplu İşlem Geçmişi</p>
-                  <p className="mt-1 text-sm text-neutral-600">Bu oturumda çalıştırılan son toplu işlemler.</p>
-                </div>
-              </div>
-              <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                {bulkOperationHistory.map((historyItem) => (
-                  <article key={historyItem.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-neutral-950">
-                        {historyItem.type === "adjust"
-                          ? "Toplu stok güncelleme"
-                          : historyItem.type === "warehouse"
-                            ? "Toplu depo atama"
-                            : "Toplu sayım güncelleme"}
-                      </p>
-                      <span className="text-xs text-neutral-500">{formatDate(historyItem.createdAt, locale, labels.notSpecified)}</span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">Başarılı: {historyItem.successCount}</span>
-                      <span className="rounded-full bg-rose-100 px-2 py-1 font-semibold text-rose-700">Hatalı: {historyItem.failureCount}</span>
-                      <span className="rounded-full bg-neutral-200 px-2 py-1 font-semibold text-neutral-700">Toplam: {historyItem.total}</span>
-                    </div>
-                  </article>
                 ))}
               </div>
-            </div>
-          ) : null}
 
-          {operationHistory.length > 0 ? (
-            <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Kalıcı Operasyon Geçmişi</p>
-                  <p className="mt-1 text-sm text-neutral-600">Inventory için özel geçmiş projeksiyonundan beslenen son stok ve depo operasyonları.</p>
-                </div>
-              </div>
-              <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                {operationHistory.map((historyItem) => (
-                  <article key={historyItem.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-neutral-950">{historyItem.title}</p>
-                        <p className="mt-1 text-xs text-neutral-600">{historyItem.summary}</p>
+              {activeBulkToolTab === "adjust" ? (
+                <section className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Toplu Stok Güncelleme</p>
+                      <p className="mt-1 text-sm text-neutral-600">Format: `SKU,DEPO_KODU,HEDEF_STOK,MIN_STOK,GUVENLIK_STOK,NOT`</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => downloadBulkTemplate("adjust")}
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+                      >
+                        Şablon indir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void submitBulkOperation("adjust")}
+                        disabled={bulkOperationPending !== null}
+                        className="h-10 rounded-xl border border-neutral-300 bg-neutral-900 px-3 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Toplu Güncelle
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={bulkAdjustCsv}
+                    onChange={(event) => setBulkAdjustCsv(event.target.value)}
+                    rows={7}
+                    placeholder="SKU-001,MAIN,45,10,5,Sezon duzeltmesi"
+                    className="mt-4 w-full rounded-2xl border border-neutral-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-neutral-500"
+                  />
+                </section>
+              ) : null}
+
+              {activeBulkToolTab === "warehouse" ? (
+                <section className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Toplu Tercihli Depo Atama</p>
+                      <p className="mt-1 text-sm text-neutral-600">Format: `SKU,TERCIH_EDILEN_SATIS_DEPOSU`</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => downloadBulkTemplate("warehouse")}
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+                      >
+                        Şablon indir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void submitBulkOperation("warehouse")}
+                        disabled={bulkOperationPending !== null}
+                        className="h-10 rounded-xl border border-neutral-300 bg-neutral-900 px-3 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Toplu Ata
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={bulkWarehouseCsv}
+                    onChange={(event) => setBulkWarehouseCsv(event.target.value)}
+                    rows={7}
+                    placeholder="SKU-001,MAIN"
+                    className="mt-4 w-full rounded-2xl border border-neutral-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-neutral-500"
+                  />
+                </section>
+              ) : null}
+
+              {activeBulkToolTab === "history" ? (
+                <section className="mt-4 space-y-4">
+                  {bulkOperationHistory.length > 0 ? (
+                    <div className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Toplu İşlem Geçmişi</p>
+                          <p className="mt-1 text-sm text-neutral-600">Bu oturumda çalıştırılan son toplu işlemler.</p>
+                        </div>
                       </div>
-                      <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${
-                        historyItem.entityType === "WAREHOUSE"
-                          ? "bg-sky-100 text-sky-700"
-                          : "bg-neutral-200 text-neutral-700"
-                      }`}>
-                        {historyItem.entityType === "WAREHOUSE" ? "Depo" : "Stok"}
-                      </span>
+                      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                        {bulkOperationHistory.map((historyItem) => (
+                          <article key={historyItem.id} className="rounded-xl border border-neutral-200 bg-white p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-neutral-950">
+                                {historyItem.type === "adjust"
+                                  ? "Toplu stok güncelleme"
+                                  : historyItem.type === "warehouse"
+                                    ? "Toplu depo atama"
+                                    : "Toplu sayım güncelleme"}
+                              </p>
+                              <span className="text-xs text-neutral-500">{formatDate(historyItem.createdAt, locale, labels.notSpecified)}</span>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                              <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">Başarılı: {historyItem.successCount}</span>
+                              <span className="rounded-full bg-rose-100 px-2 py-1 font-semibold text-rose-700">Hatalı: {historyItem.failureCount}</span>
+                              <span className="rounded-full bg-neutral-200 px-2 py-1 font-semibold text-neutral-700">Toplam: {historyItem.total}</span>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-neutral-500">
-                      <span>{formatDate(historyItem.createdAt, locale, labels.notSpecified)}</span>
-                      {historyItem.actorLabel ? <span>• {historyItem.actorLabel}</span> : null}
+                  ) : null}
+
+                  {operationHistory.length > 0 ? (
+                    <div className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Kalıcı Operasyon Geçmişi</p>
+                          <p className="mt-1 text-sm text-neutral-600">Inventory için özel geçmiş projeksiyonundan beslenen son stok ve depo operasyonları.</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                        {operationHistory.map((historyItem) => (
+                          <article key={historyItem.id} className="rounded-xl border border-neutral-200 bg-white p-3">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-semibold text-neutral-950">{historyItem.title}</p>
+                                <p className="mt-1 text-xs text-neutral-600">{historyItem.summary}</p>
+                              </div>
+                              <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${
+                                historyItem.entityType === "WAREHOUSE"
+                                  ? "bg-sky-100 text-sky-700"
+                                  : "bg-neutral-200 text-neutral-700"
+                              }`}>
+                                {historyItem.entityType === "WAREHOUSE" ? "Depo" : "Stok"}
+                              </span>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-neutral-500">
+                              <span>{formatDate(historyItem.createdAt, locale, labels.notSpecified)}</span>
+                              {historyItem.actorLabel ? <span>• {historyItem.actorLabel}</span> : null}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
                     </div>
-                  </article>
-                ))}
-              </div>
+                  ) : null}
+                </section>
+              ) : null}
             </div>
           ) : null}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto_auto]">
-          <input
-            type="search"
-            name="search"
-            defaultValue={query.search}
-            placeholder={labels.search}
-            aria-label={labels.search}
-            className="h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          />
-          <select
-            name="stockStatusFilter"
-            defaultValue={query.stockStatusFilter}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          >
-            <option value="all">{labels.stockFilter}: {labels.all}</option>
-            <option value="in_stock">{labels.stockFilter}: {labels.inStock}</option>
-            <option value="low_stock">{labels.stockFilter}: {labels.lowStock}</option>
-            <option value="out_of_stock">{labels.stockFilter}: {labels.outOfStock}</option>
-          </select>
-          <select
-            name="reservationFilter"
-            defaultValue={query.reservationFilter}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          >
-            <option value="all">{labels.reservationFilter}: {labels.all}</option>
-            <option value="with_reserved">{labels.reservationFilter}: {labels.withReservations}</option>
-            <option value="without_reserved">{labels.reservationFilter}: {labels.withoutReservations}</option>
-          </select>
-          <select
-            name="warehouseFilter"
-            defaultValue={query.warehouseFilter}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          >
-            {warehouseOptions.map((warehouseCode) => (
-              <option key={warehouseCode} value={warehouseCode}>
-                {labels.warehouseFilter}: {warehouseCode === "all" ? labels.allWarehouses : warehouseCode}
-              </option>
-            ))}
-          </select>
-          <select
-            name="movementTypeFilter"
-            defaultValue={query.movementTypeFilter}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          >
-            {movementTypeOptions.map((option) => (
-              <option key={option.value} value={option.value}>{labels.movementTypeFilter}: {option.label}</option>
-            ))}
-          </select>
-          <button type="submit" className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800 sm:col-span-2 xl:col-span-1">
-            {labels.search}
-          </button>
-          <button
-            type="button"
-            onClick={() => void exportVisibleRowsCsv()}
-            aria-label={labels.exportCsv}
-            title={labels.exportCsv}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-neutral-300 bg-white text-neutral-700 transition hover:bg-neutral-100"
-          >
-            <Download className="h-5 w-5" />
-          </button>
+        <div className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Liste Filtreleri</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="submit" className="h-11 rounded-2xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800">
+                {labels.search}
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`${overviewPath}/products`)}
+                className="h-11 rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+              >
+                Filtreleri Temizle
+              </button>
+              <button
+                type="button"
+                onClick={() => void exportVisibleRowsCsv()}
+                aria-label={labels.exportCsv}
+                title={labels.exportCsv}
+                className="inline-flex h-11 items-center justify-center rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+              >
+                <Download className="mr-2 h-5 w-5" />
+                {labels.exportCsv}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[1.4fr_1fr_1fr]">
+            <label className="grid gap-2">
+              <span className="text-xs font-medium text-neutral-600">{labels.search}</span>
+              <input
+                type="search"
+                name="search"
+                defaultValue={query.search}
+                placeholder="Ürün adı, SKU veya barkod ara"
+                aria-label={labels.search}
+                className="h-11 w-full rounded-2xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-xs font-medium text-neutral-600">{labels.stockFilter}</span>
+              <select
+                name="stockStatusFilter"
+                defaultValue={query.stockStatusFilter}
+                className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
+              >
+                <option value="all">{labels.all}</option>
+                <option value="in_stock">{labels.inStock}</option>
+                <option value="low_stock">{labels.lowStock}</option>
+                <option value="out_of_stock">{labels.outOfStock}</option>
+              </select>
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-xs font-medium text-neutral-600">{labels.reservationFilter}</span>
+              <select
+                name="reservationFilter"
+                defaultValue={query.reservationFilter}
+                className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
+              >
+                <option value="all">{labels.all}</option>
+                <option value="with_reserved">{labels.withReservations}</option>
+                <option value="without_reserved">{labels.withoutReservations}</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <label className="grid gap-2">
+              <span className="text-xs font-medium text-neutral-600">{labels.warehouseFilter}</span>
+              <select
+                name="warehouseFilter"
+                defaultValue={query.warehouseFilter}
+                className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
+              >
+                {warehouseOptions.map((warehouseCode) => (
+                  <option key={warehouseCode} value={warehouseCode}>
+                    {warehouseCode === "all" ? labels.allWarehouses : warehouseCode}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-xs font-medium text-neutral-600">{labels.movementTypeFilter}</span>
+              <select
+                name="movementTypeFilter"
+                defaultValue={query.movementTypeFilter}
+                className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
+              >
+                {movementTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Hızlı Kısayollar</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => goToInventoryWithFilters({ stockStatusFilter: "low_stock" })}
+                className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-xs font-medium text-amber-800 transition hover:bg-amber-100"
+              >
+                Düşük stokları aç
+              </button>
+              <button
+                type="button"
+                onClick={() => goToInventoryWithFilters({ stockStatusFilter: "out_of_stock" })}
+                className="inline-flex h-9 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-3 text-xs font-medium text-rose-800 transition hover:bg-rose-100"
+              >
+                Tükenenleri aç
+              </button>
+              <button
+                type="button"
+                onClick={() => goToInventoryWithFilters({})}
+                className="inline-flex h-9 items-center justify-center rounded-xl border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
+              >
+                Tüm kayıtları göster
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mt-4 rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Liste Tercihleri</p>
-              <p className="mt-1 text-sm text-neutral-600">Kompakt görünüm ve görünür alan tercihleri burada kalıcı olarak saklanır.</p>
             </div>
             <button
               type="button"
@@ -3649,242 +3309,70 @@ export function InventoryManager({
                 ...current,
                 compactInventoryList: !current.compactInventoryList,
               }))}
-              className={`inline-flex h-10 items-center justify-center rounded-xl border px-4 text-sm font-medium transition ${
+              className={`inline-flex h-11 items-center justify-center rounded-2xl border px-4 text-sm font-medium transition ${
                 compactInventoryList
                   ? "border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-800"
                   : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100"
               }`}
             >
-              {compactInventoryList ? "Kompakt görünüm açık" : "Kompakt görünümü aç"}
+              {compactInventoryList ? "Kompakt görünüm aktif" : "Kompakt görünümü etkinleştir"}
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { key: "warehouse" as const, label: "Depo alanı" },
-              { key: "stock" as const, label: "Stok özeti" },
-              { key: "movement" as const, label: "Hareket alanı" },
-              { key: "reservation" as const, label: "Rezervasyon bilgisi" },
-              { key: "preference" as const, label: "Tercihli depo bilgisi" },
-            ].map((column) => (
-              <button
-                key={column.key}
-                type="button"
-                onClick={() => toggleVisibleColumn(column.key)}
-                className={`inline-flex h-9 items-center justify-center rounded-full border px-3 text-xs font-medium transition ${
-                  visibleColumns[column.key]
-                    ? "border-neutral-900 bg-neutral-900 text-white"
-                    : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100"
-                }`}
-              >
-                {column.label}
-              </button>
-            ))}
+
+          <div className="mt-4">
+            <article className="rounded-2xl border border-neutral-200 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">Görünür Bilgi Alanları</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[
+                  { key: "warehouse" as const, label: "Depo alanı" },
+                  { key: "stock" as const, label: "Stok özeti" },
+                  { key: "movement" as const, label: "Hareket alanı" },
+                  { key: "reservation" as const, label: "Rezervasyon bilgisi" },
+                  { key: "preference" as const, label: "Tercihli depo bilgisi" },
+                ].map((column) => (
+                  <button
+                    key={column.key}
+                    type="button"
+                    onClick={() => toggleVisibleColumn(column.key)}
+                    className={`inline-flex h-9 items-center justify-center rounded-full border px-3 text-xs font-medium transition ${
+                      visibleColumns[column.key]
+                        ? "border-neutral-900 bg-neutral-900 text-white"
+                        : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100"
+                    }`}
+                  >
+                    {column.label}
+                  </button>
+                ))}
+              </div>
+            </article>
           </div>
         </div>
       </form>
 
-      {feedback ? (
-        <p className={`mx-5 mt-4 rounded-lg border px-3 py-2 text-sm ${feedback.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
-          {feedback.message}
-        </p>
+      <InventoryListResultsPanel
+        labels={labels}
+        locale={locale}
+        result={result}
+        compactInventoryList={compactInventoryList}
+        visibleColumns={visibleColumns}
+        bulkOperationResult={bulkOperationResult}
+        bulkFailureSummary={bulkFailureSummary}
+        feedback={feedback}
+        formatDate={formatDate}
+        formatProductType={formatProductType}
+        formatUnitType={formatUnitType}
+        statusClass={statusClass}
+        statusLabel={(status, inventoryLabels) => statusLabel(status, inventoryLabels as Labels)}
+        movementTypeClass={movementTypeClass}
+        movementTypeLabel={(movementType, inventoryLabels) => movementTypeLabel(movementType, inventoryLabels as Labels)}
+        getRowKey={getRowKey}
+        getPageHref={getPageHref}
+        prevPage={prevPage}
+        nextPage={nextPage}
+        onOpenDrawer={(item, timestamp) => openDrawer(item, "view", timestamp)}
+      />
+        </>
       ) : null}
-
-      {bulkOperationResult ? (
-        <div className="mx-5 mt-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="font-semibold text-neutral-950">Toplu işlem özeti</span>
-            <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">Başarılı: {bulkOperationResult.successCount}</span>
-            <span className="rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700">Hatalı: {bulkOperationResult.failureCount}</span>
-            <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-semibold text-neutral-700">Toplam: {bulkOperationResult.total}</span>
-          </div>
-          {bulkFailureSummary.length > 0 ? (
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              {bulkFailureSummary.map((item) => (
-                <article key={item.code} className="rounded-2xl border border-rose-200 bg-rose-50/70 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-rose-900">{item.message}</p>
-                    <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-rose-700">{item.count} satır</span>
-                  </div>
-                  {item.hint ? (
-                    <p className="mt-2 text-xs text-rose-800">{item.hint}</p>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          ) : null}
-          <div className="mt-4 grid gap-2">
-            {bulkOperationResult.rows.slice(0, 16).map((row: BulkOperationResult["rows"][number]) => (
-              <article key={`${row.rowNumber}-${row.sku}-${row.message}`} className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium text-neutral-900">
-                      Satır {row.rowNumber} • {row.sku || "SKU yok"}
-                      {row.warehouseCode ? ` • ${row.warehouseCode}` : ""}
-                    </p>
-                    {row.inputSummary ? (
-                      <p className="mt-1 text-xs text-neutral-500">{row.inputSummary}</p>
-                    ) : null}
-                  </div>
-                  <span className={row.success ? "text-emerald-700" : "text-rose-700"}>{row.message}</span>
-                </div>
-                {!row.success && row.hint ? (
-                  <p className="mt-2 text-xs text-rose-700">Öneri: {row.hint}</p>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="overflow-hidden rounded-b-3xl">
-        <div className="hidden grid-cols-[1.5fr_180px_180px_150px_140px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
-          <span>{labels.product}</span>
-          <span>{labels.warehouse}</span>
-          <span>Stok Özeti</span>
-          <span>Operasyon Sinyali</span>
-          <span>{labels.detail}</span>
-        </div>
-
-        {result.items.length === 0 ? (
-          <div className="p-6">
-            <EmptyStateCard
-              title="Filtrelere uygun stok kaydi bulunmadi"
-              description="Arama terimini sadeleştir veya filtreleri temizleyerek tum stok kayitlarini tekrar listele."
-            />
-          </div>
-        ) : (
-          <div className="divide-y divide-neutral-200">
-            {result.items.map((item) => {
-              const rowKey = getRowKey(item);
-              const stockSignal = item.availableStock <= 0
-                ? "Stok tükendi"
-                : item.availableStock <= item.safetyStock
-                  ? "Güvenlik stok sınırında"
-                  : item.availableStock <= item.reorderPoint
-                    ? "Yeniden sipariş gerekli"
-                    : "Stok seviyesi sağlıklı";
-
-              return (
-                <article key={rowKey} className={`grid gap-3 p-4 transition hover:bg-neutral-50 ${
-                  compactInventoryList ? "lg:grid-cols-[1.5fr_150px_150px_120px]" : "lg:grid-cols-[1.5fr_180px_180px_150px_140px]"
-                } lg:items-center`}>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate font-medium text-neutral-950">{item.name}</p>
-                      <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${statusClass(item.stockStatus)}`}>
-                        {statusLabel(item.stockStatus, labels)}
-                      </span>
-                    </div>
-                    <p className="mt-1 truncate text-xs text-neutral-500">/{item.slug} · {labels.sku}: {item.sku}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[11px] text-neutral-700">
-                        {formatProductType(item.productType)}
-                      </span>
-                      <span className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[11px] text-neutral-700">
-                        {formatUnitType(item.unitType)}
-                      </span>
-                      {visibleColumns.reservation && item.hasReservations ? (
-                        <span className="inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[11px] font-medium text-cyan-800">
-                          Rezervasyon var
-                        </span>
-                      ) : null}
-                      {visibleColumns.preference && item.preferredSalesWarehouseCode ? (
-                        <span className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[11px] text-neutral-700">
-                          Satış deposu: {item.preferredSalesWarehouseCode}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="grid gap-2 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-3 text-sm lg:hidden">
-                    {visibleColumns.warehouse ? (
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs font-medium text-neutral-500">{labels.warehouse}</span>
-                        <span className="text-sm text-neutral-700">{item.warehouseName ?? item.warehouseCode ?? labels.notSpecified}</span>
-                      </div>
-                    ) : null}
-                    <div className="grid gap-2 text-xs text-neutral-600">
-                      {visibleColumns.stock ? (
-                        <>
-                          <p>{labels.availableStock}: <span className="font-semibold text-neutral-900">{item.availableStock}</span> • {labels.onHandStock}: <span className="font-semibold text-neutral-900">{item.onHandStock}</span></p>
-                          <p>{labels.reservedStock}: <span className="font-semibold text-neutral-900">{item.reservedStock}</span> • Min: <span className="font-semibold text-neutral-900">{item.reorderPoint}</span></p>
-                        </>
-                      ) : null}
-                      <p>{stockSignal}</p>
-                      {visibleColumns.movement ? (
-                        <p>{labels.lastMovementAt}: <span className="font-semibold text-neutral-900">{formatDate(item.lastMovementAt, locale, labels.notSpecified)}</span></p>
-                      ) : null}
-                    </div>
-                    {visibleColumns.movement ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${movementTypeClass(item.lastMovementType)}`}>
-                          {movementTypeLabel(item.lastMovementType, labels)}
-                        </span>
-                      </div>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={(event) => openDrawer(item, "view", event.timeStamp)}
-                      className="h-10 rounded-xl border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
-                    >
-                      {labels.viewDetails}
-                    </button>
-                  </div>
-                  {visibleColumns.warehouse ? (
-                    <p className="hidden text-sm text-neutral-700 lg:block">
-                      {item.warehouseName ?? item.warehouseCode ?? labels.notSpecified}
-                      {item.isDefaultWarehouse ? (
-                        <span className="ml-2 inline-flex rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] font-semibold text-neutral-700">{labels.defaultWarehouse}</span>
-                      ) : null}
-                    </p>
-                  ) : null}
-                  {visibleColumns.stock ? (
-                    <div className="hidden lg:block">
-                      <p className="text-sm font-semibold text-neutral-950">{item.availableStock} kullanılabilir</p>
-                      <p className="mt-1 text-xs text-neutral-500">
-                        Mevcut {item.onHandStock} • Rezerve {item.reservedStock} • Min {item.reorderPoint}
-                      </p>
-                    </div>
-                  ) : null}
-                  {visibleColumns.movement ? (
-                    <div className="hidden lg:block">
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${movementTypeClass(item.lastMovementType)}`}>
-                        {movementTypeLabel(item.lastMovementType, labels)}
-                      </span>
-                      <p className="mt-2 text-xs text-neutral-500">{stockSignal}</p>
-                      <p className="mt-1 text-xs text-neutral-500">{formatDate(item.lastMovementAt, locale, labels.notSpecified)}</p>
-                    </div>
-                  ) : (
-                    <div className="hidden lg:block">
-                      <p className="text-xs text-neutral-500">{stockSignal}</p>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={(event) => openDrawer(item, "view", event.timeStamp)}
-                    className="hidden h-10 rounded-xl border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100 lg:block"
-                  >
-                    {labels.viewDetails}
-                  </button>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between gap-3 border-t border-neutral-200 p-4">
-        {prevPage ? (
-          <Link href={getPageHref(prevPage)} className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100">
-            {labels.prev}
-          </Link>
-        ) : <span />}
-        <p className="text-sm text-neutral-500">{labels.page} {result.page}/{result.totalPages}</p>
-        {nextPage ? (
-          <Link href={getPageHref(nextPage)} className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100">
-            {labels.next}
-          </Link>
-        ) : <span />}
-      </div>
 
       {drawerItem ? (
         <div className="fixed inset-0 z-50">
@@ -3922,561 +3410,142 @@ export function InventoryManager({
 
             <div className="grid gap-5 p-5 xl:grid-cols-[1.1fr_0.9fr]">
               <div className="grid gap-5">
-                <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(8,47,73,0.94),rgba(21,128,61,0.88))] p-5 text-white shadow-sm">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">Ürün Kartı</p>
-                      <h4 className="mt-2 text-2xl font-semibold">{drawerItem.name}</h4>
-                      <p className="mt-2 text-sm text-white/70">/{drawerItem.slug} • {labels.sku}: {drawerItem.sku}</p>
-                      <p className="mt-1 text-xs text-white/60">
-                        Barkod: {drawerItem.barcode ?? labels.notSpecified} • Birim: {formatUnitType(drawerItem.unitType)} • Tip: {formatProductType(drawerItem.productType)}
-                      </p>
-                    </div>
-                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusClass(drawerItem.stockStatus)}`}>
-                      {statusLabel(drawerItem.stockStatus, labels)}
-                    </span>
-                  </div>
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    <article className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur">
-                      <p className="text-xs text-white/65">Operasyon deposu</p>
-                      <p className="mt-1 text-base font-semibold">
-                        {drawerItem.warehouseName ?? drawerItem.warehouseCode ?? labels.notSpecified}
-                      </p>
-                    </article>
-                    <article className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur">
-                      <p className="text-xs text-white/65">{labels.onHandStock}</p>
-                      <p className="mt-1 text-base font-semibold">{drawerItem.onHandStock}</p>
-                    </article>
-                    <article className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur">
-                      <p className="text-xs text-white/65">{labels.availableStock}</p>
-                      <p className="mt-1 text-base font-semibold">{drawerItem.availableStock}</p>
-                    </article>
-                  </div>
-                  <div className="mt-5 grid gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur sm:grid-cols-3">
-                    <div>
-                      <p className="text-xs text-white/65">Stok sinyali</p>
-                      <p className="mt-1 text-sm font-semibold text-white">{drawerStockCoverage}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-white/65">Tercihli satış deposu</p>
-                      <p className="mt-1 text-sm font-semibold text-white">
-                        {drawerItem.preferredSalesWarehouseCode ?? labels.notSpecified}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-white/65">Tercihli tedarik deposu</p>
-                      <p className="mt-1 text-sm font-semibold text-white">
-                        {drawerItem.preferredPurchaseWarehouseCode ?? labels.notSpecified}
-                      </p>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Stok Kartı</p>
-                      <h4 className="mt-1 text-base font-semibold text-neutral-950">Anlık stok durumu</h4>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <article className="rounded-2xl border border-neutral-200 bg-white p-3">
-                      <p className="text-xs text-neutral-500">{labels.onHandStock}</p>
-                      <p className="mt-1 text-lg font-semibold text-neutral-900">{drawerItem.onHandStock}</p>
-                    </article>
-                    <article className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-3">
-                      <p className="text-xs text-cyan-700">{labels.reservedStock}</p>
-                      <p className="mt-1 text-lg font-semibold text-cyan-800">{drawerItem.reservedStock}</p>
-                    </article>
-                    <article className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3">
-                      <p className="text-xs text-emerald-700">{labels.availableStock}</p>
-                      <p className="mt-1 text-lg font-semibold text-emerald-800">{drawerItem.availableStock}</p>
-                    </article>
-                    <article className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
-                      <p className="text-xs text-amber-700">{labels.reorderPoint}</p>
-                      <p className="mt-1 text-lg font-semibold text-amber-800">{drawerItem.reorderPoint}</p>
-                    </article>
-                    <article className="rounded-2xl border border-orange-200 bg-orange-50/70 p-3 sm:col-span-2 lg:col-span-2">
-                      <p className="text-xs text-orange-700">{labels.safetyStock}</p>
-                      <p className="mt-1 text-lg font-semibold text-orange-800">{drawerItem.safetyStock}</p>
-                    </article>
-                  </div>
-                  <div className="mt-4 grid gap-3 lg:grid-cols-3">
-                    <article className="rounded-2xl border border-neutral-200 bg-white p-3">
-                      <p className="text-xs text-neutral-500">Ürün tipi</p>
-                      <p className="mt-1 text-sm font-semibold text-neutral-950">{formatProductType(drawerItem.productType)}</p>
-                    </article>
-                    <article className="rounded-2xl border border-neutral-200 bg-white p-3">
-                      <p className="text-xs text-neutral-500">Birim tipi</p>
-                      <p className="mt-1 text-sm font-semibold text-neutral-950">{formatUnitType(drawerItem.unitType)}</p>
-                    </article>
-                    <article className="rounded-2xl border border-neutral-200 bg-white p-3">
-                      <p className="text-xs text-neutral-500">Rezervasyon</p>
-                      <p className="mt-1 text-sm font-semibold text-neutral-950">
-                        {drawerItem.hasReservations ? "Aktif rezervasyon var" : "Rezervasyon bulunmuyor"}
-                      </p>
-                    </article>
-                  </div>
-                </section>
-
-                <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-                  <article className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Ticari Kart</p>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                        <p className="text-xs text-neutral-500">Satış fiyatı</p>
-                        <p className="mt-1 text-sm font-semibold text-neutral-950">{formatCurrency(drawerItem.unitPrice, locale)}</p>
-                      </div>
-                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                        <p className="text-xs text-neutral-500">Alış fiyatı</p>
-                        <p className="mt-1 text-sm font-semibold text-neutral-950">
-                          {drawerItem.purchasePrice === null ? labels.notSpecified : formatCurrency(drawerItem.purchasePrice, locale)}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                        <p className="text-xs text-neutral-500">Liste fiyatı</p>
-                        <p className="mt-1 text-sm font-semibold text-neutral-950">
-                          {drawerItem.compareAtPrice === null ? labels.notSpecified : formatCurrency(drawerItem.compareAtPrice, locale)}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                        <p className="text-xs text-neutral-500">Tahmini stok marjı</p>
-                        <p className="mt-1 text-sm font-semibold text-neutral-950">
-                          {drawerMarginEstimate === null ? labels.notSpecified : formatCurrency(drawerMarginEstimate, locale)}
-                        </p>
-                      </div>
-                    </div>
-                  </article>
-
-                  <article className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Operasyon Profili</p>
-                    <div className="mt-4 space-y-3 text-sm text-neutral-700">
-                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                        <p className="text-xs text-neutral-500">Tercihli satış deposu</p>
-                        <p className="mt-1 font-semibold text-neutral-950">{drawerItem.preferredSalesWarehouseCode ?? labels.notSpecified}</p>
-                      </div>
-                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                        <p className="text-xs text-neutral-500">Tercihli tedarik deposu</p>
-                        <p className="mt-1 font-semibold text-neutral-950">{drawerItem.preferredPurchaseWarehouseCode ?? labels.notSpecified}</p>
-                      </div>
-                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                        <p className="text-xs text-neutral-500">Stok kararı</p>
-                        <p className="mt-1 font-semibold text-neutral-950">{drawerStockCoverage}</p>
-                      </div>
-                    </div>
-                  </article>
-                </section>
-
                 <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Depo Dağılımı</p>
-                      <h4 className="mt-1 text-base font-semibold text-neutral-950">Tüm depolarda stok görünümü</h4>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Hızlı Aksiyonlar</p>
+                      <p className="mt-1 text-sm text-neutral-600">Ürünü inceledikten sonra en sık yapılan işlemleri buradan başlat.</p>
                     </div>
-                    <span className="rounded-full bg-neutral-100 px-2 py-1 text-[11px] font-semibold text-neutral-700">
-                      {drawerItem.warehouseDistribution.length} depo
-                    </span>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    {drawerItem.warehouseDistribution.length === 0 ? (
-                      <EmptyStateCard
-                        title="Dağılım kaydı bulunmuyor"
-                        description="Bu ürün için depo bazlı stok seviyesi oluştukça burada listelenecek."
-                      />
-                    ) : drawerItem.warehouseDistribution.map((distribution) => (
-                      <article key={`${drawerItem.productId}-${distribution.warehouseCode}`} className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-neutral-950">{distribution.warehouseName}</p>
-                            <p className="mt-1 text-xs text-neutral-500">
-                              {distribution.warehouseCode}
-                              {distribution.isDefaultWarehouse ? " • Varsayılan depo" : ""}
-                            </p>
-                          </div>
-                          <div className="grid gap-1 text-right text-xs text-neutral-600">
-                            <p>Mevcut: <span className="font-semibold text-neutral-950">{distribution.onHandStock}</span></p>
-                            <p>Rezerve: <span className="font-semibold text-neutral-950">{distribution.reservedStock}</span></p>
-                            <p>Kullanilabilir: <span className="font-semibold text-neutral-950">{distribution.availableStock}</span></p>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="rounded-2xl border border-neutral-200 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Hareket Akışı</p>
-                      <h4 className="mt-1 text-sm font-semibold text-neutral-900">{labels.recentMovements}</h4>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label className="text-xs font-medium text-neutral-600">{labels.movementDateRange}</label>
-                      <select
-                        value={drawerDateRange}
-                        onChange={(event) => updateDrawerDateRange(event.target.value, event.timeStamp)}
-                        className="h-9 rounded-xl border border-neutral-300 px-2 text-xs text-neutral-700"
-                      >
-                        <option value="all">{labels.movementAllTime}</option>
-                        <option value="24h">{labels.movementLast24Hours}</option>
-                        <option value="7d">{labels.movementLast7Days}</option>
-                        <option value="30d">{labels.movementLast30Days}</option>
-                      </select>
-                      <select
-                        value={drawerMovementFilter}
-                        onChange={(event) => {
-                          setDrawerMovementFilter(event.target.value);
-                          setDrawerMovementPage(1);
-                        }}
-                        className="h-9 rounded-xl border border-neutral-300 px-2 text-xs text-neutral-700"
-                      >
-                        {movementTypeOptions.map((option) => (
-                          <option key={`drawer-${option.value}`} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={viewAllHistoryInList}
-                      className="text-xs font-medium text-neutral-700 underline decoration-neutral-300 underline-offset-4 transition hover:text-neutral-900"
-                    >
-                      {labels.viewAllHistory}
-                    </button>
-                    <p className="text-xs text-neutral-500">{labels.page} {drawerMovementPage}/{drawerMovementTotalPages}</p>
-                  </div>
-
-                  {drawerMovementItems.length === 0 ? (
-                    <p className="text-xs text-neutral-500">{labels.noRecentMovements}</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {drawerMovementItems.map((movement, index) => (
-                        <li key={`${movement.createdAt}:${index}`} className="grid gap-2 rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-3 text-xs text-neutral-700 sm:grid-cols-[auto_auto_1fr] sm:items-start">
-                          <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${movementTypeClass(movement.type)}`}>
-                            {movementTypeLabel(movement.type, labels)}
-                          </span>
-                          <span className={movement.quantity >= 0 ? "font-semibold text-emerald-700" : "font-semibold text-rose-700"}>
-                            {movement.quantity >= 0 ? `+${movement.quantity}` : movement.quantity}
-                          </span>
-                          <div className="flex flex-col gap-1">
-                            <span className="text-neutral-500">{formatDate(movement.createdAt, locale, labels.notSpecified)}</span>
-                            <span>{movement.note ?? labels.notSpecified}</span>
-                            {formatSourceDocument({
-                              type: movement.sourceDocumentType,
-                              number: movement.sourceDocumentNumber,
-                            }) ? (
-                              <span className="text-[11px] font-medium text-neutral-600">
-                                Kaynak: {formatSourceDocument({
-                                  type: movement.sourceDocumentType,
-                                  number: movement.sourceDocumentNumber,
-                                })}
-                              </span>
-                            ) : null}
-                            {movement.counterpartyWarehouseCode ? (
-                              <span className="text-[11px] text-neutral-500">
-                                {labels.movementCounterpartyWarehouse}: {movement.counterpartyWarehouseCode}
-                              </span>
-                            ) : null}
-                            {movement.reference ? (
-                              <span className="truncate text-[11px] text-neutral-400">
-                                {labels.movementReference}: {movement.reference}
-                              </span>
-                            ) : null}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {drawerMovementTotalPages > 1 ? (
-                    <div className="mt-3 flex items-center justify-end gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setDrawerMovementPage((prev) => Math.max(1, prev - 1))}
-                        disabled={drawerMovementPage <= 1}
-                        className="h-8 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => setDrawerMode("stock_in")}
+                        className="inline-flex h-10 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100"
                       >
-                        {labels.prev}
+                        {labels.stockIn}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDrawerMovementPage((prev) => Math.min(drawerMovementTotalPages, prev + 1))}
-                        disabled={drawerMovementPage >= drawerMovementTotalPages}
-                        className="h-8 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => setDrawerMode("stock_out")}
+                        className="inline-flex h-10 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 text-sm font-medium text-rose-800 transition hover:bg-rose-100"
                       >
-                        {labels.next}
+                        {labels.stockOut}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDrawerMode("transfer")}
+                        className="inline-flex h-10 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
+                      >
+                        {labels.transferStock}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={startStockCountFromDrawer}
+                        className="inline-flex h-10 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 text-sm font-medium text-sky-800 transition hover:bg-sky-100"
+                      >
+                        {labels.startStockCount}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={viewAllHistoryInList}
+                        className="inline-flex h-10 items-center justify-center rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+                      >
+                        {labels.viewAllHistory}
                       </button>
                     </div>
-                  ) : null}
+                  </div>
                 </section>
+
+                <InventoryDrawerOverviewPanel
+                  item={drawerItem}
+                  labels={labels}
+                  locale={locale}
+                  drawerStockCoverage={drawerStockCoverage}
+                  drawerMarginEstimate={drawerMarginEstimate}
+                  formatCurrency={formatCurrency}
+                  formatProductType={formatProductType}
+                  formatUnitType={formatUnitType}
+                  statusClass={statusClass}
+                  statusLabel={(status, inventoryLabels) => statusLabel(status, inventoryLabels as Labels)}
+                />
+
+                <InventoryDrawerDistributionPanel item={drawerItem} />
+
+                <InventoryDrawerMovementsPanel
+                  item={{ ...drawerItem, recentMovements: drawerMovementItems }}
+                  labels={labels}
+                  locale={locale}
+                  drawerDateRange={drawerDateRange}
+                  drawerMovementFilter={drawerMovementFilter}
+                  drawerMovementPage={drawerMovementPage}
+                  drawerMovementTotalPages={drawerMovementTotalPages}
+                  movementTypeOptions={movementTypeOptions}
+                  formatDate={formatDate}
+                  formatSourceDocument={formatSourceDocument}
+                  movementTypeClass={movementTypeClass}
+                  movementTypeLabel={(movementType, inventoryLabels) => movementTypeLabel(movementType, inventoryLabels as Labels)}
+                  onDateRangeChange={updateDrawerDateRange}
+                  onMovementFilterChange={(value) => {
+                    setDrawerMovementFilter(value);
+                    setDrawerMovementPage(1);
+                  }}
+                  onMovementPageChange={setDrawerMovementPage}
+                  onViewAllHistory={viewAllHistoryInList}
+                />
               </div>
 
-              <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">İşlem Merkezi</p>
-                    <h4 className="mt-1 text-sm font-semibold text-neutral-900">Stok Operasyonu</h4>
-                  </div>
-                  {drawerMode !== "view" ? (
-                    <button
-                      type="button"
-                      onClick={() => setDrawerMode("view")}
-                      className="h-9 rounded-xl border border-neutral-300 px-3 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
-                    >
-                      Ozet Gorunumu
-                    </button>
-                  ) : null}
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {[
-                    { id: "stock_in", label: labels.stockIn, accent: "border-emerald-200 bg-emerald-50 text-emerald-800", disabled: !drawerItem.warehouseCode },
-                    { id: "stock_out", label: labels.stockOut, accent: "border-rose-200 bg-rose-50 text-rose-800", disabled: !drawerItem.warehouseCode },
-                    { id: "edit", label: labels.adjustStock, accent: "border-sky-200 bg-sky-50 text-sky-800", disabled: false },
-                    { id: "transfer", label: labels.transferStock, accent: "border-amber-200 bg-amber-50 text-amber-800", disabled: !drawerItem.warehouseCode },
-                  ].map((action) => (
-                    <button
-                      key={action.id}
-                      type="button"
-                      onClick={() => setDrawerMode(action.id as DrawerMode)}
-                      disabled={action.disabled}
-                      className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                        drawerMode === action.id ? `${action.accent} shadow-sm` : "border-neutral-200 bg-neutral-50 text-neutral-700 hover:bg-neutral-100"
-                      }`}
-                    >
-                      <span className="block text-xs font-semibold uppercase tracking-wide">İşlem</span>
-                      <span className="mt-1 block text-sm font-semibold">{action.label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {drawerMode === "edit" ? (
-                  <form
-                    className="mt-4 grid gap-3"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void applyAdjustmentFromDrawer();
-                    }}
-                  >
-                    <div className="grid gap-1">
-                      <label className="text-xs font-medium text-neutral-600">{labels.targetOnHandStock}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={drawerTargetOnHand}
-                        onChange={(event) => setDrawerTargetOnHand(event.target.value)}
-                        className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="grid gap-1">
-                        <label className="text-xs font-medium text-neutral-600">{labels.targetReorderPoint}</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={drawerReorderPoint}
-                          onChange={(event) => setDrawerReorderPoint(event.target.value)}
-                          className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
-                          required
-                        />
-                      </div>
-                      <div className="grid gap-1">
-                        <label className="text-xs font-medium text-neutral-600">{labels.targetSafetyStock}</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={drawerSafetyStock}
-                          onChange={(event) => setDrawerSafetyStock(event.target.value)}
-                          className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-xs font-medium text-neutral-600">{labels.adjustmentNote}</label>
-                      <textarea
-                        value={drawerNote}
-                        onChange={(event) => setDrawerNote(event.target.value)}
-                        placeholder={labels.adjustmentNote}
-                        rows={3}
-                        className="rounded-xl border border-neutral-300 px-3 py-3 text-sm"
-                      />
-                    </div>
-                    <div className="flex justify-end">
-                      <button
-                        type="submit"
-                        disabled={Boolean(pendingRowKey)}
-                        className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {pendingRowKey ? "..." : labels.applyAdjustment}
-                      </button>
-                    </div>
-                  </form>
-                ) : drawerMode === "stock_in" || drawerMode === "stock_out" ? (
-                  <form
-                    className="mt-4 grid gap-3"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void applyMovementFromDrawer(drawerMode);
-                    }}
-                  >
-                    <div className="grid gap-1">
-                      <label className="text-xs font-medium text-neutral-600">{labels.movementQuantity}</label>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={drawerMovementQuantity}
-                        onChange={(event) => setDrawerMovementQuantity(event.target.value)}
-                        className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
-                        required
-                      />
-                    </div>
-                    {drawerMode === "stock_in" ? (
-                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
-                        <div className="mb-3">
-                          <p className="text-sm font-semibold text-emerald-950">Satın alma belgesi</p>
-                          <p className="mt-1 text-xs text-emerald-800">Belge alanlarını doldurursan stok girişi satın alma kaydı olarak izlenir.</p>
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <div className="grid gap-1">
-                            <label className="text-xs font-medium text-neutral-600">Belge numarası</label>
-                            <input
-                              value={drawerPurchaseDocumentNumber}
-                              onChange={(event) => setDrawerPurchaseDocumentNumber(event.target.value)}
-                              placeholder="ALIŞ-2026-001"
-                              className="h-11 rounded-xl border border-neutral-300 bg-white px-3 text-sm"
-                            />
-                          </div>
-                          <div className="grid gap-1">
-                            <label className="text-xs font-medium text-neutral-600">Tedarikçi</label>
-                            <input
-                              value={drawerPurchaseSupplierName}
-                              onChange={(event) => setDrawerPurchaseSupplierName(event.target.value)}
-                              placeholder="Tedarikçi adı"
-                              className="h-11 rounded-xl border border-neutral-300 bg-white px-3 text-sm"
-                            />
-                          </div>
-                          <div className="grid gap-1">
-                            <label className="text-xs font-medium text-neutral-600">Belge tarihi</label>
-                            <input
-                              type="datetime-local"
-                              value={drawerPurchaseDocumentDate}
-                              onChange={(event) => setDrawerPurchaseDocumentDate(event.target.value)}
-                              className="h-11 rounded-xl border border-neutral-300 bg-white px-3 text-sm"
-                            />
-                          </div>
-                          <div className="grid gap-1">
-                            <label className="text-xs font-medium text-neutral-600">Harici referans</label>
-                            <input
-                              value={drawerPurchaseReference}
-                              onChange={(event) => setDrawerPurchaseReference(event.target.value)}
-                              placeholder="İrsaliye / e-fatura no"
-                              className="h-11 rounded-xl border border-neutral-300 bg-white px-3 text-sm"
-                            />
-                          </div>
-                          <div className="grid gap-1 md:col-span-2">
-                            <label className="text-xs font-medium text-neutral-600">Birim maliyet</label>
-                            <input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              value={drawerPurchaseUnitCost}
-                              onChange={(event) => setDrawerPurchaseUnitCost(event.target.value)}
-                              placeholder="0.00"
-                              className="h-11 rounded-xl border border-neutral-300 bg-white px-3 text-sm"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                    <div className="grid gap-1">
-                      <label className="text-xs font-medium text-neutral-600">{labels.adjustmentNote}</label>
-                      <textarea
-                        value={drawerNote}
-                        onChange={(event) => setDrawerNote(event.target.value)}
-                        placeholder={labels.adjustmentNote}
-                        rows={3}
-                        className="rounded-xl border border-neutral-300 px-3 py-3 text-sm"
-                      />
-                    </div>
-                    <div className="flex justify-end">
-                      <button
-                        type="submit"
-                        disabled={Boolean(pendingRowKey)}
-                        className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {pendingRowKey ? "..." : drawerMode === "stock_in" ? labels.stockIn : labels.stockOut}
-                      </button>
-                    </div>
-                  </form>
-                ) : drawerMode === "transfer" ? (
-                  <form
-                    className="mt-4 grid gap-3"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void applyTransferFromDrawer();
-                    }}
-                  >
-                    <div className="grid gap-1">
-                      <label className="text-xs font-medium text-neutral-600">{labels.transferTargetWarehouse}</label>
-                      <select
-                        value={drawerTransferWarehouseCode}
-                        onChange={(event) => setDrawerTransferWarehouseCode(event.target.value)}
-                        className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
-                        required
-                      >
-                        <option value="">{labels.notSpecified}</option>
-                        {warehouses
-                          .filter((warehouse) => warehouse.isActive && warehouse.code !== drawerItem.warehouseCode)
-                          .map((warehouse) => (
-                            <option key={`transfer-${warehouse.id}`} value={warehouse.code}>
-                              {warehouse.code} - {warehouse.name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-xs font-medium text-neutral-600">{labels.transferQuantity}</label>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={drawerTransferQuantity}
-                        onChange={(event) => setDrawerTransferQuantity(event.target.value)}
-                        className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-xs font-medium text-neutral-600">{labels.transferNote}</label>
-                      <textarea
-                        value={drawerTransferNote}
-                        onChange={(event) => setDrawerTransferNote(event.target.value)}
-                        placeholder={labels.transferNote}
-                        rows={3}
-                        className="rounded-xl border border-neutral-300 px-3 py-3 text-sm"
-                      />
-                    </div>
-                    <div className="flex justify-end">
-                      <button
-                        type="submit"
-                        disabled={Boolean(pendingRowKey)}
-                        className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {pendingRowKey ? "..." : labels.applyTransfer}
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="mt-4 rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
-                    Bu karttan stok girişi, stok çıkışı, manuel düzeltme ve depo transferi işlemlerini yönetebilirsin.
-                  </div>
-                )}
-              </section>
+              <InventoryDrawerOperationPanel
+                item={drawerItem}
+                labels={labels}
+                locale={locale}
+                warehouses={warehouses}
+                drawerMode={drawerMode}
+                pendingRowKey={pendingRowKey}
+                drawerTargetOnHand={drawerTargetOnHand}
+                drawerReorderPoint={drawerReorderPoint}
+                drawerSafetyStock={drawerSafetyStock}
+                drawerNote={drawerNote}
+                drawerMovementQuantity={drawerMovementQuantity}
+                drawerTransferWarehouseCode={drawerTransferWarehouseCode}
+                drawerTransferQuantity={drawerTransferQuantity}
+                drawerTransferNote={drawerTransferNote}
+                drawerPurchaseDocumentNumber={drawerPurchaseDocumentNumber}
+                drawerPurchaseSupplierName={drawerPurchaseSupplierName}
+                drawerPurchaseDocumentDate={drawerPurchaseDocumentDate || defaultDateTimeLocal}
+                drawerPurchaseDocumentType={drawerPurchaseDocumentType}
+                drawerPurchaseReference={drawerPurchaseReference}
+                drawerPurchaseExternalStatus={drawerPurchaseExternalStatus}
+                drawerPurchaseUnitCost={drawerPurchaseUnitCost}
+                setDrawerMode={setDrawerMode}
+                setDrawerTargetOnHand={setDrawerTargetOnHand}
+                setDrawerReorderPoint={setDrawerReorderPoint}
+                setDrawerSafetyStock={setDrawerSafetyStock}
+                setDrawerNote={setDrawerNote}
+                setDrawerMovementQuantity={setDrawerMovementQuantity}
+                setDrawerTransferWarehouseCode={setDrawerTransferWarehouseCode}
+                setDrawerTransferQuantity={setDrawerTransferQuantity}
+                setDrawerTransferNote={setDrawerTransferNote}
+                setDrawerPurchaseDocumentNumber={setDrawerPurchaseDocumentNumber}
+                setDrawerPurchaseSupplierName={setDrawerPurchaseSupplierName}
+                setDrawerPurchaseDocumentDate={setDrawerPurchaseDocumentDate}
+                setDrawerPurchaseDocumentType={setDrawerPurchaseDocumentType}
+                setDrawerPurchaseReference={setDrawerPurchaseReference}
+                setDrawerPurchaseExternalStatus={setDrawerPurchaseExternalStatus}
+                setDrawerPurchaseUnitCost={setDrawerPurchaseUnitCost}
+                formatDate={formatDate}
+                formatSourceDocument={formatSourceDocument}
+                movementTypeClass={movementTypeClass}
+                movementTypeLabel={(movementType, inventoryLabels) => movementTypeLabel(movementType, inventoryLabels as Labels)}
+                onHistoryShortcut={(value) => {
+                  setDrawerMovementFilter(value);
+                  setDrawerMovementPage(1);
+                  viewAllHistoryInList();
+                }}
+                onViewAllHistory={viewAllHistoryInList}
+                onApplyAdjustment={applyAdjustmentFromDrawer}
+                onApplyMovement={applyMovementFromDrawer}
+                onApplyTransfer={applyTransferFromDrawer}
+              />
             </div>
           </aside>
         </div>
@@ -4623,7 +3692,7 @@ export function InventoryManager({
                     <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.stockCountDate}</label>
                     <input
                       type="datetime-local"
-                      value={stockCountDate}
+                      value={stockCountDate || defaultDateTimeLocal}
                       onChange={(event) => setStockCountDate(event.target.value)}
                       className="h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
                     />
@@ -4649,6 +3718,47 @@ export function InventoryManager({
               </div>
             ) : stockCountDrawerItem ? (
               <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+              <div className="grid gap-3 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 md:grid-cols-3">
+                {[
+                  { id: "preparation" as const, label: "Hazırlık", description: "Sayım bağlamı ve özet" },
+                  { id: "preview" as const, label: "Fark Önizleme", description: "Varyans ve rezervasyon etkisi" },
+                  { id: "result" as const, label: "Uygulama Sonucu", description: "İşlem sonrası çıktı" },
+                ].map((step, index) => {
+                  const isActive = stockCountDrawerStep === step.id;
+                  const isDone = stockCountDrawerStep === "result" && step.id !== "result";
+
+                  return (
+                    <article
+                      key={step.id}
+                      className={`rounded-2xl border px-4 py-3 ${
+                        isActive
+                          ? "border-neutral-900 bg-white"
+                          : isDone
+                            ? "border-emerald-200 bg-emerald-50"
+                            : "border-neutral-200 bg-white/80"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${
+                          isActive
+                            ? "bg-neutral-900 text-white"
+                            : isDone
+                              ? "bg-emerald-600 text-white"
+                              : "bg-neutral-200 text-neutral-600"
+                        }`}
+                        >
+                          {index + 1}
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-neutral-950">{step.label}</p>
+                          <p className="text-xs text-neutral-500">{step.description}</p>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
               <div className="grid gap-3 md:grid-cols-4">
                 <div className="rounded-xl border border-neutral-200 p-4">
                   <p className="text-xs text-neutral-500">{labels.stockCountWarehouseScope}</p>
@@ -4706,6 +3816,61 @@ export function InventoryManager({
                 </div>
 
                 <div className="space-y-3">
+                  {stockCountDrawerStep === "preparation" ? (
+                    <section className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 shadow-sm">
+                      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Hazırlık Özeti</p>
+                          <p className="mt-1 text-sm text-neutral-700">Sayım kapsamını, notlarını ve genel fark dağılımını doğrula. Sonraki adımda sadece sorunlu satırları odaklı incele.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setStockCountDrawerStep("preview")}
+                          className="h-10 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800"
+                        >
+                          Fark Önizleme
+                        </button>
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {stockCountDrawerStep === "preview" ? (
+                    <section className="grid gap-3 lg:grid-cols-[1fr_1fr]">
+                      <article className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Varyanslı Satırlar</p>
+                        <p className="mt-2 text-sm text-neutral-700">
+                          {stockCountDrawerItem.varianceLineCount > 0
+                            ? `${stockCountDrawerItem.varianceLineCount} satır sistem stoktan farklı. Önce bu satırları gözden geçir.`
+                            : "Varyanslı satır bulunmuyor. Sayım sistemle uyumlu görünüyor."}
+                        </p>
+                      </article>
+                      <article className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">Rezervasyon Etkisi</p>
+                        <p className="mt-2 text-sm text-neutral-700">
+                          Rezervasyon baskısı olan ürünlerde sayım uygulaması öncesi kullanılabilir stok ve açık sipariş etkisini ayrıca doğrula.
+                        </p>
+                      </article>
+                      <article className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm lg:col-span-2">
+                        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Uygulama Özeti</p>
+                            <p className="mt-1 text-sm text-neutral-700">
+                              Uygulama sırasında farklı satırlar için stok hareketi üretilir, bekleyen satırlar ise son kontrol gerektirir.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void applyStockCount()}
+                            disabled={pendingStockCount || stockCountDrawerItem.status === "APPLIED"}
+                            className="h-10 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {labels.stockCountApply}
+                          </button>
+                        </div>
+                      </article>
+                    </section>
+                  ) : null}
+
                   {stockCountDrawerItem.status !== "APPLIED" ? (
                     <section className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 shadow-sm">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -4741,7 +3906,7 @@ export function InventoryManager({
                     </section>
                   ) : null}
 
-                  {stockCountDrawerItem.status !== "APPLIED" ? (
+                  {stockCountDrawerItem.status !== "APPLIED" && stockCountDrawerStep !== "result" ? (
                     <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm">
                       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                         <div>
@@ -4754,6 +3919,30 @@ export function InventoryManager({
                           <p>Farklı satır: <span className="font-semibold text-neutral-950">{stockCountSummary.positive + stockCountSummary.negative}</span></p>
                           <p>Bekleyen satır: <span className="font-semibold text-neutral-950">{stockCountSummary.pending}</span></p>
                         </div>
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {stockCountDrawerStep === "result" && stockCountApplyResult ? (
+                    <section className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Uygulama Sonucu</p>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <article className="rounded-xl border border-emerald-200 bg-white p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Uygulanan satır</p>
+                          <p className="mt-1 text-sm font-semibold text-neutral-950">{stockCountApplyResult.appliedLines}</p>
+                        </article>
+                        <article className="rounded-xl border border-amber-200 bg-white p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Varyanslı satır</p>
+                          <p className="mt-1 text-sm font-semibold text-neutral-950">{stockCountApplyResult.varianceLines}</p>
+                        </article>
+                        <article className="rounded-xl border border-neutral-200 bg-white p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Bekleyen satır</p>
+                          <p className="mt-1 text-sm font-semibold text-neutral-950">{stockCountApplyResult.pendingLines}</p>
+                        </article>
+                        <article className="rounded-xl border border-sky-200 bg-white p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Uygulama zamanı</p>
+                          <p className="mt-1 text-sm font-semibold text-neutral-950">{formatDate(stockCountApplyResult.appliedAt, locale, labels.notSpecified)}</p>
+                        </article>
                       </div>
                     </section>
                   ) : null}
@@ -4836,14 +4025,43 @@ export function InventoryManager({
                   {labels.stockCountCreateAction}
                 </button>
               ) : (
-                <button
-                  type="button"
-                  disabled={pendingStockCount || !stockCountDrawerItem || stockCountDrawerItem.status === "APPLIED"}
-                  onClick={() => void applyStockCount()}
-                  className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {labels.stockCountApply}
-                </button>
+                <div className="flex items-center gap-3">
+                  {stockCountDrawerStep !== "preparation" ? (
+                    <button
+                      type="button"
+                      onClick={() => setStockCountDrawerStep(stockCountDrawerStep === "result" ? "preview" : "preparation")}
+                      className="h-11 rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+                    >
+                      Geri
+                    </button>
+                  ) : null}
+                  {stockCountDrawerStep === "preparation" ? (
+                    <button
+                      type="button"
+                      onClick={() => setStockCountDrawerStep("preview")}
+                      className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800"
+                    >
+                      Fark Önizleme
+                    </button>
+                  ) : stockCountDrawerStep === "preview" ? (
+                    <button
+                      type="button"
+                      disabled={pendingStockCount || !stockCountDrawerItem || stockCountDrawerItem.status === "APPLIED"}
+                      onClick={() => void applyStockCount()}
+                      className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {labels.stockCountApply}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={closeStockCountDrawer}
+                      className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800"
+                    >
+                      Tamam
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -4863,42 +4081,16 @@ export function InventoryManager({
               </button>
             </div>
             <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-xl border border-neutral-200 p-4">
-                  <p className="text-xs text-neutral-500">{labels.transactionType}</p>
+                  <p className="text-xs text-neutral-500">Belge</p>
                   <p className="mt-1 text-sm font-semibold text-neutral-950">{formatTransactionType(transactionDrawerItem.type, labels)}</p>
+                  <p className="mt-1 text-xs text-neutral-500">{labels.transactionCreatedAt}: {formatDate(transactionDrawerItem.createdAt, locale, labels.notSpecified)}</p>
                 </div>
                 <div className="rounded-xl border border-neutral-200 p-4">
-                  <p className="text-xs text-neutral-500">{labels.transactionCreatedAt}</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{formatDate(transactionDrawerItem.createdAt, locale, labels.notSpecified)}</p>
+                  <p className="text-xs text-neutral-500">Harici referans</p>
+                  <p className="mt-1 text-sm text-neutral-900">{transactionDrawerItem.reference ?? transactionDrawerItem.sourceDocument.externalReference ?? labels.notSpecified}</p>
                 </div>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-                  <p className="text-xs text-neutral-500">Satır sayısı</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">{transactionDrawerItem.lines.length}</p>
-                </div>
-                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-                  <p className="text-xs text-neutral-500">Toplam miktar</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">
-                    {transactionDrawerItem.lines.reduce((sum, line) => sum + line.quantity, 0)}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-                  <p className="text-xs text-neutral-500">Belge ilişkisi</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-950">
-                    {formatSourceDocument({
-                      type: transactionDrawerItem.sourceDocument.type,
-                      number: transactionDrawerItem.sourceDocument.number,
-                    }) ?? labels.notSpecified}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-neutral-200 p-4">
-                <p className="text-xs text-neutral-500">{labels.movementReference}</p>
-                <p className="mt-1 text-sm text-neutral-900">{transactionDrawerItem.reference ?? labels.notSpecified}</p>
               </div>
 
               <div className="rounded-xl border border-neutral-200 p-4">
@@ -4931,8 +4123,13 @@ export function InventoryManager({
               </div>
 
               <div className="rounded-xl border border-neutral-200 p-4">
-                <p className="text-xs text-neutral-500">{labels.adjustmentNote}</p>
-                <p className="mt-1 text-sm text-neutral-900">{transactionDrawerItem.note ?? labels.notSpecified}</p>
+                <p className="text-xs text-neutral-500">Karşı taraf</p>
+                <p className="mt-1 text-sm text-neutral-900">{transactionDrawerItem.sourceDocument.counterpartyName ?? labels.notSpecified}</p>
+              </div>
+
+              <div className="rounded-xl border border-neutral-200 p-4">
+                <p className="text-xs text-neutral-500">Dış sistem durumu</p>
+                <p className="mt-1 text-sm text-neutral-900">{transactionDrawerItem.sourceDocument.externalSystemStatus ?? labels.notSpecified}</p>
               </div>
 
               <div className="rounded-xl border border-neutral-200 p-4">
@@ -4949,9 +4146,21 @@ export function InventoryManager({
                       </div>
                       <div className="mt-2 grid gap-1 text-xs text-neutral-600">
                         <p>{labels.warehouse}: {line.fromWarehouseCode ?? labels.notSpecified} {line.toWarehouseCode ? `→ ${line.toWarehouseCode}` : ""}</p>
-                        <p>{labels.adjustmentNote}: {line.note ?? labels.notSpecified}</p>
+                        {line.note ? <p>{labels.adjustmentNote}: {line.note}</p> : null}
                       </div>
                     </article>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-neutral-200 p-4">
+                <h4 className="text-sm font-semibold text-neutral-900">Etkilenen Depolar</h4>
+                <div className="mt-3 space-y-2 text-sm text-neutral-700">
+                  {transactionDrawerItem.lines.map((line) => (
+                    <p key={`warehouse-impact-${line.id}`}>
+                      {line.inventoryItemSku}: {line.fromWarehouseCode ?? labels.notSpecified}
+                      {line.toWarehouseCode ? ` → ${line.toWarehouseCode}` : ""}
+                    </p>
                   ))}
                 </div>
               </div>

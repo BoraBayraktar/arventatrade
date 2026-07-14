@@ -44,6 +44,8 @@ function buildWhere(args: {
 
   return {
     deleted: false,
+    status: "ACTIVE" as const,
+    salesEnabled: true,
     ...(search
       ? {
           OR: [
@@ -157,8 +159,21 @@ export class CatalogRepository {
       where: {
         slug,
         deleted: false,
+        status: "ACTIVE",
+        salesEnabled: true,
       },
       include: {
+        attributeLinks: {
+          where: {
+            isVariantAxis: true,
+          },
+          include: {
+            attributeDefinition: true,
+          },
+          orderBy: {
+            sortOrder: "asc",
+          },
+        },
         category: true,
         inventoryItem: {
           select: {
@@ -175,6 +190,24 @@ export class CatalogRepository {
             },
           },
         },
+        variants: {
+          where: {
+            deleted: false,
+            salesEnabled: true,
+          },
+          include: {
+            attributeValues: {
+              include: {
+                attributeDefinition: true,
+              },
+            },
+          },
+          orderBy: [
+            { isDefault: "desc" },
+            { sortOrder: "asc" },
+            { createdAt: "asc" },
+          ],
+        },
       },
     });
   }
@@ -184,6 +217,8 @@ export class CatalogRepository {
       where: {
         slug,
         deleted: false,
+        status: "ACTIVE",
+        salesEnabled: true,
       },
       select: {
         id: true,

@@ -1,5 +1,6 @@
 export type CartLineInput = {
   productId: string;
+  variantId?: string;
   quantity: number;
 };
 
@@ -10,6 +11,11 @@ export type CommerceQuoteInput = {
 
 export type CommerceLineQuote = {
   productId: string;
+  variantId: string | null;
+  variantSlug: string | null;
+  variantSku: string | null;
+  variantTitle: string | null;
+  variantOptionSummary: string | null;
   slug: string;
   sku: string;
   name: string;
@@ -94,8 +100,13 @@ export type AdminOrderSummary = {
 export type AdminOrderDetailItem = {
   id: string;
   productId: string | null;
+  productVariantId: string | null;
   productSlug: string;
   productSku: string;
+  productVariantSlug: string | null;
+  productVariantSku: string | null;
+  productVariantTitle: string | null;
+  productVariantOptionSummary: string | null;
   productName: string;
   productImageUrl: string;
   quantity: number;
@@ -118,10 +129,23 @@ export type AdminOrderDetail = {
   createdAt: string;
   updatedAt: string;
   items: AdminOrderDetailItem[];
+  documents: AdminOrderDocumentSummaryItem[];
   inventorySummary: AdminOrderInventorySummary;
   inventoryMovements: AdminOrderInventoryMovementEntry[];
   statusHistory: AdminOrderStatusHistoryEntry[];
   paymentStatusHistory: AdminPaymentStatusHistoryEntry[];
+};
+
+export type AdminOrderDocumentSummaryItem = {
+  id: string;
+  documentNumber: string;
+  documentType: "PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH";
+  status: "DRAFT" | "LINKED" | "ISSUED" | "CANCELLED";
+  externalSystemStatus: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED";
+  issueDate: string;
+  totalAmount: number | null;
+  currency: string;
+  inventoryTransactionNumber: string | null;
 };
 
 export type AdminOrderInventorySummary = {

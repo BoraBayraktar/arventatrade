@@ -36,6 +36,7 @@ export class CommerceRepository {
 
   private sumAvailableStock(levels: Array<{ onHand: number; reserved: number }>, fallbackStock: number) {
     if (levels.length === 0) {
+      // Sprint 1 kuralı: Product.stock sipariş otoritesi değildir; sadece aggregate yoksa legacy summary fallback'tir.
       return fallbackStock;
     }
 
@@ -153,6 +154,7 @@ export class CommerceRepository {
     })) ?? [];
 
     if (levels.length === 0) {
+      // Legacy summary değerinden tek seferlik aggregate bootstrap yapılır; sonrasında otorite inventory level'dır.
       await tx.inventoryLevel.create({
         data: {
           inventoryItemId,
@@ -274,6 +276,66 @@ export class CommerceRepository {
     });
   }
 
+  async listSellableSnapshots(lines: Array<{ productId: string; variantId?: string }>) {
+    const productIds = Array.from(new Set(lines.map((line) => line.productId)));
+    const variantIds = Array.from(new Set(lines.map((line) => line.variantId).filter((value): value is string => Boolean(value))));
+    const products = await prisma.product.findMany({
+      where: {
+        id: {
+          in: productIds,
+        },
+        deleted: false,
+        status: "ACTIVE",
+        salesEnabled: true,
+      },
+      include: {
+        variants: variantIds.length > 0
+          ? {
+              where: {
+                id: {
+                  in: variantIds,
+                },
+                deleted: false,
+                salesEnabled: true,
+              },
+            }
+          : false,
+      },
+    });
+
+    return lines.flatMap((line) => {
+      const product = products.find((item) => item.id === line.productId);
+      if (!product) {
+        return [];
+      }
+
+      const variant = line.variantId
+        ? product.variants.find((item) => item.id === line.variantId)
+        : null;
+
+      if (line.variantId && !variant) {
+        return [];
+      }
+
+      return [{
+        productId: product.id,
+        slug: product.slug,
+        sku: variant?.sku ?? product.sku,
+        name: product.name,
+        imageUrl: variant?.imageUrl ?? product.imageUrl,
+        currency: product.currency,
+        unitPrice: variant?.priceOverride?.toNumber() ?? product.price.toNumber(),
+        compareAtPrice: variant?.compareAtPriceOverride?.toNumber() ?? product.compareAtPrice?.toNumber() ?? null,
+        variantId: variant?.id ?? null,
+        variantSlug: variant?.slug ?? null,
+        variantSku: variant?.sku ?? null,
+        variantTitle: variant?.title ?? null,
+        variantOptionSummary: variant?.optionSummary ?? null,
+        variantStockOverride: variant?.stockOverride ?? null,
+      }];
+    });
+  }
+
   async createOrderAndCommitInventory(args: {
     orderNumber: string;
     lines: CommerceLineQuote[];
@@ -286,6 +348,9 @@ export class CommerceRepository {
     return this.runSerializableTransaction(async (tx) => {
       const holds: Array<{
         productId: string;
+        variantId: string | null;
+        variantTitle: string | null;
+        variantSku: string | null;
         inventoryItemId: string;
         warehouseId: string;
         reservationId: string;
@@ -356,11 +421,21 @@ export class CommerceRepository {
               type: "RESERVATION_HOLD",
               quantity: reservedQuantity,
               note: `Checkout reservation hold for ${args.orderNumber}`,
+              metadata: line.variantId
+                ? {
+                    productVariantId: line.variantId,
+                    productVariantTitle: line.variantTitle,
+                    productVariantSku: line.variantSku,
+                  }
+                : undefined,
             },
           });
 
           holds.push({
             productId: state.productId,
+            variantId: line.variantId,
+            variantTitle: line.variantTitle,
+            variantSku: line.variantSku,
             inventoryItemId: state.inventoryItemId,
             warehouseId: level.warehouseId,
             reservationId: reservation.id,
@@ -404,8 +479,13 @@ export class CommerceRepository {
           items: {
             create: args.lines.map((line) => ({
               productId: line.productId,
+              productVariantId: line.variantId,
               productSlug: line.slug,
               productSku: line.sku,
+              productVariantSlug: line.variantSlug,
+              productVariantSku: line.variantSku,
+              productVariantTitle: line.variantTitle,
+              productVariantOptionSummary: line.variantOptionSummary,
               productName: line.name,
               productImageUrl: line.imageUrl,
               quantity: line.quantity,
@@ -423,6 +503,16 @@ export class CommerceRepository {
       });
 
       for (const hold of holds) {
+        const committedLevel = await this.getActiveLevelSnapshot(
+          tx,
+          hold.inventoryItemId,
+          hold.warehouseId,
+        );
+
+        if (!committedLevel || committedLevel.onHand < hold.quantity || committedLevel.reserved < hold.quantity) {
+          throw new Error(`STALE_RESERVATION_LEVEL:${hold.productId}:${hold.warehouseId}:${hold.quantity}`);
+        }
+
         await tx.inventoryLevel.update({
           where: {
             inventoryItemId_warehouseId: {
@@ -439,16 +529,6 @@ export class CommerceRepository {
             },
           },
         });
-
-        const committedLevel = await this.getActiveLevelSnapshot(
-          tx,
-          hold.inventoryItemId,
-          hold.warehouseId,
-        );
-
-        if (!committedLevel || committedLevel.onHand < hold.quantity || committedLevel.reserved < hold.quantity) {
-          throw new Error(`STALE_RESERVATION_LEVEL:${hold.productId}:${hold.warehouseId}:${hold.quantity}`);
-        }
 
         await tx.stockReservation.update({
           where: {
@@ -469,6 +549,13 @@ export class CommerceRepository {
             type: "ORDER_COMMIT",
             quantity: -hold.quantity,
             note: `Checkout inventory commit for ${args.orderNumber}`,
+            metadata: hold.variantId
+              ? {
+                  productVariantId: hold.variantId,
+                  productVariantTitle: hold.variantTitle,
+                  productVariantSku: hold.variantSku,
+                }
+              : undefined,
           },
         });
 
@@ -651,6 +738,29 @@ export class CommerceRepository {
             },
           },
         },
+        businessDocuments: {
+          where: {
+            deleted: false,
+          },
+          orderBy: {
+            issueDate: "desc",
+          },
+          select: {
+            id: true,
+            documentNumber: true,
+            documentType: true,
+            status: true,
+            externalSystemStatus: true,
+            issueDate: true,
+            totalAmount: true,
+            currency: true,
+            inventoryTransaction: {
+              select: {
+                transactionNumber: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -733,6 +843,29 @@ export class CommerceRepository {
             },
           },
         },
+        businessDocuments: {
+          where: {
+            deleted: false,
+          },
+          orderBy: {
+            issueDate: "desc",
+          },
+          select: {
+            id: true,
+            documentNumber: true,
+            documentType: true,
+            status: true,
+            externalSystemStatus: true,
+            issueDate: true,
+            totalAmount: true,
+            currency: true,
+            inventoryTransaction: {
+              select: {
+                transactionNumber: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -811,6 +944,29 @@ export class CommerceRepository {
                     code: true,
                   },
                 },
+              },
+            },
+          },
+        },
+        businessDocuments: {
+          where: {
+            deleted: false,
+          },
+          orderBy: {
+            issueDate: "desc",
+          },
+          select: {
+            id: true,
+            documentNumber: true,
+            documentType: true,
+            status: true,
+            externalSystemStatus: true,
+            issueDate: true,
+            totalAmount: true,
+            currency: true,
+            inventoryTransaction: {
+              select: {
+                transactionNumber: true,
               },
             },
           },

@@ -69,6 +69,7 @@ export default async function AdminOrderDetailPage({
         paymentHistoryTitle: dictionary.admin.paymentStatusHistory,
         paymentHistoryFrom: dictionary.admin.paymentHistoryFrom,
         paymentHistoryTo: dictionary.admin.paymentHistoryTo,
+        orderDocumentsTitle: dictionary.admin.documentManager,
         inventorySummaryTitle: dictionary.admin.inventorySummaryTitle,
         inventoryReservations: dictionary.admin.inventoryReservations,
         inventoryReservedQuantity: dictionary.admin.inventoryReservedQuantity,

@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Bell,
   Boxes,
+  ChevronDown,
   ClipboardList,
   FolderTree,
   LayoutGrid,
+  Menu,
   Package,
   ReceiptText,
   ShieldCheck,
@@ -16,6 +18,7 @@ import {
   UserRound,
   Users,
   Workflow,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,6 +29,7 @@ import { LogoutButton } from "@/ui/admin/logout-button";
 export type MenuItem = {
   href: string;
   label: string;
+  children?: MenuItem[];
 };
 
 const adminMenuIcons: Array<{ route: string; icon: LucideIcon }> = [
@@ -35,6 +39,8 @@ const adminMenuIcons: Array<{ route: string; icon: LucideIcon }> = [
   { route: "/admin/categories", icon: FolderTree },
   { route: "/admin/storefront", icon: LayoutGrid },
   { route: "/admin/orders", icon: ReceiptText },
+  { route: "/admin/documents", icon: ReceiptText },
+  { route: "/admin/finance", icon: ReceiptText },
   { route: "/admin/integrations", icon: Workflow },
   { route: "/admin/customers", icon: Users },
   { route: "/admin/users", icon: UserRound },
@@ -87,7 +93,10 @@ export function AdminPanelShell({
   children,
 }: Props) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [openMenuGroups, setOpenMenuGroups] = useState<Record<string, boolean>>({});
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
@@ -183,6 +192,7 @@ export function AdminPanelShell({
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setNotificationsOpen(false);
+      setMobileMenuOpen(false);
     }, 0);
 
     return () => {
@@ -233,58 +243,193 @@ export function AdminPanelShell({
     return linkUrl;
   }
 
+  function isMenuItemActive(item: MenuItem): boolean {
+    const url = new URL(item.href, "http://localhost");
+    const section = url.searchParams.get("section");
+    const itemPath = url.pathname;
+
+    if (section) {
+      return pathname === itemPath && searchParams.get("section") === section;
+    }
+
+    if (item.children?.length) {
+      return pathname === itemPath || item.children.some((child) => isMenuItemActive(child));
+    }
+
+    return pathname === itemPath;
+  }
+
+  function renderMenuItem(item: MenuItem, depth = 0, compact = false): ReactElement {
+    const active = isMenuItemActive(item);
+    const hasChildren = Boolean(item.children?.length);
+    const MenuIcon = resolveMenuIcon(item.href);
+
+    if (hasChildren) {
+      const isOpen = openMenuGroups[item.href] ?? active;
+
+      return (
+        <div key={item.href} className="grid gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setOpenMenuGroups((current) => ({
+                ...current,
+                [item.href]: !(current[item.href] ?? active),
+              }));
+            }}
+            className={cn(
+              "relative flex w-full items-center rounded-xl text-left font-semibold transition-all",
+              compact ? "px-2.5 py-2 text-[13px]" : "px-3 py-2 text-sm",
+              active
+                ? "bg-neutral-100 text-neutral-950 shadow-sm ring-1 ring-neutral-200"
+                : isOpen
+                  ? "bg-neutral-50 text-neutral-900 ring-1 ring-neutral-200"
+                  : "text-neutral-700 hover:bg-neutral-50",
+            )}
+            aria-expanded={isOpen}
+          >
+            <span
+              className={cn(
+                "mr-3 h-4 w-1 rounded-full transition-opacity",
+                active ? "bg-neutral-950 opacity-100" : "bg-neutral-300 opacity-0",
+              )}
+              aria-hidden="true"
+            />
+            <MenuIcon className={cn("mr-2", compact ? "h-3.5 w-3.5" : "h-4 w-4")} aria-hidden="true" />
+            <span className="flex-1">{item.label}</span>
+            <ChevronDown
+              className={cn(
+                compact ? "h-3.5 w-3.5 transition-transform duration-200" : "h-4 w-4 transition-transform duration-200",
+                isOpen ? "rotate-180" : "rotate-0",
+              )}
+              aria-hidden="true"
+            />
+          </button>
+          <div
+            className={cn(
+              "grid transition-[grid-template-rows,opacity] duration-200 ease-out",
+              isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+            )}
+          >
+            <div className="overflow-hidden">
+              <div
+                className={cn(
+                  "ml-4 grid gap-1 border-l pl-3 pt-1 transition-colors",
+                  compact && "ml-3 pl-2.5",
+                  active || isOpen ? "border-neutral-300" : "border-neutral-200",
+                )}
+              >
+              {item.children?.map((child) => renderMenuItem(child, depth + 1, compact))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "relative flex items-center rounded-xl font-medium transition-all",
+          compact ? "px-2.5 py-2 text-[13px]" : "px-3 py-2 text-sm",
+          depth > 0 && !compact && "py-2 text-[13px]",
+          active
+            ? "bg-neutral-100 font-semibold text-neutral-950 shadow-sm ring-1 ring-neutral-200"
+            : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950",
+        )}
+      >
+        <span
+          className={cn(
+            "mr-3 h-4 w-1 rounded-full transition-opacity",
+            active ? "bg-neutral-950 opacity-100" : "bg-neutral-300 opacity-0",
+          )}
+          aria-hidden="true"
+        />
+        {depth === 0 ? <MenuIcon className={cn("mr-2", compact ? "h-3.5 w-3.5" : "h-4 w-4")} aria-hidden="true" /> : null}
+        {item.label}
+      </Link>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-neutral-50">
       <div className="mx-auto grid items-start max-w-screen-2xl gap-3 px-2 py-2 lg:grid-cols-[260px_1fr]">
-        <aside className="overflow-hidden rounded-2xl border border-neutral-200 bg-white/95 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.05)] lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
+        {mobileMenuOpen ? (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <button
+              type="button"
+              aria-label="Mobil menüyü kapat"
+              className="absolute inset-0 bg-black/35 backdrop-blur-[1px]"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <aside className="absolute left-0 top-0 h-full w-[min(84vw,300px)] overflow-hidden rounded-r-3xl border-r border-neutral-200 bg-white p-2.5 shadow-2xl">
+              <div className="flex items-center justify-between rounded-2xl border border-neutral-200 bg-gradient-to-br from-white to-neutral-50 px-3 py-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-400">Backoffice</p>
+                  <h1 className="mt-1 text-base font-semibold tracking-tight text-neutral-950">{title}</h1>
+                </div>
+                <Button type="button" variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)} aria-label="Kapat">
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-neutral-200 bg-neutral-50/80 px-3 py-2.5">
+                <p className="truncate text-sm font-semibold text-neutral-950">{userName}</p>
+                <div className="mt-1 flex min-w-0 items-center gap-2 text-[11px] text-neutral-500">
+                  <p className="truncate">{userEmail}</p>
+                  <span aria-hidden="true" className="text-neutral-300">•</span>
+                  <p className="shrink-0 rounded-full bg-white px-2 py-0.5 font-medium uppercase tracking-wide text-neutral-600">
+                    {userRole}
+                  </p>
+                </div>
+              </div>
+
+              <nav className="mt-3 grid gap-1 overflow-y-auto pr-1 [scrollbar-width:thin]">
+                {menuItems.map((item) => renderMenuItem(item, 0, true))}
+              </nav>
+            </aside>
+          </div>
+        ) : null}
+
+        <aside className="hidden overflow-hidden rounded-2xl border border-neutral-200 bg-white/95 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.05)] lg:sticky lg:top-4 lg:block lg:h-[calc(100vh-2rem)]">
           <div className="rounded-2xl border border-neutral-200 bg-gradient-to-br from-white to-neutral-50 px-3 py-2.5">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-400">Backoffice</p>
             <h1 className="mt-1.5 text-lg font-semibold tracking-tight text-neutral-950">{title}</h1>
           </div>
 
           <nav className="mt-4 grid gap-1 overflow-y-auto pr-1 [scrollbar-width:thin]">
-            {menuItems.map((item) => {
-              const active = pathname === item.href;
-              const MenuIcon = resolveMenuIcon(item.href);
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "relative flex items-center rounded-xl px-3 py-2 text-sm font-medium transition-all",
-                    active
-                      ? "bg-neutral-100 font-semibold text-neutral-950 shadow-sm ring-1 ring-neutral-200"
-                      : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "mr-3 h-4 w-1 rounded-full transition-opacity",
-                      active ? "bg-neutral-950 opacity-100" : "bg-neutral-300 opacity-0",
-                    )}
-                    aria-hidden="true"
-                  />
-                  <MenuIcon className="mr-2 h-4 w-4" aria-hidden="true" />
-                  {item.label}
-                </Link>
-              );
-            })}
+            {menuItems.map((item) => renderMenuItem(item))}
           </nav>
 
         </aside>
 
         <section className="grid content-start gap-4">
           <header className="flex h-[72px] items-center justify-between gap-3 overflow-hidden rounded-2xl border border-neutral-200 bg-white px-3 py-2">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold leading-5 text-neutral-950">{userName}</p>
-              <div className="flex min-w-0 items-center gap-2 text-xs leading-4 text-neutral-500">
+            <div className="min-w-0 flex flex-1 items-center gap-2">
+              <div className="flex items-center gap-2 lg:hidden">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Menüyü aç"
+                  onClick={() => setMobileMenuOpen(true)}
+                >
+                  <Menu className="h-4 w-4" />
+                </Button>
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Menü</span>
+              </div>
+              <div className="hidden min-w-0 lg:block">
+                <p className="truncate text-sm font-semibold leading-5 text-neutral-950">{userName}</p>
+                <div className="flex min-w-0 items-center gap-2 text-xs leading-4 text-neutral-500">
                 <p className="truncate">{userEmail}</p>
                 <span aria-hidden="true" className="text-neutral-300">•</span>
                 <p className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-600">
                   {userRole}
                 </p>
+                </div>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">

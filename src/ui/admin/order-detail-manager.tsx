@@ -11,8 +11,13 @@ type PaymentStatus = "PENDING" | "AUTHORIZED" | "PAID" | "FAILED" | "REFUNDED";
 
 type Item = {
   id: string;
+  productVariantId: string | null;
   productSlug: string;
   productSku: string;
+  productVariantSlug: string | null;
+  productVariantSku: string | null;
+  productVariantTitle: string | null;
+  productVariantOptionSummary: string | null;
   productName: string;
   productImageUrl: string;
   quantity: number;
@@ -35,6 +40,17 @@ type OrderDetail = {
   createdAt: string;
   updatedAt: string;
   items: Item[];
+  documents: {
+    id: string;
+    documentNumber: string;
+    documentType: "PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH";
+    status: "DRAFT" | "LINKED" | "ISSUED" | "CANCELLED";
+    externalSystemStatus: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED";
+    issueDate: string;
+    totalAmount: number | null;
+    currency: string;
+    inventoryTransactionNumber: string | null;
+  }[];
   inventorySummary: {
     reservationCount: number;
     committedReservationCount: number;
@@ -103,6 +119,7 @@ type Labels = {
   paymentHistoryTitle: string;
   paymentHistoryFrom: string;
   paymentHistoryTo: string;
+  orderDocumentsTitle: string;
   inventorySummaryTitle: string;
   inventoryReservations: string;
   inventoryReservedQuantity: string;
@@ -197,6 +214,21 @@ function movementBadgeClass(value: OrderDetail["inventoryMovements"][number]["ty
     case "INITIAL_LOAD":
     default:
       return "bg-neutral-200 text-neutral-700";
+  }
+}
+
+function formatDocumentType(value: OrderDetail["documents"][number]["documentType"]) {
+  switch (value) {
+    case "PURCHASE_DOCUMENT":
+      return "Satın alma belgesi";
+    case "DELIVERY_NOTE":
+      return "İrsaliye";
+    case "E_INVOICE":
+      return "E-fatura";
+    case "E_DISPATCH":
+      return "E-irsaliye";
+    default:
+      return value;
   }
 }
 
@@ -316,6 +348,13 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
                 <div>
                   <p className="font-medium text-neutral-950">{item.productName}</p>
                   <p className="mt-1 text-xs text-neutral-500">/{item.productSlug} · {item.productSku}</p>
+                  {item.productVariantTitle ? (
+                    <p className="mt-1 text-xs text-neutral-500">
+                      {item.productVariantTitle}
+                      {item.productVariantOptionSummary ? ` • ${item.productVariantOptionSummary}` : ""}
+                      {item.productVariantSku ? ` · ${item.productVariantSku}` : ""}
+                    </p>
+                  ) : null}
                 </div>
                 <p className="text-sm text-neutral-700">{item.quantity}</p>
                 <p className="text-sm text-neutral-700">{formatMoney(item.unitPrice, item.currency, locale)}</p>
@@ -323,6 +362,32 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
               </article>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="border-t border-neutral-200 p-5">
+        <h3 className="mb-3 text-lg font-semibold tracking-tight text-neutral-950">{labels.orderDocumentsTitle}</h3>
+        <div className="space-y-3">
+          {order.documents.length === 0 ? (
+            <p className="text-sm text-neutral-500">{labels.notSpecified}</p>
+          ) : order.documents.map((document) => (
+            <article key={document.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="grid gap-2 text-sm text-neutral-700 md:grid-cols-2">
+                  <p><span className="font-medium text-neutral-900">Belge:</span> {document.documentNumber}</p>
+                  <p><span className="font-medium text-neutral-900">Tür:</span> {formatDocumentType(document.documentType)}</p>
+                  <p><span className="font-medium text-neutral-900">Durum:</span> {document.status}</p>
+                  <p><span className="font-medium text-neutral-900">Dış sistem:</span> {document.externalSystemStatus}</p>
+                  <p><span className="font-medium text-neutral-900">{labels.historyAt}:</span> {formatDate(document.issueDate, locale)}</p>
+                  <p><span className="font-medium text-neutral-900">İşlem no:</span> {document.inventoryTransactionNumber ?? labels.notSpecified}</p>
+                  <p><span className="font-medium text-neutral-900">{labels.orderTotal}:</span> {document.totalAmount !== null ? formatMoney(document.totalAmount, document.currency, locale) : labels.notSpecified}</p>
+                </div>
+                <Link href={`/${locale}/admin/documents`} className="text-xs font-medium text-neutral-600 underline decoration-neutral-300 underline-offset-4">
+                  Belgelerde aç
+                </Link>
+              </div>
+            </article>
+          ))}
         </div>
       </div>
 

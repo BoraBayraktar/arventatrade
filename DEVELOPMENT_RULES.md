@@ -36,6 +36,25 @@ Tum yeni gelistirmeler ve refactor islemleri bu kurallara uygun yapilmalidir.
 - Read agirlikli endpointlerde TTL bazli cache stratejisi uygulanir.
 - Yazma operasyonlarinda ilgili key invalidation kurallari tanimlanir.
 
+## 6) Genel UI / UX Prensipleri
+
+- Bu kurallar yalnizca tek bir modul icin degil, tum yonetim paneli ve tum uygun uygulama yuzeyleri icin gecerlidir.
+- Varsayilan ekran her zaman sade, hizli anlasilir ve aksiyon odakli olmalidir.
+- Kullanici ilk bakista sadece temel isi yapabilmelidir; ileri detaylar varsayilan acik gelmemelidir.
+- Her karmasik ekran `ozet -> detay -> teknik detay` katman mantigiyla tasarlanmalidir.
+- Ana aksiyonlar her zaman gorunur olmali; ikincil veya teknik bilgiler acilabilir alanlar icinde sunulmalidir.
+- Belge, log, maliyet, entegrasyon, projection, mapping ve benzeri derin bilgiler ancak ihtiyac halinde gosterilmelidir.
+- Varsayilan gorunumde kullanici teknik terimlerle bogulmamali; once is dili, sonra sistem detayi gelmelidir.
+- Liste ekranlari sade filtrelerle acilmali; gelismis filtreler acilabilir panel veya ikinci katman icinde sunulmalidir.
+- Uzun formlar tek parca ve yorucu olmamali; bolumler, step akislari, drawer yapisi veya sekmeler ile yonetilmelidir.
+- Ayni bilgi ayni yogunlukta birden fazla yerde tekrar edilmemelidir.
+- Bos durumlar yalnizca “veri yok” dememeli; kullaniciyi bir sonraki dogru aksiyona yonlendirmelidir.
+- Mobilde sadece responsive daraltma degil, onceliklendirilmis bilgi siralamasi uygulanmalidir.
+- Yeni bir UI alani eklenirken once su soru sorulmalidir:
+  - Bu bilgi ilk bakista gercekten gerekli mi?
+  - Degilse varsayilan yuzey yerine detay katmanina alinmalidir.
+- Modul tasariminda “kucuk isletme / buyuk isletme” gibi kullaniciya acik etiketlemeler yapilmaz; sade deneyim varsayilan olur, derinlik ihtiyac halinde acilir.
+
 ## Uygulama Notu
 
 - Kod incelemesi, lint ve mimari kontroller bu dosyaya gore yapilir.

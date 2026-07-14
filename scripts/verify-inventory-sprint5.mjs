@@ -13,20 +13,17 @@ function assertIncludes(content, expected, message) {
   }
 }
 
-const schema = read("prisma/schema.prisma");
-assertIncludes(schema, "model InventoryHistoryEvent", "InventoryHistoryEvent modeli bulunamadı.");
-assertIncludes(schema, "enum InventoryHistoryEventType", "InventoryHistoryEventType enum'u bulunamadı.");
+const service = read("src/modules/inventory/services/inventory.service.ts");
+assertIncludes(service, "\"inventory:overview:v4\"", "Overview cache sürümü performans sprinti için güncellenmedi.");
+assertIncludes(service, "includeWarehouseDistribution: false", "Overview ilk geçişte hafif proje üretmiyor.");
+assertIncludes(service, "includeRecentMovements: false", "Overview ilk geçişte hareket yükünü devre dışı bırakmıyor.");
+assertIncludes(service, "const productsForDecoration =", "Overview yalnızca gerekli ürünleri detaylandırmıyor.");
+assertIncludes(service, "buildInventoryOverviewSummary", "Overview özet projeksiyonu ayrı helper'a taşınmadı.");
 
 const repository = read("src/modules/inventory/repositories/inventory.repository.ts");
-assertIncludes(repository, "createInventoryHistoryEvent", "Inventory history create repository metodu bulunamadı.");
-assertIncludes(repository, "listInventoryHistoryEvents", "Inventory history list repository metodu bulunamadı.");
+assertIncludes(repository, "async listInventoryOverviewMovements", "Overview hareket ayrıştırması repository'de bulunmuyor.");
 
-const service = read("src/modules/inventory/services/inventory.service.ts");
-assertIncludes(service, "private async recordHistory", "Inventory service history projection helper'ı bulunamadı.");
-assertIncludes(service, "this.repository.listInventoryHistoryEvents(12)", "Operation history yeni projection kaynağından okunmuyor.");
-assertIncludes(service, "eventType: \"BULK_OPERATION\"", "Toplu işlemler history projection'a yazılmıyor.");
-
-const ui = read("src/ui/admin/inventory-manager.tsx");
-assertIncludes(ui, "özel geçmiş projeksiyonundan", "UI hâlâ eski audit metnini gösteriyor.");
+const planDoc = read("docs/PARASUT_INVENTORY_REVISION_PLAN.md");
+assertIncludes(planDoc, "Gerekirse raporlama projection tablolari", "Revizyon planında projection yönü bulunamadı.");
 
 console.log("Sprint 5 inventory doğrulamaları başarıyla geçti.");

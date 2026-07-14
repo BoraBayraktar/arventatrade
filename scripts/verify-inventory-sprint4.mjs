@@ -13,22 +13,25 @@ function assertIncludes(content, expected, message) {
   }
 }
 
-const schema = read("prisma/schema.prisma");
-assertIncludes(schema, "sourceDocumentType String?", "InventoryTransaction belge tipi alanı bulunamadı.");
-assertIncludes(schema, "sourceDocumentDate DateTime?", "InventoryTransaction belge tarihi alanı bulunamadı.");
-assertIncludes(schema, "externalReference String?", "InventoryTransaction dış referans alanı bulunamadı.");
-assertIncludes(schema, "counterpartyName  String?", "InventoryTransaction taraf alanı bulunamadı.");
+const policyDoc = read("docs/INVENTORY_COSTING_POLICY.md");
+assertIncludes(policyDoc, "Resmi maliyet otoritesi:", "Maliyet politikası resmi maliyet otoritesini netleştirmiyor.");
+assertIncludes(policyDoc, "Karşılaştırma / analiz görünümü:", "Maliyet politikası karşılaştırma görünümünü ayırmıyor.");
+assertIncludes(policyDoc, "resolveInventoryUnitCost", "Maliyet politikası resmi helper ayrımını tanımlamıyor.");
 
-const repository = read("src/modules/inventory/repositories/inventory.repository.ts");
-assertIncludes(repository, "sourceDocumentType: args.sourceDocumentType ?? null", "Repository transaction belge alanlarını yazmıyor.");
-assertIncludes(repository, "purchaseReceipt:", "Repository transaction sorgusunda purchaseReceipt include eksik.");
+const contracts = read("src/modules/inventory/contracts/inventory.contract.ts");
+assertIncludes(contracts, "officialCostingMethod: \"AVERAGE_COST\";", "Inventory report contract resmi maliyet alanını içermiyor.");
+assertIncludes(contracts, "displayCostingMethod: AdminInventoryReportCostingMethod;", "Inventory report contract görünen maliyet alanını içermiyor.");
+assertIncludes(contracts, "comparisonCostingModeEnabled: boolean;", "Inventory report contract karşılaştırma modu alanını içermiyor.");
 
 const service = read("src/modules/inventory/services/inventory.service.ts");
-assertIncludes(service, "sourceDocumentDate: Date | null", "Service transaction belge tarihi eşlemesini yapmıyor.");
-assertIncludes(service, "externalReference: item.purchaseReceipt?.externalReference ?? item.externalReference", "Service dış referans merkezileştirmesi eksik.");
+assertIncludes(service, "officialCostingMethod: \"AVERAGE_COST\"", "Inventory report service resmi maliyet yöntemini sabitlemiyor.");
+assertIncludes(service, "displayCostingMethod: parsed.costingMethod", "Inventory report service görünen maliyet yöntemini ayırmıyor.");
+assertIncludes(service, "comparisonCostingModeEnabled: parsed.costingMethod !== \"AVERAGE_COST\"", "Inventory report service karşılaştırma modunu işaretlemiyor.");
+assertIncludes(service, "resmi maliyet otoritesi daima ağırlıklı ortalama maliyettir", "Resmi maliyet helper notu eksik.");
 
-const ui = read("src/ui/admin/inventory-manager.tsx");
-assertIncludes(ui, "formatSourceDocumentMeta", "UI belge meta formatlayıcısı eksik.");
-assertIncludes(ui, "Harici ref:", "UI dış referans gösterimi eksik.");
+const manager = read("src/ui/admin/inventory-manager.tsx");
+assertIncludes(manager, "labels.reportOfficialCostingMethod", "Inventory manager resmi maliyet etiketini göstermiyor.");
+assertIncludes(manager, "labels.reportComparisonCostingMode", "Inventory manager görünen maliyet modunu göstermiyor.");
+assertIncludes(manager, "Bu seçim yalnızca karşılaştırma görünümünü değiştirir; resmi maliyet yöntemi değişmez.", "Inventory manager karşılaştırma modu açıklamasını göstermiyor.");
 
 console.log("Sprint 4 inventory doğrulamaları başarıyla geçti.");

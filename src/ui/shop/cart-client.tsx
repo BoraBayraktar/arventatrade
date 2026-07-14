@@ -24,11 +24,16 @@ type Labels = {
 
 type CartLine = {
 	productId: string;
+	variantId?: string;
+	variantLabel?: string;
 	quantity: number;
 };
 
 type QuoteLine = {
 	productId: string;
+	variantId: string | null;
+	variantTitle: string | null;
+	variantOptionSummary: string | null;
 	slug: string;
 	name: string;
 	imageUrl: string;
@@ -142,17 +147,21 @@ export function CartClient({ locale, labels }: { locale: string; labels: Labels 
 		return () => clearTimeout(timer);
 	}, [cart, refreshQuote, promotionCode]);
 
-	function updateQuantity(productId: string, quantity: number) {
+	function updateQuantity(productId: string, quantity: number, variantId?: string | null) {
 		const next = cart
-			.map((line) => (line.productId === productId ? { ...line, quantity } : line))
+			.map((line) => (
+				line.productId === productId && (line.variantId ?? null) === (variantId ?? null)
+					? { ...line, quantity }
+					: line
+			))
 			.filter((line) => line.quantity > 0);
 
 		setCart(next);
 		writeCart(next);
 	}
 
-	function removeLine(productId: string) {
-		const next = cart.filter((line) => line.productId !== productId);
+	function removeLine(productId: string, variantId?: string | null) {
+		const next = cart.filter((line) => !(line.productId === productId && (line.variantId ?? null) === (variantId ?? null)));
 		setCart(next);
 		writeCart(next);
 	}
@@ -220,21 +229,26 @@ export function CartClient({ locale, labels }: { locale: string; labels: Labels 
 					<div className="rounded-xl border border-neutral-200 bg-white">
 						<div className="divide-y divide-neutral-200">
 							{quote.lines.map((line) => (
-								<article key={line.productId} className="grid gap-4 p-4 md:grid-cols-[100px_1fr_auto] md:items-center">
+								<article key={`${line.productId}:${line.variantId ?? ""}`} className="grid gap-4 p-4 md:grid-cols-[100px_1fr_auto] md:items-center">
 									<div className="h-24 w-24 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
 										{/* eslint-disable-next-line @next/next/no-img-element */}
 										<img src={line.imageUrl} alt={line.name} className="h-full w-full object-cover" />
 									</div>
 									<div>
 										<p className="font-medium text-neutral-900">{line.name}</p>
+										{line.variantTitle ? (
+											<p className="mt-1 text-xs text-neutral-500">
+												{line.variantTitle}{line.variantOptionSummary ? ` • ${line.variantOptionSummary}` : ""}
+											</p>
+										) : null}
 										<p className="mt-1 text-sm text-neutral-500">{formatMoney(line.unitPrice, line.currency, locale)}</p>
 										{!line.inStock ? (
 											<p className="mt-1 text-sm text-red-600">{labels.stockWarning} ({line.availableStock})</p>
 										) : null}
 										<div className="mt-2 flex items-center gap-2">
-											<label className="text-sm text-neutral-600" htmlFor={`qty-${line.productId}`}>{labels.quantity}</label>
+											<label className="text-sm text-neutral-600" htmlFor={`qty-${line.productId}-${line.variantId ?? "base"}`}>{labels.quantity}</label>
 											<input
-												id={`qty-${line.productId}`}
+												id={`qty-${line.productId}-${line.variantId ?? "base"}`}
 												type="number"
 												min={1}
 												max={99}
@@ -245,11 +259,11 @@ export function CartClient({ locale, labels }: { locale: string; labels: Labels 
 														return;
 													}
 
-													updateQuantity(line.productId, Math.max(1, Math.min(99, next)));
+													updateQuantity(line.productId, Math.max(1, Math.min(99, next)), line.variantId);
 												}}
 												className="h-9 w-20 rounded-md border border-neutral-300 px-2 text-sm"
 											/>
-											<button type="button" className="text-sm text-neutral-500 underline" onClick={() => removeLine(line.productId)}>
+											<button type="button" className="text-sm text-neutral-500 underline" onClick={() => removeLine(line.productId, line.variantId)}>
 												{labels.remove}
 											</button>
 										</div>

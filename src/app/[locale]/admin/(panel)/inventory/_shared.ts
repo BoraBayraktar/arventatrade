@@ -5,6 +5,7 @@ import { getCurrentUserFromContext } from "@/modules/identity/services/auth-cont
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
 
 export type InventoryRouteSearchParams = {
+  section?: string;
   search?: string;
   stockStatusFilter?: string;
   reservationFilter?: string;
@@ -20,11 +21,19 @@ export type InventoryRouteSearchParams = {
   reportPeriodDays?: string;
   reportComparePrevious?: string;
   reportCostingMethod?: string;
+  reportCategoryFilter?: string;
+  reportProductTypeFilter?: string;
+  reportWarehouseFilter?: string;
+  reportStockStatusFilter?: string;
+  reportReservationFilter?: string;
+  reportMovementTypeFilter?: string;
   page?: string;
 };
 
 export type InventoryRoutePageVariant =
   | "overview"
+  | "quick-actions"
+  | "inventory-list"
   | "transactions"
   | "counts"
   | "warehouses"
@@ -121,9 +130,49 @@ export async function loadInventoryRouteContext(
           || searchParams.reportCostingMethod === "LAST_PURCHASE_COST"
             ? searchParams.reportCostingMethod
             : undefined,
+        categoryId: searchParams.reportCategoryFilter?.trim() || undefined,
+        productType:
+          searchParams.reportProductTypeFilter === "PHYSICAL"
+          || searchParams.reportProductTypeFilter === "SERVICE"
+          || searchParams.reportProductTypeFilter === "RAW_MATERIAL"
+          || searchParams.reportProductTypeFilter === "SEMI_FINISHED"
+            ? searchParams.reportProductTypeFilter
+            : undefined,
+        warehouseCode: searchParams.reportWarehouseFilter?.trim() || undefined,
+        stockStatus:
+          searchParams.reportStockStatusFilter === "in_stock"
+          || searchParams.reportStockStatusFilter === "low_stock"
+          || searchParams.reportStockStatusFilter === "out_of_stock"
+            ? searchParams.reportStockStatusFilter
+            : undefined,
+        reservationStatus:
+          searchParams.reportReservationFilter === "with_reserved"
+          || searchParams.reportReservationFilter === "without_reserved"
+            ? searchParams.reportReservationFilter
+            : undefined,
+        movementType:
+          searchParams.reportMovementTypeFilter === "INITIAL_LOAD"
+          || searchParams.reportMovementTypeFilter === "MANUAL_ADJUSTMENT"
+          || searchParams.reportMovementTypeFilter === "PURCHASE_RECEIPT"
+          || searchParams.reportMovementTypeFilter === "DAMAGE_WRITE_OFF"
+          || searchParams.reportMovementTypeFilter === "TRANSFER_OUT"
+          || searchParams.reportMovementTypeFilter === "TRANSFER_IN"
+          || searchParams.reportMovementTypeFilter === "RESERVATION_HOLD"
+          || searchParams.reportMovementTypeFilter === "RESERVATION_RELEASE"
+          || searchParams.reportMovementTypeFilter === "ORDER_COMMIT"
+          || searchParams.reportMovementTypeFilter === "ORDER_CANCEL_RESTOCK"
+          || searchParams.reportMovementTypeFilter === "RETURN_RESTOCK"
+            ? searchParams.reportMovementTypeFilter
+            : undefined,
       })
       : inventoryService.getInventoryReports().then((result) => ({
         ...result,
+        filterOptions: {
+          categories: [],
+          productTypes: [],
+          warehouses: [],
+          movementTypes: [],
+        },
         lowStock: [],
         movementSummary: [],
         trend: [],
@@ -160,6 +209,9 @@ export async function loadInventoryRouteContext(
       appliedCount: 0,
       failedCount: 0,
       duplicateCount: 0,
+      unresolvedCount: 0,
+      readOnlyCount: 0,
+      targetLevelMissingCount: 0,
       latestFailedMessage: null,
       items: [],
     };
@@ -196,6 +248,12 @@ export async function loadInventoryRouteContext(
       reportPeriodDays: searchParams.reportPeriodDays ?? "30",
       reportComparePrevious: searchParams.reportComparePrevious ?? "1",
       reportCostingMethod: searchParams.reportCostingMethod ?? "AVERAGE_COST",
+      reportCategoryFilter: searchParams.reportCategoryFilter ?? "all",
+      reportProductTypeFilter: searchParams.reportProductTypeFilter ?? "all",
+      reportWarehouseFilter: searchParams.reportWarehouseFilter ?? "all",
+      reportStockStatusFilter: searchParams.reportStockStatusFilter ?? "all",
+      reportReservationFilter: searchParams.reportReservationFilter ?? "all",
+      reportMovementTypeFilter: searchParams.reportMovementTypeFilter ?? "all",
     },
     labels: {
       title: dictionary.admin.inventoryManager,
@@ -309,7 +367,36 @@ export async function loadInventoryRouteContext(
       activeAlerts: dictionary.admin.inventoryActiveAlerts,
       reportsTitle: dictionary.admin.inventoryReportsTitle,
       reportsDescription: dictionary.admin.inventoryReportsDescription,
+      quickActionTitle: dictionary.admin.inventoryQuickActionTitle,
+      quickActionDescription: dictionary.admin.inventoryQuickActionDescription,
+      quickActionInputLabel: dictionary.admin.inventoryQuickActionInputLabel,
+      quickActionInputPlaceholder: dictionary.admin.inventoryQuickActionInputPlaceholder,
+      quickActionOpen: dictionary.admin.inventoryQuickActionOpen,
+      quickActionLookup: dictionary.admin.inventoryQuickActionLookup,
+      quickActionSearching: dictionary.admin.inventoryQuickActionSearching,
+      quickActionStartCamera: dictionary.admin.inventoryQuickActionStartCamera,
+      quickActionStopCamera: dictionary.admin.inventoryQuickActionStopCamera,
+      quickActionCameraReady: dictionary.admin.inventoryQuickActionCameraReady,
+      quickActionCameraUnsupported: dictionary.admin.inventoryQuickActionCameraUnsupported,
+      quickActionCameraDenied: dictionary.admin.inventoryQuickActionCameraDenied,
+      quickActionNoMatch: dictionary.admin.inventoryQuickActionNoMatch,
+      quickActionMatchBarcode: dictionary.admin.inventoryQuickActionMatchBarcode,
+      quickActionMatchSku: dictionary.admin.inventoryQuickActionMatchSku,
+      quickActionMatchName: dictionary.admin.inventoryQuickActionMatchName,
+      quickActionScannerHint: dictionary.admin.inventoryQuickActionScannerHint,
+      quickActionRememberedMode: dictionary.admin.inventoryQuickActionRememberedMode,
+      quickActionAutoOpenHint: dictionary.admin.inventoryQuickActionAutoOpenHint,
+      quickActionFastModeTitle: dictionary.admin.inventoryQuickActionFastModeTitle,
+      quickActionFastModeDescription: dictionary.admin.inventoryQuickActionFastModeDescription,
+      quickActionQuantityLabel: dictionary.admin.inventoryQuickActionQuantityLabel,
+      quickActionApplyNow: dictionary.admin.inventoryQuickActionApplyNow,
+      quickActionApplySuccess: dictionary.admin.inventoryQuickActionApplySuccess,
+      quickActionApplyFailed: dictionary.admin.inventoryQuickActionApplyFailed,
+      quickActionTargetWarehouseLabel: dictionary.admin.inventoryQuickActionTargetWarehouseLabel,
+      quickActionSerialMode: dictionary.admin.inventoryQuickActionSerialMode,
+      quickActionSerialModeHint: dictionary.admin.inventoryQuickActionSerialModeHint,
       sectionsTitle: dictionary.admin.inventorySectionsTitle,
+      sectionQuickActions: dictionary.admin.inventorySectionQuickActions,
       sectionReports: dictionary.admin.inventorySectionReports,
       sectionSync: dictionary.admin.inventorySectionSync,
       sectionCritical: dictionary.admin.inventorySectionCritical,
@@ -347,14 +434,27 @@ export async function loadInventoryRouteContext(
       lowStockReport: dictionary.admin.inventoryLowStockReport,
       movementSummaryTitle: dictionary.admin.inventoryMovementSummaryTitle,
       trendTitle: dictionary.admin.inventoryTrendTitle,
+      category: dictionary.admin.category,
+      productType: dictionary.admin.productType,
       reportPeriod: dictionary.admin.inventoryReportPeriod,
       reportComparePrevious: dictionary.admin.inventoryReportComparePrevious,
       reportCostingMethod: dictionary.admin.inventoryReportCostingMethod,
+      reportCategoryFilter: dictionary.admin.inventoryReportCategoryFilter,
+      reportProductTypeFilter: dictionary.admin.inventoryReportProductTypeFilter,
+      reportWarehouseFilter: dictionary.admin.inventoryReportWarehouseFilter,
+      reportStockStatusFilter: dictionary.admin.inventoryReportStockStatusFilter,
+      reportReservationFilter: dictionary.admin.inventoryReportReservationFilter,
+      reportMovementTypeFilter: dictionary.admin.inventoryReportMovementTypeFilter,
+      reportFiltersTitle: dictionary.admin.inventoryReportFiltersTitle,
+      reportFiltersDescription: dictionary.admin.inventoryReportFiltersDescription,
+      reportClearFilters: dictionary.admin.clearFilters,
       reportPeriod7Days: dictionary.admin.inventoryReportPeriod7Days,
       reportPeriod30Days: dictionary.admin.inventoryReportPeriod30Days,
       reportPeriod90Days: dictionary.admin.inventoryReportPeriod90Days,
       reportCostAverage: dictionary.admin.inventoryReportCostAverage,
       reportCostLastPurchase: dictionary.admin.inventoryReportCostLastPurchase,
+      reportOfficialCostingMethod: dictionary.admin.inventoryReportOfficialCostingMethod,
+      reportComparisonCostingMode: dictionary.admin.inventoryReportComparisonCostingMode,
       reportCurrentPeriod: dictionary.admin.inventoryReportCurrentPeriod,
       reportPreviousPeriod: dictionary.admin.inventoryReportPreviousPeriod,
       reportDifference: dictionary.admin.inventoryReportDifference,
