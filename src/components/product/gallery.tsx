@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { GridTileImage } from "@/components/grid/tile";
 import styles from "@/ui/shop/surface.module.css";
 
@@ -350,20 +351,22 @@ export function Gallery({ images, zoomTargetId }: GalleryProps) {
 
           {images.length > 1 ? (
             <>
-              <button
+              <Button
                 formAction={() => updateImage(String(previousImageIndex))}
                 aria-label="Previous product image"
+                variant="secondary"
                 className={`${navButtonClassName} left-3`}
               >
                 <ChevronLeft className="h-5 w-5" />
-              </button>
-              <button
+              </Button>
+              <Button
                 formAction={() => updateImage(String(nextImageIndex))}
                 aria-label="Next product image"
+                variant="secondary"
                 className={`${navButtonClassName} right-3`}
               >
                 <ChevronRight className="h-5 w-5" />
-              </button>
+              </Button>
             </>
           ) : null}
         </div>
@@ -399,15 +402,16 @@ export function Gallery({ images, zoomTargetId }: GalleryProps) {
 
             return (
               <li key={`${image.src}-${index}`} className="h-20 w-20">
-                <button
+                <Button
                   formAction={() => updateImage(String(index))}
                   aria-label="Select product image"
-                  className="h-full w-full"
+                  variant="ghost"
+                  className="h-full w-full p-0"
                   onMouseEnter={() => previewImage(index)}
                   onFocus={() => previewImage(index)}
                 >
                   <GridTileImage alt={image.altText} src={image.src} width={80} height={80} active={isActive} />
-                </button>
+                </Button>
               </li>
             );
           })}

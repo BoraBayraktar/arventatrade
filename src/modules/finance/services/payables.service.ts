@@ -1,4 +1,5 @@
 import { documentService } from "@/modules/documents/services/document.service";
+import { financeRepository } from "@/modules/finance/repositories/finance.repository";
 import type {
   AdminSupplierPayableDetail,
   AdminSupplierPayableSummary,
@@ -16,12 +17,14 @@ export class PayablesService {
 
     for (const document of documents) {
       const supplierName = document.counterpartyName.trim() || "Belirtilmedi";
+      const supplierId = document.supplierId ?? null;
       const currency = document.currency || "TRY";
       const supplierKey = `${normalizeSupplierKey(supplierName)}:${currency}`;
       const current = grouped.get(supplierKey);
 
       if (!current) {
         grouped.set(supplierKey, {
+          supplierId,
           supplierKey,
           supplierName,
           currency,
@@ -34,6 +37,7 @@ export class PayablesService {
         continue;
       }
 
+      current.supplierId = current.supplierId ?? supplierId;
       current.totalAmount += document.totalAmount ?? 0;
       current.documentCount += 1;
       current.draftCount += document.status === "DRAFT" ? 1 : 0;

@@ -59,6 +59,8 @@ export type AdminBusinessDocumentListItem = {
   externalSystemStatus: AdminBusinessDocumentSyncStatus;
   providerConfigId: string | null;
   providerDisplayName: string | null;
+  supplierId: string | null;
+  customerAccountId: string | null;
   counterpartyName: string;
   orderId: string | null;
   orderNumber: string | null;
@@ -120,7 +122,8 @@ export type AdminCreateBusinessDocumentInput = {
   totalAmount?: number | null;
   externalReference?: string | null;
   externalSystemStatus?: AdminBusinessDocumentSyncStatus;
-  counterpartyName?: string | null;
+  supplierId?: string | null;
+  customerAccountId?: string | null;
   counterpartyTaxNumber?: string | null;
   counterpartyTaxOffice?: string | null;
   counterpartyEmail?: string | null;

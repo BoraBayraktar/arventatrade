@@ -1,6 +1,8 @@
 export type AuditLogEntityType =
   | "USER"
   | "PRODUCT"
+  | "SUPPLIER"
+  | "CUSTOMER_ACCOUNT"
   | "CATEGORY"
   | "ORDER"
   | "WAREHOUSE"

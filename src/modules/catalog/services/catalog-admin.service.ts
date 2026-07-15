@@ -184,6 +184,10 @@ const updateAttributeDefinitionSchema = z.object({
 
 const categoryListQuerySchema = z.object({
   search: z.string().trim().optional(),
+  parentId: z.string().trim().optional(),
+  rootOnly: z.coerce.boolean().optional().default(false),
+  hasProducts: z.enum(["all", "with_products", "without_products"]).default("all"),
+  sort: z.enum(["updated_desc", "name_asc", "name_desc", "product_count_desc"]).default("updated_desc"),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(10),
 });
@@ -830,7 +834,7 @@ export class CatalogAdminService {
       sku: created.sku,
       warehouseId: parsed.preferredPurchaseWarehouseId ?? parsed.preferredSalesWarehouseId ?? undefined,
       targetOnHandStock: parsed.stock,
-      note: "Catalog admin initial stock setup",
+      note: "Ürün yönetimi ilk stok kurulumu",
     });
     const hydrated = await this.repository.findActiveProductForAdminById(created.id);
     if (!hydrated) {
@@ -983,6 +987,11 @@ export class CatalogAdminService {
     return rows.map(mapSupplier);
   }
 
+  async getSupplierById(id: string): Promise<AdminSupplierItem | null> {
+    const row = await this.repository.findActiveSupplierById(id);
+    return row ? mapSupplier(row) : null;
+  }
+
   async createBrand(input: AdminCreateBrandInput): Promise<AdminBrandItem> {
     const parsed = createBrandSchema.parse(input);
     const created = await this.repository.createBrand(parsed);
@@ -1050,6 +1059,9 @@ export class CatalogAdminService {
       this.repository.listCategories(parsed),
       this.repository.countCategories({
         search: parsed.search,
+        parentId: parsed.parentId,
+        rootOnly: parsed.rootOnly,
+        hasProducts: parsed.hasProducts,
       }),
     ]);
 

@@ -43,12 +43,11 @@ export class PaymentsService {
     }
 
     const enrichedItems = await Promise.all(items.map(async (item) => {
-      const matchedSupplier = await financeRepository.findSupplierByName(item.supplierName);
-      const records = matchedSupplier ? (paymentRecordTotals.get(matchedSupplier.id) ?? []) : [];
+      const records = item.supplierId ? (paymentRecordTotals.get(item.supplierId) ?? []) : [];
       const recordedAmount = records.reduce((sum, record) => sum + record.amount, 0);
 
       return {
-        supplierId: matchedSupplier?.id ?? "",
+        supplierId: item.supplierId ?? "",
         supplierKey: item.supplierKey,
         supplierName: item.supplierName,
         totalAmount: item.totalAmount,
@@ -99,7 +98,7 @@ export class PaymentsService {
     }
 
     const payableItems = await payablesService.listSupplierPayables();
-    const payable = payableItems.find((item) => item.supplierName === supplier.name);
+    const payable = payableItems.find((item) => item.supplierId === supplier.id);
 
     if (!payable) {
       throw new Error("Ödeme kaydı oluşturulacak tedarikçi borcu bulunamadı.");

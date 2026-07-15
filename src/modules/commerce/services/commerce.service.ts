@@ -20,6 +20,7 @@ import type {
   CommerceQuoteInput,
   CommerceQuoteResult,
 } from "@/modules/commerce/contracts/commerce.contract";
+import { customerAccountService } from "@/modules/customers/services/customer-account.service";
 import { CommerceRepository } from "@/modules/commerce/repositories/commerce.repository";
 import { integrationService } from "@/modules/integration/services/integration.service";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
@@ -214,6 +215,11 @@ function mapRestockStatus(args: {
 function mapOrderDetail(order: {
   id: string;
   orderNumber: string;
+  customerAccount: {
+    id: string;
+    name: string;
+    email: string | null;
+  } | null;
   status: "CONFIRMED" | "CANCELLED";
   paymentStatus: "PENDING" | "AUTHORIZED" | "PAID" | "FAILED" | "REFUNDED";
   subtotal: { toNumber: () => number };
@@ -366,6 +372,9 @@ function mapOrderDetail(order: {
   return {
     id: order.id,
     orderNumber: order.orderNumber,
+    customerAccountId: order.customerAccount?.id ?? null,
+    customerAccountName: order.customerAccount?.name ?? null,
+    customerAccountEmail: order.customerAccount?.email ?? null,
     status: order.status,
     paymentStatus: order.paymentStatus,
     subtotal: order.subtotal.toNumber(),
@@ -448,7 +457,13 @@ export class CommerceService {
     };
   }
 
-  async checkout(input: CommerceCheckoutInput): Promise<CommerceCheckoutResult> {
+  async checkout(
+    input: CommerceCheckoutInput,
+    customerProfile?: {
+      email: string;
+      name: string;
+    } | null,
+  ): Promise<CommerceCheckoutResult> {
     const quote = await this.quote(input);
 
     if (quote.lines.length === 0) {
@@ -467,6 +482,9 @@ export class CommerceService {
 
     const orderNumber = `ARV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     let createdOrderNumber = orderNumber;
+    const customerAccount = customerProfile
+      ? await customerAccountService.ensureCustomerAccountFromUserProfile(customerProfile)
+      : null;
 
     try {
       const createdOrder = await this.repository.createOrderAndCommitInventory({
@@ -477,6 +495,7 @@ export class CommerceService {
         total: quote.total,
         promotionCode: quote.promotionCode,
         currency: quote.currency,
+        customerAccountId: customerAccount?.id ?? null,
       });
       createdOrderNumber = createdOrder.orderNumber;
     } catch (error) {
@@ -529,25 +548,54 @@ export class CommerceService {
       this.repository.countOrders({ search: parsed.search, status: parsed.status, paymentStatus: parsed.paymentStatus }),
     ]);
 
-    const items: AdminOrderListItem[] = orders.map((order) => ({
+    const items: AdminOrderListItem[] = orders.map((order: {
+      id: string;
+      orderNumber: string;
+      customerAccount?: {
+        id: string;
+        name: string;
+        email: string | null;
+      } | null;
+      status: AdminOrderListItem["status"];
+      paymentStatus: AdminOrderListItem["paymentStatus"];
+      stockReservations: Array<{
+        inventoryMovements: Array<{
+          createdAt: Date;
+        }>;
+      }>;
+      subtotal: { toNumber(): number };
+      discountTotal: { toNumber(): number };
+      total: { toNumber(): number };
+      promotionCode: string | null;
+      currency: string;
+      items: Array<{
+        quantity: number;
+      }>;
+      createdAt: Date;
+    }) => ({
       id: order.id,
       orderNumber: order.orderNumber,
+      customerAccountId: order.customerAccount?.id ?? null,
+      customerAccountName: order.customerAccount?.name ?? null,
       status: order.status,
       paymentStatus: order.paymentStatus,
       restockStatus: mapRestockStatus({
         reservationCount: order.stockReservations.length,
-        restockMovementCount: order.stockReservations.reduce((sum, reservation) => sum + reservation.inventoryMovements.length, 0),
+        restockMovementCount: order.stockReservations.reduce(
+          (sum: number, reservation: { inventoryMovements: Array<{ createdAt: Date }> }) => sum + reservation.inventoryMovements.length,
+          0,
+        ),
       }),
       lastRestockedAt: order.stockReservations
-        .flatMap((reservation) => reservation.inventoryMovements)
-        .map((movement) => movement.createdAt)
-        .sort((left, right) => right.getTime() - left.getTime())[0]?.toISOString() ?? null,
+        .flatMap((reservation: { inventoryMovements: Array<{ createdAt: Date }> }) => reservation.inventoryMovements)
+        .map((movement: { createdAt: Date }) => movement.createdAt)
+        .sort((left: Date, right: Date) => right.getTime() - left.getTime())[0]?.toISOString() ?? null,
       subtotal: order.subtotal.toNumber(),
       discountTotal: order.discountTotal.toNumber(),
       total: order.total.toNumber(),
       promotionCode: order.promotionCode,
       currency: order.currency,
-      itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
+      itemCount: order.items.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0),
       createdAt: order.createdAt.toISOString(),
     }));
 

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Price } from "@/components/price";
 import { AddToCartControls } from "@/components/product/add-to-cart-controls";
+import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/i18n";
 import type { ProductDetail } from "@/modules/catalog/contracts/catalog.contract";
 
@@ -83,14 +84,15 @@ export function ProductDescription({ locale, product, labels }: ProductDescripti
 						{product.variants.map((variant) => {
 							const active = variant.id === selectedVariant?.id;
 							return (
-								<button
+								<Button
 									key={variant.id}
 									type="button"
+									variant={active ? "default" : "secondary"}
 									onClick={() => setSelectedVariantId(variant.id)}
-									className={`rounded-full border px-3 py-2 text-sm transition ${active ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-700"}`}
+									className="rounded-full"
 								>
 									{variant.optionSummary}
-								</button>
+								</Button>
 							);
 						})}
 					</div>

@@ -469,19 +469,20 @@ export function CatalogFilters({
                     const active = selectedFeatureFilters.includes(token);
 
                     return (
-                      <button
+                      <Button
                         key={token}
                         type="button"
+                        variant={active ? "default" : "outline"}
                         onClick={() => toggleFeatureFilter(facet.key, option.value)}
-                        className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-medium transition ${
+                        className={`h-auto justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
                           active
-                            ? "border-[color:var(--primary)] bg-[color:var(--primary)] text-white"
+                            ? "border-[color:var(--primary)] bg-[color:var(--primary)] text-white hover:bg-[color:var(--primary)]"
                             : "border-border bg-white text-foreground hover:border-[color:var(--primary)] hover:text-[color:var(--primary)]"
                         }`}
                       >
                         <span>{option.value}</span>
                         <span className={active ? "text-white/80" : "text-muted-foreground"}>({option.count})</span>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -509,132 +510,142 @@ export function CatalogFilters({
           <p className="text-xs font-semibold uppercase tracking-[0.11em] text-muted-foreground">{labels.activeFilters}</p>
           <div className="flex flex-wrap gap-2">
             {hasSearch ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setSearch("");
                   applyFilters({ searchText: "" });
                 }}
-                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-[color:var(--primary)] hover:text-[color:var(--primary)]"
+                className="h-auto rounded-full px-3 py-1.5 text-xs"
               >
                 {labels.searchLabel}: {search.trim()} x
-              </button>
+              </Button>
             ) : null}
 
             {hasCategory ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setCategory("all");
                   applyFilters({ categorySlug: "all" });
                 }}
-                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-[color:var(--primary)] hover:text-[color:var(--primary)]"
+                className="h-auto rounded-full px-3 py-1.5 text-xs"
               >
                 {labels.categoryLabel}: {categoryMap.get(category) ?? category} x
-              </button>
+              </Button>
             ) : null}
 
             {hasSort ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setSort("latest");
                   applyFilters({ sortValue: "latest" });
                 }}
-                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-[color:var(--primary)] hover:text-[color:var(--primary)]"
+                className="h-auto rounded-full px-3 py-1.5 text-xs"
               >
                 {labels.sortLabel}: {sortLabelByValue[sort]} x
-              </button>
+              </Button>
             ) : null}
 
             {hasStockOnly ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setInStockOnly(false);
                   applyFilters({ inStock: false });
                 }}
-                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-[color:var(--primary)] hover:text-[color:var(--primary)]"
+                className="h-auto rounded-full px-3 py-1.5 text-xs"
               >
                 {labels.inStockOnly} x
-              </button>
+              </Button>
             ) : null}
 
             {hasOutOfStockOnly ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setOutOfStockOnly(false);
                   applyFilters({ outOfStock: false });
                 }}
-                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-[color:var(--primary)] hover:text-[color:var(--primary)]"
+                className="h-auto rounded-full px-3 py-1.5 text-xs"
               >
                 {labels.outOfStockOnly} x
-              </button>
+              </Button>
             ) : null}
 
             {hasLowStockOnly ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setLowStockOnly(false);
                   applyFilters({ lowStock: false });
                 }}
-                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-[color:var(--primary)] hover:text-[color:var(--primary)]"
+                className="h-auto rounded-full px-3 py-1.5 text-xs"
               >
                 {labels.lowStockOnly} x
-              </button>
+              </Button>
             ) : null}
 
             {hasNewOnly ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setNewOnly(false);
                   applyFilters({ onlyNew: false });
                 }}
-                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-[color:var(--primary)] hover:text-[color:var(--primary)]"
+                className="h-auto rounded-full px-3 py-1.5 text-xs"
               >
                 {labels.newOnly} x
-              </button>
+              </Button>
             ) : null}
 
             {hasDiscountOnly ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setDiscountedOnly(false);
                   applyFilters({ discounted: false });
                 }}
-                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-[color:var(--primary)] hover:text-[color:var(--primary)]"
+                className="h-auto rounded-full px-3 py-1.5 text-xs"
               >
                 {labels.discountedOnly} x
-              </button>
+              </Button>
             ) : null}
 
             {selectedFeatureFilters.map((token) => (
-              <button
+              <Button
                 key={token}
                 type="button"
+                variant="outline"
                 onClick={() => removeFeatureFilter(token)}
-                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-[color:var(--primary)] hover:text-[color:var(--primary)]"
+                className="h-auto rounded-full px-3 py-1.5 text-xs"
               >
                 {token.replace("::", ": ")} x
-              </button>
+              </Button>
             ))}
 
             {hasMinPrice || hasMaxPrice ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setMinPrice("");
                   setMaxPrice("");
                   applyFilters({ min: "", max: "" });
                 }}
-                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-[color:var(--primary)] hover:text-[color:var(--primary)]"
+                className="h-auto rounded-full px-3 py-1.5 text-xs"
               >
                 {labels.priceRange}: {hasMinPrice ? minPrice : "0"} - {hasMaxPrice ? maxPrice : "..."} x
-              </button>
+              </Button>
             ) : null}
           </div>
         </div>

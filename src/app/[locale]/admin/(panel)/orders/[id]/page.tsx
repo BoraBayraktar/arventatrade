@@ -53,6 +53,7 @@ export default async function AdminOrderDetailPage({
         orderDiscount: dictionary.admin.orderDiscount,
         promotionCode: dictionary.admin.promotionCode,
         orderDate: dictionary.admin.orderDate,
+        customerAccount: dictionary.admin.customerAccountsTitle,
         updateStatus: dictionary.admin.updateOrderStatus,
         deleteOrder: dictionary.admin.deleteOrder,
         operationFailed: dictionary.admin.operationFailed,

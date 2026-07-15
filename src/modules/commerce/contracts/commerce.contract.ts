@@ -59,6 +59,8 @@ export type AdminPaymentStatusChangeSource = "SYSTEM" | "ADMIN";
 export type AdminOrderListItem = {
   id: string;
   orderNumber: string;
+  customerAccountId: string | null;
+  customerAccountName: string | null;
   status: AdminOrderStatus;
   paymentStatus: AdminPaymentStatus;
   restockStatus: "NOT_RESTOCKED" | "RESTOCKED" | "PARTIALLY_RESTOCKED";
@@ -119,6 +121,9 @@ export type AdminOrderDetailItem = {
 export type AdminOrderDetail = {
   id: string;
   orderNumber: string;
+  customerAccountId: string | null;
+  customerAccountName: string | null;
+  customerAccountEmail: string | null;
   status: AdminOrderStatus;
   paymentStatus: AdminPaymentStatus;
   subtotal: number;

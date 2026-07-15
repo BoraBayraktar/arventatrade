@@ -47,6 +47,7 @@ export default async function AdminCategoriesPage({
       initialResult={categoryResult}
       parentCandidates={candidateItems.map((item) => ({
         id: item.id,
+        slug: item.slug,
         name: item.name,
         parentId: item.parentId,
       }))}
@@ -56,10 +57,21 @@ export default async function AdminCategoriesPage({
         createTitle: dictionary.admin.createCategory,
         listTitle: dictionary.admin.categoryList,
         search: dictionary.admin.searchCategory,
+        allParents: dictionary.admin.allParentCategories,
         slug: dictionary.admin.slug,
         name: dictionary.admin.name,
         productCount: dictionary.admin.productCount,
         parentCategory: dictionary.admin.parentCategory,
+        filterProducts: dictionary.admin.filterProducts,
+        filterAllProducts: dictionary.admin.filterAllProducts,
+        filterWithProducts: dictionary.admin.filterWithProducts,
+        filterWithoutProducts: dictionary.admin.filterWithoutProducts,
+        sort: dictionary.admin.sortCategories,
+        sortUpdatedDesc: dictionary.admin.sortUpdatedDesc,
+        sortNameAsc: dictionary.admin.sortNameAsc,
+        sortNameDesc: dictionary.admin.sortNameDesc,
+        sortProductCountDesc: dictionary.admin.sortProductCountDesc,
+        rootCategoriesOnly: dictionary.admin.rootCategoriesOnly,
         noParent: dictionary.admin.noParentCategory,
         page: dictionary.admin.page,
         prev: dictionary.admin.prev,
@@ -74,6 +86,8 @@ export default async function AdminCategoriesPage({
         validationRequired: dictionary.admin.validationRequired,
         validationDeleteBlocked: dictionary.admin.validationDeleteCategoryBlocked,
         loading: dictionary.common.loading,
+        importCsv: dictionary.admin.importCsv,
+        exportCsv: dictionary.admin.exportCsv,
       }}
     />
   );

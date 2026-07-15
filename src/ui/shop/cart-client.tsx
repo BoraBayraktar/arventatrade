@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import styles from "@/ui/shop/surface.module.css";
 
 type Labels = {
@@ -247,7 +248,7 @@ export function CartClient({ locale, labels }: { locale: string; labels: Labels 
 										) : null}
 										<div className="mt-2 flex items-center gap-2">
 											<label className="text-sm text-neutral-600" htmlFor={`qty-${line.productId}-${line.variantId ?? "base"}`}>{labels.quantity}</label>
-											<input
+											<Input
 												id={`qty-${line.productId}-${line.variantId ?? "base"}`}
 												type="number"
 												min={1}
@@ -261,11 +262,11 @@ export function CartClient({ locale, labels }: { locale: string; labels: Labels 
 
 													updateQuantity(line.productId, Math.max(1, Math.min(99, next)), line.variantId);
 												}}
-												className="h-9 w-20 rounded-md border border-neutral-300 px-2 text-sm"
+												className="h-9 w-20"
 											/>
-											<button type="button" className="text-sm text-neutral-500 underline" onClick={() => removeLine(line.productId, line.variantId)}>
+											<Button type="button" variant="ghost" className="h-auto px-0 text-sm text-neutral-500 underline hover:bg-transparent hover:text-neutral-700" onClick={() => removeLine(line.productId, line.variantId)}>
 												{labels.remove}
-											</button>
+											</Button>
 										</div>
 									</div>
 									<div className="text-sm font-semibold text-neutral-900">{formatMoney(line.lineTotal, line.currency, locale)}</div>
@@ -276,11 +277,11 @@ export function CartClient({ locale, labels }: { locale: string; labels: Labels 
 
 					<aside className="h-fit rounded-xl border border-neutral-200 bg-white p-5">
 						<label className="text-sm text-neutral-500" htmlFor="promotion-code">{labels.promotionCode}</label>
-						<input
+						<Input
 							id="promotion-code"
 							value={promotionCode}
 							onChange={(event) => setPromotionCode(event.target.value.toUpperCase())}
-							className="mt-1 h-10 w-full rounded-md border border-neutral-300 px-3 text-sm"
+							className="mt-1 h-10"
 							placeholder="SUMMER10"
 						/>
 						<p className="text-sm text-neutral-500">{labels.subtotal}</p>

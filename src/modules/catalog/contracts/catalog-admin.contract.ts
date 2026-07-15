@@ -281,6 +281,10 @@ export type AdminCategoryListItem = {
 
 export type AdminCategoryListQuery = {
   search?: string;
+  parentId?: string;
+  rootOnly?: boolean;
+  hasProducts?: "all" | "with_products" | "without_products";
+  sort?: "updated_desc" | "name_asc" | "name_desc" | "product_count_desc";
   page?: number;
   pageSize?: number;
 };

@@ -19,6 +19,7 @@ export default async function AdminInventoryExternalEventsPage({
       result={context.result}
       transactionResult={context.transactionResult}
       warehouses={context.warehouses}
+      suppliers={context.suppliers}
       alertResult={context.alertResult}
       stockCounts={context.stockCounts}
       reports={context.reports}

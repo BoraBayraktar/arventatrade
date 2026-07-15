@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Download, Upload, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Category = {
   id: string;
@@ -18,6 +19,7 @@ type Category = {
 
 type ParentCategoryOption = {
   id: string;
+  slug: string;
   name: string;
   parentId: string | null;
 };
@@ -27,10 +29,21 @@ type Labels = {
   createTitle: string;
   listTitle: string;
   search: string;
+  allParents: string;
   slug: string;
   name: string;
   productCount: string;
   parentCategory: string;
+  filterProducts: string;
+  filterAllProducts: string;
+  filterWithProducts: string;
+  filterWithoutProducts: string;
+  sort: string;
+  sortUpdatedDesc: string;
+  sortNameAsc: string;
+  sortNameDesc: string;
+  sortProductCountDesc: string;
+  rootCategoriesOnly: string;
   noParent: string;
   page: string;
   prev: string;
@@ -45,6 +58,8 @@ type Labels = {
   validationRequired: string;
   validationDeleteBlocked: string;
   loading: string;
+  importCsv: string;
+  exportCsv: string;
 };
 
 type Props = {
@@ -83,10 +98,16 @@ function mapPayload(form: CategoryForm) {
 }
 
 export function CategoryManager({ initialResult, parentCandidates, labels, canDelete }: Props) {
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
   const [result, setResult] = useState(initialResult);
   const [query, setQuery] = useState("");
+  const [selectedParentId, setSelectedParentId] = useState("");
+  const [rootOnly, setRootOnly] = useState(false);
+  const [hasProducts, setHasProducts] = useState<"all" | "with_products" | "without_products">("all");
+  const [sort, setSort] = useState<"updated_desc" | "name_asc" | "name_desc" | "product_count_desc">("updated_desc");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<CategoryForm>(emptyForm);
@@ -212,6 +233,18 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
     if (nextQuery.trim()) {
       params.set("search", nextQuery.trim());
     }
+    if (selectedParentId.trim()) {
+      params.set("parentId", selectedParentId);
+    }
+    if (rootOnly) {
+      params.set("rootOnly", "true");
+    }
+    if (hasProducts !== "all") {
+      params.set("hasProducts", hasProducts);
+    }
+    if (sort !== "updated_desc") {
+      params.set("sort", sort);
+    }
     params.set("page", String(page));
     params.set("pageSize", String(result.pageSize));
 
@@ -256,19 +289,24 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
     setError(null);
   }
 
-  async function applyFilters(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      await fetchCategories(query, 1);
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : labels.opFailed);
-    } finally {
-      setLoading(false);
-    }
-  }
+      void fetchCategories(query, 1)
+        .catch((caughtError) => {
+          setError(caughtError instanceof Error ? caughtError.message : labels.opFailed);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [hasProducts, labels.opFailed, query, rootOnly, selectedParentId, sort]);
 
   async function goToPage(nextPage: number) {
     setLoading(true);
@@ -350,6 +388,131 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
     }
   }
 
+  function parseCsvLine(line: string) {
+    const values: string[] = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let index = 0; index < line.length; index += 1) {
+      const char = line[index];
+
+      if (char === "\"") {
+        if (inQuotes && line[index + 1] === "\"") {
+          current += "\"";
+          index += 1;
+        } else {
+          inQuotes = !inQuotes;
+        }
+        continue;
+      }
+
+      if (char === "," && !inQuotes) {
+        values.push(current);
+        current = "";
+        continue;
+      }
+
+      current += char;
+    }
+
+    values.push(current);
+    return values.map((value) => value.trim());
+  }
+
+  function toCsvValue(value: string | number) {
+    const normalized = String(value);
+    if (normalized.includes(",") || normalized.includes("\"") || normalized.includes("\n")) {
+      return `"${normalized.replaceAll("\"", "\"\"")}"`;
+    }
+    return normalized;
+  }
+
+  function exportCategories() {
+    const header = ["name", "slug", "parentSlug", "productCount"];
+    const rows = result.items.map((category) => {
+      const parentSlug = category.parentId ? parentCandidates.find((item) => item.id === category.parentId)?.slug ?? "" : "";
+      return [
+        toCsvValue(category.name),
+        toCsvValue(category.slug),
+        toCsvValue(parentSlug),
+        toCsvValue(category.productCount),
+      ];
+    });
+
+    const csv = [header.join(","), ...rows.map((row) => row.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "categories.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function importCategories(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    setImporting(true);
+    setError(null);
+
+    try {
+      const text = await file.text();
+      const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      if (lines.length <= 1) {
+        setError("CSV dosyasinda aktarilacak satir bulunamadi.");
+        return;
+      }
+
+      const headers = parseCsvLine(lines[0]).map((value) => value.toLocaleLowerCase("tr-TR"));
+      const parentSlugMap = new Map(
+        parentCandidates.map((item) => [item.slug.toLocaleLowerCase("tr-TR"), item.id]),
+      );
+
+      for (const line of lines.slice(1)) {
+        const columns = parseCsvLine(line);
+        const row = Object.fromEntries(headers.map((key, index) => [key, columns[index] ?? ""])) as Record<string, string>;
+
+        if (!row.name?.trim() || !row.slug?.trim()) {
+          continue;
+        }
+
+        const parentSlug = row.parentslug?.trim().toLocaleLowerCase("tr-TR") ?? "";
+        const response = await fetch("/api/admin/categories", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: row.name.trim(),
+            slug: row.slug.trim(),
+            parentId: parentSlug ? parentSlugMap.get(parentSlug) ?? null : null,
+          }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+          setError(payload?.message ?? labels.opFailed);
+          return;
+        }
+      }
+
+      await fetchCategories(query, result.page);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : labels.opFailed);
+    } finally {
+      setImporting(false);
+      if (importFileInputRef.current) {
+        importFileInputRef.current.value = "";
+      }
+    }
+  }
+
   return (
     <section className="rounded-2xl border border-neutral-200 bg-white">
       <div className="flex flex-col gap-4 border-b border-neutral-200 p-5 lg:flex-row lg:items-center lg:justify-between">
@@ -358,16 +521,70 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
           <h2 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-950">{labels.listTitle}</h2>
           <p className="mt-1 text-sm text-neutral-500">{result.total} kategori listeleniyor</p>
         </div>
-        <Button type="button" onClick={openCreateDrawer}>{labels.createTitle}</Button>
+        <div className="flex flex-wrap gap-2">
+          <input
+            ref={importFileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(event) => void importCategories(event.target.files?.[0] ?? null)}
+          />
+          <Button type="button" variant="secondary" disabled={loading || importing} onClick={() => importFileInputRef.current?.click()}>
+            <Upload className="h-4 w-4" />
+            {labels.importCsv}
+          </Button>
+          <Button type="button" variant="secondary" disabled={loading} onClick={exportCategories}>
+            <Download className="h-4 w-4" />
+            {labels.exportCsv}
+          </Button>
+          <Button type="button" onClick={openCreateDrawer}>{labels.createTitle}</Button>
+        </div>
       </div>
 
       <div className="p-5">
         {error ? <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p> : null}
 
-        <form className="mb-5 grid gap-3 md:grid-cols-[1fr_auto]" onSubmit={applyFilters}>
+        <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.3fr_220px_200px_220px_auto]">
           <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={labels.search} />
-          <Button type="submit" variant="secondary" disabled={loading}>{labels.search}</Button>
-        </form>
+          <Select value={selectedParentId || "__all__"} onValueChange={(value) => setSelectedParentId(value === "__all__" ? "" : value)}>
+            <SelectTrigger>
+              <SelectValue placeholder={labels.allParents} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">{labels.allParents}</SelectItem>
+              {parentSelectOptions.map((item) => (
+                <SelectItem key={item.id} value={item.id}>
+                  {`${"-- ".repeat(item.depth)}${item.label}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={hasProducts} onValueChange={(value) => setHasProducts(value as "all" | "with_products" | "without_products")}>
+            <SelectTrigger>
+              <SelectValue placeholder={labels.filterProducts} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{labels.filterAllProducts}</SelectItem>
+              <SelectItem value="with_products">{labels.filterWithProducts}</SelectItem>
+              <SelectItem value="without_products">{labels.filterWithoutProducts}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sort} onValueChange={(value) => setSort(value as "updated_desc" | "name_asc" | "name_desc" | "product_count_desc")}>
+            <SelectTrigger>
+              <SelectValue placeholder={labels.sort} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="updated_desc">{labels.sortUpdatedDesc}</SelectItem>
+              <SelectItem value="name_asc">{labels.sortNameAsc}</SelectItem>
+              <SelectItem value="name_desc">{labels.sortNameDesc}</SelectItem>
+              <SelectItem value="product_count_desc">{labels.sortProductCountDesc}</SelectItem>
+            </SelectContent>
+          </Select>
+          <label className="flex items-center gap-3 rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-700">
+            <input type="checkbox" checked={rootOnly} onChange={(event) => setRootOnly(event.target.checked)} />
+            {labels.rootCategoriesOnly}
+          </label>
+        </div>
 
         <div className="overflow-hidden rounded-xl border border-neutral-200">
           <div className="hidden grid-cols-[1fr_1fr_1fr_120px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
@@ -434,20 +651,24 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
               </div>
               <div className="grid gap-2">
                 <Label>{labels.parentCategory}</Label>
-                <select
-                  value={activeForm.parentId}
-                  onChange={(event) => patchActiveField("parentId", event.target.value)}
-                  className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
+                <Select
+                  value={activeForm.parentId || "__none__"}
+                  onValueChange={(value) => patchActiveField("parentId", value === "__none__" ? "" : value)}
                 >
-                  <option value="">{labels.noParent}</option>
-                  {parentSelectOptions
-                    .filter((item) => (drawerMode === "edit" ? item.id !== editingId : true))
-                    .map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {`${"-- ".repeat(item.depth)}${item.label}`}
-                      </option>
-                    ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder={labels.noParent} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{labels.noParent}</SelectItem>
+                    {parentSelectOptions
+                      .filter((item) => (drawerMode === "edit" ? item.id !== editingId : true))
+                      .map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {`${"-- ".repeat(item.depth)}${item.label}`}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="mt-2 flex justify-end gap-2 border-t border-neutral-200 pt-5">

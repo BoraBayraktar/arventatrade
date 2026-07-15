@@ -260,7 +260,8 @@
 		"integrationCreatedAt": "Created at",
 		"integrationValidationEntityIds": "Enter at least one valid entity id.",
 		"integrationValidationQueueLimit": "Queue limit must be between 1 and 100.",
-		"userManager": "User Management",
+		"userManagerGroup": "User Management",
+		"userManager": "System Users",
 		"createProduct": "Add New Product",
 		"productList": "Product List",
 		"slug": "Slug",
@@ -284,7 +285,22 @@
 		"allSuppliers": "All suppliers",
 		"createBrand": "Create brand",
 		"createSupplier": "Create supplier",
+		"manageBrands": "Manage brands",
+		"manageSuppliers": "Manage suppliers",
+		"searchBrand": "Search brand",
+		"searchSupplier": "Search supplier",
+		"noBrandResults": "No matching brand found.",
+		"noSupplierResults": "No matching supplier found.",
+		"brandsTitle": "Brand Management",
+		"brandsDescription": "Define brands centrally and use them as selectable data in product forms.",
+		"brandsCreateTitle": "New brand definition",
+		"brandsEmpty": "No brand definitions yet.",
 		"createAttributeDefinition": "Create attribute definition",
+		"manageAttributeDefinitions": "Manage attribute definitions",
+		"productAttributesTitle": "Product Attribute Definitions",
+		"productAttributesDescription": "Manage variant and product attribute definitions centrally. Product forms select from this shared source.",
+		"productAttributesCreateTitle": "New attribute definition",
+		"productAttributesEmpty": "No product attribute definitions yet.",
 		"attributesTitle": "Variant Attribute Definitions",
 		"attributeName": "Attribute name",
 		"attributeDisplayType": "Display type",
@@ -343,7 +359,18 @@
 		"supplierPhone": "Phone",
 		"importCsv": "Import CSV",
 		"exportCsv": "Export CSV",
-		"productImportHint": "Use CSV import for bulk product creation and export to download the current product list.",
+		"allParentCategories": "All parent categories",
+		"filterProducts": "Product filter",
+		"filterAllProducts": "All categories",
+		"filterWithProducts": "Categories with products",
+		"filterWithoutProducts": "Categories without products",
+		"sortCategories": "Sort",
+		"sortUpdatedDesc": "Recently updated",
+		"sortNameAsc": "Name A-Z",
+		"sortNameDesc": "Name Z-A",
+		"sortProductCountDesc": "Most products",
+		"rootCategoriesOnly": "Root categories only",
+		"productImportHint": "For CSV import, references such as brand, supplier, category, and warehouse must already exist in the system. Import does not create these records automatically.",
 		"productImportSuccess": "Imported products:",
 		"productImportFailed": "Product import failed.",
 		"productExportFailed": "Product export failed.",
@@ -430,11 +457,11 @@
 		,"roleAdmin": "Admin"
 		,"roleEditor": "Editor"
 		,"roleCustomer": "Customer"
-		,"customerManager": "Customer Management"
-		,"createCustomer": "New Customer"
-		,"customerList": "Customer List"
-		,"searchCustomer": "Search customer"
-		,"emptyCustomers": "No customers to display."
+		,"customerManager": "Customer Users"
+		,"createCustomer": "New Customer User"
+		,"customerList": "Customer Users"
+		,"searchCustomer": "Search customer user"
+		,"emptyCustomers": "No customer users to display."
 		,"auditLogMenu": "Audit Log"
 		,"auditLogTitle": "Activity Logs"
 		,"auditLogCount": "records listed"
@@ -483,6 +510,10 @@
 		,"documentsDocumentStatus": "Document status"
 		,"documentsIssueDate": "Issue date"
 		,"documentsCounterparty": "Counterparty"
+		,"documentsSelectSupplier": "Select supplier"
+		,"documentsSelectCustomerAccount": "Select customer account"
+		,"documentsSearchCounterparty": "Search source"
+		,"documentsNoCounterpartyResults": "No matching records found."
 		,"documentsExternalReference": "External reference"
 		,"documentsExternalSystemStatus": "External system status"
 		,"documentsOrderNumber": "Order number"
@@ -551,6 +582,15 @@
 		,"documentsWebhookEndpoint": "Webhook endpoint"
 		,"documentsWebhookTitle": "Webhook validation"
 		,"documentsWebhookHint": "When the real provider arrives, callback requests will be processed through this signed webhook flow."
+		,"suppliersTitle": "Suppliers"
+		,"suppliersDescription": "Define suppliers centrally so product, document, and finance modules can consume one shared source."
+		,"suppliersCreateTitle": "Create supplier"
+		,"suppliersEmpty": "No suppliers found."
+		,"customerAccountsTitle": "Trade Customer Accounts"
+		,"customerAccountsDescription": "Define trade customer accounts centrally so document and finance surfaces select from a shared source instead of free text."
+		,"customerAccountsCreateTitle": "Create trade customer account"
+		,"customerAccountsAddress": "Address"
+		,"customerAccountsEmpty": "No customer accounts found."
 		,"financeMenuOverview": "Finance Overview"
 		,"financeMenuSupplierPayables": "Supplier Payables"
 		,"financeMenuCustomerReceivables": "Customer Receivables"

@@ -8,11 +8,14 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { Locale } from "@/lib/i18n";
 import type { ProductFeature } from "@/modules/catalog/contracts/catalog.contract";
 import type { AdminWarehouseItem } from "@/modules/inventory/contracts/inventory.contract";
+
+const checkboxClassName = "h-4 w-4 rounded border-neutral-300 text-neutral-950 focus:ring-2 focus:ring-neutral-300";
 
 type Category = {
   id: string;
@@ -179,7 +182,14 @@ type Labels = {
   allSuppliers: string;
   createBrand: string;
   createSupplier: string;
+  manageBrands: string;
+  manageSuppliers: string;
+  searchBrand: string;
+  searchSupplier: string;
+  noBrandResults: string;
+  noSupplierResults: string;
   createAttributeDefinition: string;
+  manageAttributeDefinitions: string;
   attributesTitle: string;
   attributeName: string;
   attributeDisplayType: string;
@@ -344,14 +354,6 @@ type ProductForm = {
 };
 
 type DrawerMode = "create" | "edit";
-type QuickCreateDrawerMode = "brand" | "supplier";
-type AttributeDefinitionEditorState = {
-  id: string;
-  slug: string;
-  name: string;
-  displayType: AttributeDefinition["displayType"];
-  sortOrder: string;
-};
 type VariantGenerationState = Record<string, string>;
 
 const NONE_VALUE = "__none__";
@@ -696,9 +698,7 @@ export function ProductManager({
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imageUploading, setImageUploading] = useState(false);
   const [drawerFullscreen, setDrawerFullscreen] = useState(false);
-  const [quickCreateDrawerMode, setQuickCreateDrawerMode] = useState<QuickCreateDrawerMode | null>(null);
   const [variantEditorIndex, setVariantEditorIndex] = useState<number | null>(null);
-  const [attributeDefinitionEditor, setAttributeDefinitionEditor] = useState<AttributeDefinitionEditorState | null>(null);
   const [variantGenerationValues, setVariantGenerationValues] = useState<VariantGenerationState>({});
   const [variantGenerationOpen, setVariantGenerationOpen] = useState(false);
   const [importingCsv, setImportingCsv] = useState(false);
@@ -706,9 +706,6 @@ export function ProductManager({
   const [brandOptions, setBrandOptions] = useState<Brand[]>(brands);
   const [supplierOptions, setSupplierOptions] = useState<Supplier[]>(suppliers);
   const [attributeDefinitionOptions, setAttributeDefinitionOptions] = useState<AttributeDefinition[]>(attributeDefinitions);
-  const [brandCreateForm, setBrandCreateForm] = useState({ slug: "", name: "" });
-  const [supplierCreateForm, setSupplierCreateForm] = useState({ slug: "", name: "", taxNumber: "", email: "", phone: "" });
-  const [attributeDefinitionCreateForm, setAttributeDefinitionCreateForm] = useState({ slug: "", name: "", displayType: "TEXT" as AttributeDefinition["displayType"] });
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -975,7 +972,6 @@ export function ProductManager({
       imageFileInputRef.current.value = "";
     }
     setDrawerFullscreen(false);
-    setQuickCreateDrawerMode(null);
     setDrawerMode("create");
   }
 
@@ -1039,7 +1035,6 @@ export function ProductManager({
       imageFileInputRef.current.value = "";
     }
     setDrawerFullscreen(false);
-    setQuickCreateDrawerMode(null);
     setDrawerMode("edit");
   }
 
@@ -1055,13 +1050,7 @@ export function ProductManager({
       imageFileInputRef.current.value = "";
     }
     setDrawerFullscreen(false);
-    setQuickCreateDrawerMode(null);
     setError(null);
-  }
-
-  function openQuickCreateDrawer(mode: QuickCreateDrawerMode) {
-    setError(null);
-    setQuickCreateDrawerMode(mode);
   }
 
   function openVariantEditor(index: number) {
@@ -1075,17 +1064,6 @@ export function ProductManager({
     }
 
     setVariantEditorIndex(null);
-  }
-
-  function openAttributeDefinitionEditor(definition: AttributeDefinition) {
-    setError(null);
-    setAttributeDefinitionEditor({
-      id: definition.id,
-      slug: definition.slug,
-      name: definition.name,
-      displayType: definition.displayType,
-      sortOrder: String(definition.sortOrder),
-    });
   }
 
   function openVariantGenerationModal() {
@@ -1138,21 +1116,6 @@ export function ProductManager({
     );
   }
 
-  function closeAttributeDefinitionEditor() {
-    if (loading) {
-      return;
-    }
-
-    setAttributeDefinitionEditor(null);
-  }
-
-  function closeQuickCreateDrawer() {
-    if (loading) {
-      return;
-    }
-
-    setQuickCreateDrawerMode(null);
-  }
 
   function handleImageFileChange(files: FileList | null) {
     setImageFiles(files ? Array.from(files) : []);
@@ -1312,208 +1275,6 @@ export function ProductManager({
       ...prev,
       features: prev.features.filter((_, featureIndex) => featureIndex !== index),
     }));
-  }
-
-  async function createBrandOption() {
-    if (!brandCreateForm.slug.trim() || !brandCreateForm.name.trim()) {
-      setError(labels.validationRequired);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/admin/brands", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(brandCreateForm),
-      });
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(payload?.message ?? labels.opFailed);
-        return;
-      }
-
-      const payload = (await response.json()) as { item: Brand };
-      setBrandOptions((prev) => [...prev, payload.item].sort((left, right) => left.name.localeCompare(right.name, "tr")));
-      patchActiveField("brandId", payload.item.id);
-      setBrandCreateForm({ slug: "", name: "" });
-      setQuickCreateDrawerMode(null);
-    } catch {
-      setError(labels.opFailed);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function createSupplierOption() {
-    if (!supplierCreateForm.slug.trim() || !supplierCreateForm.name.trim()) {
-      setError(labels.validationRequired);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/admin/suppliers", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(supplierCreateForm),
-      });
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(payload?.message ?? labels.opFailed);
-        return;
-      }
-
-      const payload = (await response.json()) as { item: Supplier };
-      setSupplierOptions((prev) => [...prev, payload.item].sort((left, right) => left.name.localeCompare(right.name, "tr")));
-      patchActiveField("primarySupplierId", payload.item.id);
-      setSupplierCreateForm({ slug: "", name: "", taxNumber: "", email: "", phone: "" });
-      setQuickCreateDrawerMode(null);
-    } catch {
-      setError(labels.opFailed);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function createAttributeDefinitionOption() {
-    if (!attributeDefinitionCreateForm.slug.trim() || !attributeDefinitionCreateForm.name.trim()) {
-      setError(labels.validationRequired);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/admin/product-attributes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(attributeDefinitionCreateForm),
-      });
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(payload?.message ?? labels.opFailed);
-        return;
-      }
-
-      const payload = (await response.json()) as { item: AttributeDefinition };
-      setAttributeDefinitionOptions((prev) => [...prev, payload.item].sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name, "tr")));
-      setAttributeDefinitionCreateForm({ slug: "", name: "", displayType: "TEXT" });
-    } catch {
-      setError(labels.opFailed);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function saveAttributeDefinitionEditor() {
-    if (!attributeDefinitionEditor || !attributeDefinitionEditor.slug.trim() || !attributeDefinitionEditor.name.trim()) {
-      setError(labels.validationRequired);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/admin/product-attributes/${attributeDefinitionEditor.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          slug: attributeDefinitionEditor.slug.trim(),
-          name: attributeDefinitionEditor.name.trim(),
-          displayType: attributeDefinitionEditor.displayType,
-          sortOrder: Number(attributeDefinitionEditor.sortOrder || "0"),
-        }),
-      });
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(payload?.message ?? labels.opFailed);
-        return;
-      }
-
-      const payload = (await response.json()) as { item: AttributeDefinition };
-      setAttributeDefinitionOptions((prev) =>
-        prev
-          .map((item) => (item.id === payload.item.id ? payload.item : item))
-          .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name, "tr")),
-      );
-      setAttributeDefinitionEditor(null);
-    } catch {
-      setError(labels.opFailed);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function deleteAttributeDefinition(definition: AttributeDefinition) {
-    if (!window.confirm(labels.variantAxisDeleteConfirm)) {
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/admin/product-attributes/${definition.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(payload?.message ?? labels.variantAxisDeleteBlocked);
-        return;
-      }
-
-      setAttributeDefinitionOptions((prev) => prev.filter((item) => item.id !== definition.id));
-      patchActiveForm((prev) => ({
-        ...prev,
-        attributeLinks: prev.attributeLinks.filter((item) => item.attributeDefinitionId !== definition.id),
-        variants: prev.variants.map((variant) => {
-          const nextAttributes = variant.attributes.filter((attribute) => attribute.attributeDefinitionId !== definition.id);
-          const nextLinks = prev.attributeLinks.filter((item) => item.attributeDefinitionId !== definition.id);
-          const previousSummary = buildVariantOptionSummary(variant.attributes, prev.attributeLinks, attributeDefinitionOptions);
-          const nextSummary = buildVariantOptionSummary(nextAttributes, nextLinks, attributeDefinitionOptions);
-          const previousTitle = buildVariantTitle(prev.name, variant.attributes, prev.attributeLinks, attributeDefinitionOptions);
-          const nextTitle = buildVariantTitle(prev.name, nextAttributes, nextLinks, attributeDefinitionOptions);
-          const previousSlug = buildVariantSlug(prev.slug, variant.attributes, prev.attributeLinks);
-          const nextSlug = buildVariantSlug(prev.slug, nextAttributes, nextLinks);
-          const previousSku = buildVariantSku(prev.sku, variant.attributes, prev.attributeLinks);
-          const nextSku = buildVariantSku(prev.sku, nextAttributes, nextLinks);
-
-          return {
-            ...variant,
-            attributes: nextAttributes,
-            title: !variant.title.trim() || variant.title.trim() === previousTitle ? nextTitle : variant.title,
-            slug: !variant.slug.trim() || variant.slug.trim() === previousSlug ? nextSlug : variant.slug,
-            sku: !variant.sku.trim() || variant.sku.trim() === previousSku ? nextSku : variant.sku,
-            optionSummary: !variant.optionSummary.trim() || variant.optionSummary.trim() === previousSummary ? nextSummary : variant.optionSummary,
-          };
-        }),
-      }));
-      setAttributeDefinitionEditor(null);
-    } catch {
-      setError(labels.opFailed);
-    } finally {
-      setLoading(false);
-    }
   }
 
   function toggleAttributeAxis(attributeDefinitionId: string) {
@@ -2158,31 +1919,23 @@ export function ProductManager({
                   </div>
                   <div className="grid gap-2">
                     <Label>{labels.brand}</Label>
-                    <div className="flex items-center gap-2">
-                      <Select value={activeForm.brandId || NONE_VALUE} onValueChange={(value) => patchActiveField("brandId", value === NONE_VALUE ? "" : value)}>
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder={labels.notSpecified} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={NONE_VALUE}>{labels.notSpecified}</SelectItem>
-                          {brandOptions.filter((brand) => brand.isActive).map((brand) => (
-                            <SelectItem key={brand.id} value={brand.id}>
-                              {brand.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="secondary"
-                        className="h-10 w-10 shrink-0"
-                        onClick={() => openQuickCreateDrawer("brand")}
-                        aria-label={labels.createBrand}
-                        title={labels.createBrand}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                    <div className="grid gap-2">
+                      <SearchableSelect
+                        value={activeForm.brandId || NONE_VALUE}
+                        onValueChange={(value) => patchActiveField("brandId", value === NONE_VALUE ? "" : value)}
+                        options={[
+                          { value: NONE_VALUE, label: labels.notSpecified },
+                          ...brandOptions
+                            .filter((brand) => brand.isActive)
+                            .map((brand) => ({ value: brand.id, label: brand.name })),
+                        ]}
+                        placeholder={labels.notSpecified}
+                        searchPlaceholder={labels.searchBrand}
+                        emptyLabel={labels.noBrandResults}
+                      />
+                      <Link href={`/${locale}/admin/brands`} className="text-xs font-medium text-neutral-600 underline underline-offset-4">
+                        {labels.manageBrands}
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -2284,6 +2037,7 @@ export function ProductManager({
                     checked={activeForm.productType === "SERVICE" ? false : activeForm.stockTrackingEnabled}
                     onChange={(event) => patchActiveForm((prev) => ({ ...prev, stockTrackingEnabled: event.target.checked }))}
                     disabled={activeForm.productType === "SERVICE"}
+                    className={checkboxClassName}
                   />
                   <span>{labels.stockTrackingEnabled}</span>
                 </label>
@@ -2293,6 +2047,7 @@ export function ProductManager({
                       type="checkbox"
                       checked={activeForm.salesEnabled}
                       onChange={(event) => patchActiveForm((prev) => ({ ...prev, salesEnabled: event.target.checked }))}
+                      className={checkboxClassName}
                     />
                     <span>{labels.salesEnabled}</span>
                   </label>
@@ -2301,6 +2056,7 @@ export function ProductManager({
                       type="checkbox"
                       checked={activeForm.purchaseEnabled}
                       onChange={(event) => patchActiveForm((prev) => ({ ...prev, purchaseEnabled: event.target.checked }))}
+                      className={checkboxClassName}
                     />
                     <span>{labels.purchaseEnabled}</span>
                   </label>
@@ -2350,34 +2106,27 @@ export function ProductManager({
                     <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">{labels.supplier}</p>
                     <div className="mt-2 grid gap-2">
                       <Label>{labels.supplier}</Label>
-                      <div className="flex items-center gap-2">
-                        <Select
+                      <div className="grid gap-2">
+                        <SearchableSelect
                           value={activeForm.primarySupplierId || NONE_VALUE}
                           onValueChange={(value) => patchActiveField("primarySupplierId", value === NONE_VALUE ? "" : value)}
-                        >
-                          <SelectTrigger className="flex-1">
-                            <SelectValue placeholder={labels.notSpecified} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={NONE_VALUE}>{labels.notSpecified}</SelectItem>
-                            {supplierOptions.filter((supplier) => supplier.isActive).map((supplier) => (
-                              <SelectItem key={supplier.id} value={supplier.id}>
-                                {supplier.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="secondary"
-                          className="h-10 w-10 shrink-0"
-                          onClick={() => openQuickCreateDrawer("supplier")}
-                          aria-label={labels.createSupplier}
-                          title={labels.createSupplier}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                          options={[
+                            { value: NONE_VALUE, label: labels.notSpecified },
+                            ...supplierOptions
+                              .filter((supplier) => supplier.isActive)
+                              .map((supplier) => ({
+                                value: supplier.id,
+                                label: supplier.name,
+                                description: supplier.taxNumber || supplier.email || supplier.phone || undefined,
+                              })),
+                          ]}
+                          placeholder={labels.notSpecified}
+                          searchPlaceholder={labels.searchSupplier}
+                          emptyLabel={labels.noSupplierResults}
+                        />
+                        <Link href={`/${locale}/admin/suppliers`} className="text-xs font-medium text-neutral-600 underline underline-offset-4">
+                          {labels.manageSuppliers}
+                        </Link>
                       </div>
                     </div>
                   </div>
@@ -2444,35 +2193,9 @@ export function ProductManager({
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Variant Master Data</p>
                   <h4 className="mt-1 text-base font-semibold text-neutral-950">{labels.attributesTitle}</h4>
                   <p className="mt-1 text-sm text-neutral-500">{labels.variantAxesHint}</p>
-                </div>
-
-                <div className="grid gap-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <div className="grid gap-2 md:grid-cols-3">
-                    <div className="grid gap-2">
-                      <Label>{labels.attributeName}</Label>
-                      <Input value={attributeDefinitionCreateForm.name} onChange={(event) => setAttributeDefinitionCreateForm((prev) => ({ ...prev, name: event.target.value }))} />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>{labels.slug}</Label>
-                      <Input value={attributeDefinitionCreateForm.slug} onChange={(event) => setAttributeDefinitionCreateForm((prev) => ({ ...prev, slug: event.target.value }))} />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>{labels.attributeDisplayType}</Label>
-                      <Select value={attributeDefinitionCreateForm.displayType} onValueChange={(value) => setAttributeDefinitionCreateForm((prev) => ({ ...prev, displayType: value as AttributeDefinition["displayType"] }))}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="TEXT">{labels.attributeDisplayText}</SelectItem>
-                          <SelectItem value="COLOR">{labels.attributeDisplayColor}</SelectItem>
-                          <SelectItem value="NUMBER">{labels.attributeDisplayNumber}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <Button type="button" variant="secondary" disabled={loading} onClick={createAttributeDefinitionOption}>
-                    {labels.createAttributeDefinition}
-                  </Button>
+                  <Link href={`/${locale}/admin/product-attributes`} className="mt-2 inline-flex text-sm font-medium text-neutral-700 underline underline-offset-4">
+                    {labels.manageAttributeDefinitions}
+                  </Link>
                 </div>
 
                 <div className="grid gap-2">
@@ -2486,6 +2209,7 @@ export function ProductManager({
                             type="checkbox"
                             checked={active}
                             onChange={() => toggleAttributeAxis(definition.id)}
+                            className={checkboxClassName}
                           />
                           <span>{definition.name}</span>
                         </label>
@@ -2505,14 +2229,6 @@ export function ProductManager({
                           <div>
                             <p className="text-sm font-semibold text-neutral-900">{definition.name}</p>
                             <p className="text-xs text-neutral-500">{definition.slug} • {labels.variantAxisUsageCount}: {definition.productCount}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button type="button" size="sm" variant="outline" onClick={() => openAttributeDefinitionEditor(definition)}>
-                              {labels.edit}
-                            </Button>
-                            <Button type="button" size="sm" variant="outline" onClick={() => void deleteAttributeDefinition(definition)}>
-                              {labels.delete}
-                            </Button>
                           </div>
                         </div>
                       ))}
@@ -2601,6 +2317,7 @@ export function ProductManager({
                             type="checkbox"
                             checked={feature.highlighted}
                             onChange={(event) => patchFeature(index, { highlighted: event.target.checked })}
+                            className={checkboxClassName}
                           />
                           {labels.highlightFeature}
                         </label>
@@ -2763,11 +2480,11 @@ export function ProductManager({
                       <Label>{labels.stockStatus}</Label>
                       <div className="flex flex-wrap gap-3 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm">
                         <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={activeVariantEditor.isDefault} onChange={(event) => patchVariant(variantEditorIndex as number, { isDefault: event.target.checked })} />
+                          <input type="checkbox" checked={activeVariantEditor.isDefault} onChange={(event) => patchVariant(variantEditorIndex as number, { isDefault: event.target.checked })} className={checkboxClassName} />
                           <span>{labels.variantDefault}</span>
                         </label>
                         <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={activeVariantEditor.salesEnabled} onChange={(event) => patchVariant(variantEditorIndex as number, { salesEnabled: event.target.checked })} />
+                          <input type="checkbox" checked={activeVariantEditor.salesEnabled} onChange={(event) => patchVariant(variantEditorIndex as number, { salesEnabled: event.target.checked })} className={checkboxClassName} />
                           <span>{labels.variantSalesEnabled}</span>
                         </label>
                       </div>
@@ -2793,66 +2510,6 @@ export function ProductManager({
                         </div>
                       );
                     })}
-                  </div>
-                </div>
-              </aside>
-            </div>
-          ) : null}
-
-          {attributeDefinitionEditor ? (
-            <div className="absolute inset-0 z-10">
-              <button type="button" aria-label={labels.cancel} className="absolute inset-0 bg-black/20" onClick={closeAttributeDefinitionEditor} />
-              <aside className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-neutral-200 bg-white shadow-2xl">
-                <div className="flex items-start justify-between border-b border-neutral-200 p-5">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.variantAxes}</p>
-                    <h3 className="mt-1 text-xl font-semibold tracking-tight">{attributeDefinitionEditor.name || labels.attributeName}</h3>
-                  </div>
-                  <Button type="button" size="icon" variant="ghost" onClick={closeAttributeDefinitionEditor} disabled={loading}>
-                    <X className="h-5 w-5" />
-                  </Button>
-                </div>
-
-                <div className="grid gap-4 p-5">
-                  <div className="grid gap-2">
-                    <Label>{labels.attributeName}</Label>
-                    <Input value={attributeDefinitionEditor.name} onChange={(event) => setAttributeDefinitionEditor((prev) => (prev ? { ...prev, name: event.target.value } : prev))} />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>{labels.slug}</Label>
-                    <Input value={attributeDefinitionEditor.slug} onChange={(event) => setAttributeDefinitionEditor((prev) => (prev ? { ...prev, slug: event.target.value } : prev))} />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>{labels.attributeDisplayType}</Label>
-                    <Select value={attributeDefinitionEditor.displayType} onValueChange={(value) => setAttributeDefinitionEditor((prev) => (prev ? { ...prev, displayType: value as AttributeDefinition["displayType"] } : prev))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="TEXT">{labels.attributeDisplayText}</SelectItem>
-                        <SelectItem value="COLOR">{labels.attributeDisplayColor}</SelectItem>
-                        <SelectItem value="NUMBER">{labels.attributeDisplayNumber}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>{labels.page}</Label>
-                    <Input type="number" min="0" step="1" value={attributeDefinitionEditor.sortOrder} onChange={(event) => setAttributeDefinitionEditor((prev) => (prev ? { ...prev, sortOrder: event.target.value } : prev))} />
-                  </div>
-                </div>
-
-                <div className="mt-auto flex justify-between gap-2 border-t border-neutral-200 p-5">
-                  <Button type="button" variant="outline" disabled={loading} onClick={() => {
-                    const definition = attributeDefinitionOptions.find((item) => item.id === attributeDefinitionEditor.id);
-                    if (definition) {
-                      void deleteAttributeDefinition(definition);
-                    }
-                  }}>
-                    {labels.delete}
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="secondary" disabled={loading} onClick={closeAttributeDefinitionEditor}>{labels.cancel}</Button>
-                    <Button type="button" disabled={loading} onClick={saveAttributeDefinitionEditor}>{labels.save}</Button>
                   </div>
                 </div>
               </aside>
@@ -2917,75 +2574,6 @@ export function ProductManager({
             </div>
           ) : null}
 
-          {quickCreateDrawerMode ? (
-            <div className="absolute inset-0 z-10">
-              <button type="button" aria-label={labels.cancel} className="absolute inset-0 bg-black/20" onClick={closeQuickCreateDrawer} />
-              <aside className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-neutral-200 bg-white shadow-2xl">
-                <div className="flex items-start justify-between border-b border-neutral-200 p-5">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.title}</p>
-                    <h3 className="mt-1 text-xl font-semibold tracking-tight">
-                      {quickCreateDrawerMode === "brand" ? labels.createBrand : labels.createSupplier}
-                    </h3>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      {quickCreateDrawerMode === "brand"
-                        ? "Ürün formundan çıkmadan yeni marka kaydı oluşturun."
-                        : "Ürün formundan çıkmadan yeni tedarikçi kaydı oluşturun."}
-                    </p>
-                  </div>
-                  <Button type="button" size="icon" variant="ghost" onClick={closeQuickCreateDrawer} disabled={loading}>
-                    <X className="h-5 w-5" />
-                  </Button>
-                </div>
-
-                {quickCreateDrawerMode === "brand" ? (
-                  <div className="grid gap-4 p-5">
-                    <div className="grid gap-2">
-                      <Label>{labels.brandName}</Label>
-                      <Input value={brandCreateForm.name} onChange={(event) => setBrandCreateForm((prev) => ({ ...prev, name: event.target.value }))} />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>{labels.slug}</Label>
-                      <Input value={brandCreateForm.slug} onChange={(event) => setBrandCreateForm((prev) => ({ ...prev, slug: event.target.value }))} />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button type="button" variant="secondary" onClick={closeQuickCreateDrawer} disabled={loading}>{labels.cancel}</Button>
-                      <Button type="button" disabled={loading} onClick={createBrandOption}>{labels.createBrand}</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid gap-4 p-5">
-                    <div className="grid gap-2">
-                      <Label>{labels.supplierName}</Label>
-                      <Input value={supplierCreateForm.name} onChange={(event) => setSupplierCreateForm((prev) => ({ ...prev, name: event.target.value }))} />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>{labels.slug}</Label>
-                      <Input value={supplierCreateForm.slug} onChange={(event) => setSupplierCreateForm((prev) => ({ ...prev, slug: event.target.value }))} />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>{labels.supplierTaxNumber}</Label>
-                      <Input value={supplierCreateForm.taxNumber} onChange={(event) => setSupplierCreateForm((prev) => ({ ...prev, taxNumber: event.target.value }))} />
-                    </div>
-                    <div className="grid gap-2 md:grid-cols-2">
-                      <div className="grid gap-2">
-                        <Label>{labels.supplierEmail}</Label>
-                        <Input value={supplierCreateForm.email} onChange={(event) => setSupplierCreateForm((prev) => ({ ...prev, email: event.target.value }))} />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label>{labels.supplierPhone}</Label>
-                        <Input value={supplierCreateForm.phone} onChange={(event) => setSupplierCreateForm((prev) => ({ ...prev, phone: event.target.value }))} />
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button type="button" variant="secondary" onClick={closeQuickCreateDrawer} disabled={loading}>{labels.cancel}</Button>
-                      <Button type="button" disabled={loading} onClick={createSupplierOption}>{labels.createSupplier}</Button>
-                    </div>
-                  </div>
-                )}
-              </aside>
-            </div>
-          ) : null}
         </div>
       ) : null}
     </section>

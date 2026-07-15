@@ -25,17 +25,37 @@ function resolveStatuses(status: "all" | AdminReceivableStatus): AdminReceivable
   return [status];
 }
 
-function mapReceivable(item: Awaited<ReturnType<typeof financeRepository.listOperationalReceivables>>[number]): AdminReceivableListItem {
+function mapReceivable(item: {
+  id: string;
+  orderNumber: string;
+  paymentStatus: AdminReceivableStatus;
+  total: { toNumber: () => number };
+  currency: string;
+  createdAt: Date;
+  customerAccount?: { name: string | null } | null;
+  items: Array<{ quantity: number }>;
+  businessDocuments: Array<{
+    id: string;
+    documentNumber: string;
+    issueDate: Date;
+    totalAmount: { toNumber: () => number } | null;
+    currency: string;
+    counterpartyName: string;
+  }>;
+}): AdminReceivableListItem {
   const latestDocument = item.businessDocuments[0] ?? null;
+  const resolvedCounterpartyName = item.customerAccount?.name?.trim()
+    || latestDocument?.counterpartyName?.trim()
+    || "Merkezi müşteri kartı henüz bağlanmadı";
 
   return {
     orderId: item.id,
     orderNumber: item.orderNumber,
-    counterpartyName: latestDocument?.counterpartyName?.trim() || "Müşteri bilgisi henüz bağlanmadı",
+    counterpartyName: resolvedCounterpartyName,
     paymentStatus: item.paymentStatus as AdminReceivableStatus,
     totalAmount: item.total.toNumber(),
     currency: item.currency,
-    itemCount: item.items.reduce((sum, line) => sum + line.quantity, 0),
+    itemCount: item.items.reduce((sum: number, line: { quantity: number }) => sum + line.quantity, 0),
     createdAt: item.createdAt.toISOString(),
     latestDocument: latestDocument
       ? {

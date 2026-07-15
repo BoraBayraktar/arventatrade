@@ -344,6 +344,7 @@ export class CommerceRepository {
     total: number;
     promotionCode: string | null;
     currency: string;
+    customerAccountId?: string | null;
   }) {
     return this.runSerializableTransaction(async (tx) => {
       const holds: Array<{
@@ -450,9 +451,10 @@ export class CommerceRepository {
         }
       }
 
-      const order = await tx.order.create({
+      const order = await (tx.order as any).create({
         data: {
           orderNumber: args.orderNumber,
+          customerAccountId: args.customerAccountId ?? null,
           status: "CONFIRMED",
           paymentStatus: "PENDING",
           subtotal: args.subtotal,
@@ -576,7 +578,7 @@ export class CommerceRepository {
   }
 
   async listOrders(args: Required<Pick<AdminOrderListQuery, "page" | "pageSize">> & Pick<AdminOrderListQuery, "search" | "status" | "paymentStatus">) {
-    return prisma.order.findMany({
+    return (prisma.order as any).findMany({
       where: {
         deleted: false,
         ...(args.search
@@ -591,6 +593,13 @@ export class CommerceRepository {
         ...(args.paymentStatus ? { paymentStatus: args.paymentStatus } : {}),
       },
       include: {
+        customerAccount: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         items: {
           where: {
             deleted: false,
@@ -678,12 +687,19 @@ export class CommerceRepository {
   }
 
   async findOrderById(id: string) {
-    return prisma.order.findFirst({
+    return (prisma.order as any).findFirst({
       where: {
         id,
         deleted: false,
       },
       include: {
+        customerAccount: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         items: {
           where: {
             deleted: false,

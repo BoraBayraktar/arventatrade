@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -90,10 +90,6 @@ type ProductQuestionsManagerProps = {
   };
 };
 
-function subscribeNoop() {
-  return () => {};
-}
-
 export function ProductQuestionsManager({
   labels,
   initialQuestionResult,
@@ -104,11 +100,7 @@ export function ProductQuestionsManager({
 }: ProductQuestionsManagerProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const referenceTime = useSyncExternalStore(
-    subscribeNoop,
-    () => Date.now(),
-    () => 0,
-  );
+  const [referenceTime, setReferenceTime] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [questionStatus, setQuestionStatus] = useState<"all" | "pending" | "answered">(initialQuery.status);
   const [questionSort, setQuestionSort] = useState<"priority" | "latest" | "oldest">(initialQuery.sort);
@@ -126,7 +118,19 @@ export function ProductQuestionsManager({
   const [bulkAnswerDraft, setBulkAnswerDraft] = useState("");
   const [stats, setStats] = useState<{ total: number; pending: number; answered: number; overdue: number }>(
     initialStats,
-  );  function persistSearchHistory(term: string) {
+  );
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setReferenceTime(Date.now());
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  function persistSearchHistory(term: string) {
     const normalized = term.trim();
     if (!normalized) {
       return;

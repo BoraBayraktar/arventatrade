@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type AddToCartControlsProps = {
 	locale: string;
@@ -102,7 +103,7 @@ export function AddToCartControls({ locale, product, labels }: AddToCartControls
 
 			<div className="flex items-center gap-2">
 				<label className="text-sm text-neutral-600" htmlFor="product-quantity">{labels.quantity}</label>
-				<input
+				<Input
 					id="product-quantity"
 					type="number"
 					min={1}
@@ -116,7 +117,7 @@ export function AddToCartControls({ locale, product, labels }: AddToCartControls
 
 						setQuantity(Math.max(1, Math.min(maxQuantity, next)));
 					}}
-					className="h-10 w-24 rounded-md border border-neutral-300 px-2 text-sm"
+					className="w-24"
 				/>
 			</div>
 

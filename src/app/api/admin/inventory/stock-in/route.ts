@@ -14,6 +14,7 @@ const stockInSchema = z.object({
   documentType: z.enum(["PURCHASE_DOCUMENT", "DELIVERY_NOTE", "E_INVOICE", "E_DISPATCH"]).optional(),
   sourceDocumentNumber: z.string().trim().min(1).max(120).optional(),
   sourceDocumentDate: z.string().datetime().optional(),
+  sourceDocumentSupplierId: z.string().trim().min(1).optional(),
   sourceDocumentSupplier: z.string().trim().min(2).max(160).optional(),
   sourceDocumentReference: z.string().trim().min(1).max(160).optional(),
   externalSystemStatus: z.enum(["NOT_SENT", "QUEUED", "SENT", "FAILED"]).optional(),
@@ -31,10 +32,11 @@ export async function POST(request: Request) {
       warehouseCode: payload.warehouseCode,
       quantity: payload.quantity,
       type: "PURCHASE_RECEIPT",
-      note: payload.note ?? "Inventory manager stock in",
+      note: payload.note ?? "Stok yöneticisi stok girişi",
       documentType: payload.documentType,
       sourceDocumentNumber: payload.sourceDocumentNumber,
       sourceDocumentDate: payload.sourceDocumentDate,
+      sourceDocumentSupplierId: payload.sourceDocumentSupplierId,
       sourceDocumentSupplier: payload.sourceDocumentSupplier,
       sourceDocumentReference: payload.sourceDocumentReference,
       externalSystemStatus: payload.externalSystemStatus,
@@ -52,6 +54,7 @@ export async function POST(request: Request) {
         quantity: payload.quantity,
         documentType: payload.documentType ?? null,
         sourceDocumentNumber: payload.sourceDocumentNumber ?? null,
+        sourceDocumentSupplierId: payload.sourceDocumentSupplierId ?? null,
         sourceDocumentSupplier: payload.sourceDocumentSupplier ?? null,
         externalSystemStatus: payload.externalSystemStatus ?? null,
       },
@@ -73,6 +76,10 @@ export async function POST(request: Request) {
 
     if (error instanceof Error && error.message.startsWith("PRODUCT_NOT_FOUND:")) {
       return NextResponse.json({ message: "Ürün bulunamadı." }, { status: 404 });
+    }
+
+    if (error instanceof Error && error.message === "SUPPLIER_NOT_FOUND") {
+      return NextResponse.json({ message: "Tedarikçi bulunamadı." }, { status: 404 });
     }
 
     if (error instanceof Error && error.message.includes("PurchaseReceipt_receiptNumber_key")) {

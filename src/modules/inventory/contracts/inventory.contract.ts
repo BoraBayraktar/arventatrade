@@ -44,6 +44,7 @@ export type RecordProductInventoryMovementInput = {
   documentType?: "PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH";
   sourceDocumentNumber?: string;
   sourceDocumentDate?: string;
+  sourceDocumentSupplierId?: string;
   sourceDocumentSupplier?: string;
   sourceDocumentReference?: string;
   externalSystemStatus?: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED";

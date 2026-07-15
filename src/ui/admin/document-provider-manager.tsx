@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { AdminDocumentProviderConfigItem } from "@/modules/documents/contracts/document.contract";
 
 type Labels = {
@@ -118,9 +121,9 @@ export function DocumentProviderManager({
             ) : items.map((item) => (
               <article key={item.id} className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-neutral-900 px-3 py-1 text-xs font-semibold text-white">{item.displayName}</span>
-                  {item.isDefault ? <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">{labels.providerIsDefault}</span> : null}
-                  {item.isActive ? <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">{labels.providerIsActive}</span> : null}
+                  <Badge>{item.displayName}</Badge>
+                  {item.isDefault ? <Badge className="border-sky-200 bg-sky-100 text-sky-700">{labels.providerIsDefault}</Badge> : null}
+                  {item.isActive ? <Badge className="border-emerald-200 bg-emerald-100 text-emerald-700">{labels.providerIsActive}</Badge> : null}
                 </div>
                 <p className="mt-2">{labels.providerCode}: {item.providerCode}</p>
                 <p className="mt-1">{labels.providerEndpointUrl}: {item.endpointUrl ?? labels.notSpecified}</p>
@@ -130,22 +133,22 @@ export function DocumentProviderManager({
           </div>
 
           <div className="grid gap-3 rounded-2xl border border-neutral-200 p-4">
-            <input value={providerCode} onChange={(event) => setProviderCode(event.target.value)} placeholder={labels.providerCode} className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm" />
-            <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={labels.providerDisplayName} className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm" />
-            <input value={endpointUrl} onChange={(event) => setEndpointUrl(event.target.value)} placeholder={labels.providerEndpointUrl} className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm" />
-            <input value={senderLabel} onChange={(event) => setSenderLabel(event.target.value)} placeholder={labels.providerSenderLabel} className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm" />
-            <input value={senderVkn} onChange={(event) => setSenderVkn(event.target.value)} placeholder={labels.providerSenderVkn} className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm" />
-            <input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={labels.providerUsername} className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm" />
-            <input value={secretKey} onChange={(event) => setSecretKey(event.target.value)} placeholder={labels.providerSecret} className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm" />
-            <input value={webhookSecret} onChange={(event) => setWebhookSecret(event.target.value)} placeholder={labels.providerWebhookSecret} className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm" />
-            <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder={labels.providerCompanyName} className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm" />
+            <Input value={providerCode} onChange={(event) => setProviderCode(event.target.value)} placeholder={labels.providerCode} />
+            <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={labels.providerDisplayName} />
+            <Input value={endpointUrl} onChange={(event) => setEndpointUrl(event.target.value)} placeholder={labels.providerEndpointUrl} />
+            <Input value={senderLabel} onChange={(event) => setSenderLabel(event.target.value)} placeholder={labels.providerSenderLabel} />
+            <Input value={senderVkn} onChange={(event) => setSenderVkn(event.target.value)} placeholder={labels.providerSenderVkn} />
+            <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={labels.providerUsername} />
+            <Input value={secretKey} onChange={(event) => setSecretKey(event.target.value)} placeholder={labels.providerSecret} />
+            <Input value={webhookSecret} onChange={(event) => setWebhookSecret(event.target.value)} placeholder={labels.providerWebhookSecret} />
+            <Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder={labels.providerCompanyName} />
             <label className="flex items-center gap-2 text-sm text-neutral-700"><input type="checkbox" checked={supportsStatusSync} onChange={(event) => setSupportsStatusSync(event.target.checked)} />{labels.providerSupportsStatusSync}</label>
             <label className="flex items-center gap-2 text-sm text-neutral-700"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} />{labels.providerIsActive}</label>
             <label className="flex items-center gap-2 text-sm text-neutral-700"><input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />{labels.providerIsDefault}</label>
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            <button type="button" onClick={() => void saveProvider()} disabled={pending} className="h-11 rounded-2xl border border-neutral-300 bg-neutral-900 px-5 text-sm font-medium text-white">
+            <Button type="button" onClick={() => void saveProvider()} disabled={pending}>
               {pending ? labels.saving : labels.providerSave}
-            </button>
+            </Button>
           </div>
         </div>
       </section>

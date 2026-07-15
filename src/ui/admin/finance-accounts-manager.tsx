@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import type { AdminFinanceAccountsResult, AdminFinanceAccountEntryType } from "@/modules/finance/contracts/accounts.contract";
 
 type Labels = {
@@ -69,12 +71,11 @@ export function FinanceAccountsManager({ locale, result, initialSearch, initialT
           <p className="text-sm text-neutral-600">{labels.description}</p>
         </div>
         <form action={`/${locale}/admin/finance/accounts`} className="mt-4">
-          <input
+          <Input
             type="search"
             name="search"
             defaultValue={initialSearch}
             placeholder={labels.search}
-            className="h-11 w-full rounded-2xl border border-neutral-300 bg-white px-4 text-sm"
           />
         </form>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -113,9 +114,9 @@ export function FinanceAccountsManager({ locale, result, initialSearch, initialT
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.type === "RECEIVABLE" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                  <Badge className={item.type === "RECEIVABLE" ? "border-emerald-200 bg-emerald-100 text-emerald-700" : "border-amber-200 bg-amber-100 text-amber-700"}>
                     {item.type === "RECEIVABLE" ? labels.receivable : labels.payable}
-                  </span>
+                  </Badge>
                   <h2 className="text-lg font-semibold text-neutral-950">{item.counterpartyName}</h2>
                 </div>
                 <div className="mt-3 grid gap-2 text-sm text-neutral-700 md:grid-cols-2 xl:grid-cols-5">

@@ -15,6 +15,10 @@ export async function GET(request: Request) {
 
     const categories = await catalogAdminService.listCategories({
       search: searchParams.get("search") ?? undefined,
+      parentId: searchParams.get("parentId") ?? undefined,
+      rootOnly: searchParams.get("rootOnly") === "true",
+      hasProducts: (searchParams.get("hasProducts") as "all" | "with_products" | "without_products" | null) ?? undefined,
+      sort: (searchParams.get("sort") as "updated_desc" | "name_asc" | "name_desc" | "product_count_desc" | null) ?? undefined,
       page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
       pageSize: searchParams.get("pageSize") ? Number(searchParams.get("pageSize")) : 10,
     });

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
+import { customerAccountService } from "@/modules/customers/services/customer-account.service";
 import { documentService } from "@/modules/documents/services/document.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
 import { DocumentManager } from "@/ui/admin/document-manager";
@@ -25,13 +27,15 @@ export default async function AdminDocumentsPage({
   }
 
   const dictionary = getDictionary(locale as Locale);
-  const [result, providerConfigs] = await Promise.all([
+  const [result, providerConfigs, suppliers, customerAccounts] = await Promise.all([
     documentService.listBusinessDocuments({
       search: resolvedSearchParams.search,
       page: 1,
       pageSize: 20,
     }),
     documentService.listProviderConfigs(),
+    catalogAdminService.listSuppliers(),
+    customerAccountService.listCustomerAccounts(),
   ]);
 
   return (
@@ -42,6 +46,16 @@ export default async function AdminDocumentsPage({
         id: item.id,
         displayName: item.displayName,
         isDefault: item.isDefault,
+      }))}
+      supplierOptions={suppliers.map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.taxNumber ?? item.email ?? item.phone ?? null,
+      }))}
+      customerAccountOptions={customerAccounts.map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.email ?? item.phone ?? item.taxNumber ?? null,
       }))}
       initialSearch={resolvedSearchParams.search ?? ""}
       labels={{
@@ -82,6 +96,10 @@ export default async function AdminDocumentsPage({
         slaAttention: dictionary.admin.documentsSlaAttention,
         slaCritical: dictionary.admin.documentsSlaCritical,
         slaQueuedStale: dictionary.admin.documentsSlaQueuedStale,
+        selectSupplier: dictionary.admin.documentsSelectSupplier,
+        selectCustomerAccount: dictionary.admin.documentsSelectCustomerAccount,
+        searchCounterparty: dictionary.admin.documentsSearchCounterparty,
+        noCounterpartyResults: dictionary.admin.documentsNoCounterpartyResults,
       }}
     />
   );

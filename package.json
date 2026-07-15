@@ -12,6 +12,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
+    "db:backfill:business-document-master-data": "tsx --tsconfig tsconfig.json scripts/backfill-business-document-master-data.ts",
     "verify:rbac": "node scripts/verify-rbac.mjs",
     "verify:crud": "node scripts/verify-product-crud.mjs",
     "verify:storefront": "node scripts/verify-storefront.mjs",

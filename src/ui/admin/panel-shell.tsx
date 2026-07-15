@@ -5,14 +5,15 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   Bell,
+  ChevronRight,
   Boxes,
-  ChevronDown,
   ClipboardList,
   FolderTree,
   LayoutGrid,
   Menu,
   Package,
   ReceiptText,
+  Search,
   ShieldCheck,
   Store,
   UserRound,
@@ -22,7 +23,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "@/ui/admin/logout-button";
 
@@ -39,6 +44,10 @@ const adminMenuIcons: Array<{ route: string; icon: LucideIcon }> = [
   { route: "/admin/categories", icon: FolderTree },
   { route: "/admin/storefront", icon: LayoutGrid },
   { route: "/admin/orders", icon: ReceiptText },
+  { route: "/admin/brands", icon: Users },
+  { route: "/admin/suppliers", icon: Users },
+  { route: "/admin/customer-accounts", icon: Users },
+  { route: "/admin/product-attributes", icon: ClipboardList },
   { route: "/admin/documents", icon: ReceiptText },
   { route: "/admin/finance", icon: ReceiptText },
   { route: "/admin/integrations", icon: Workflow },
@@ -97,6 +106,7 @@ export function AdminPanelShell({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [openMenuGroups, setOpenMenuGroups] = useState<Record<string, boolean>>({});
+  const [menuSearch, setMenuSearch] = useState("");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
@@ -263,12 +273,13 @@ export function AdminPanelShell({
     const active = isMenuItemActive(item);
     const hasChildren = Boolean(item.children?.length);
     const MenuIcon = resolveMenuIcon(item.href);
+    const searchingMenu = menuSearch.trim().length > 0;
 
     if (hasChildren) {
-      const isOpen = openMenuGroups[item.href] ?? active;
+      const isOpen = searchingMenu || (openMenuGroups[item.href] ?? active);
 
       return (
-        <div key={item.href} className="grid gap-1">
+        <div key={item.href} className="space-y-1">
           <button
             type="button"
             onClick={() => {
@@ -278,49 +289,30 @@ export function AdminPanelShell({
               }));
             }}
             className={cn(
-              "relative flex w-full items-center rounded-xl text-left font-semibold transition-all",
-              compact ? "px-2.5 py-2 text-[13px]" : "px-3 py-2 text-sm",
+              "flex w-full items-center rounded-lg text-left font-medium transition-colors",
+              compact ? "h-10 px-2.5 text-[14px]" : "h-11 px-3 text-[15px]",
+              depth > 0 && (compact ? "pl-9" : "pl-10"),
               active
-                ? "bg-neutral-100 text-neutral-950 shadow-sm ring-1 ring-neutral-200"
+                ? "bg-blue-50 text-blue-700 shadow-none"
                 : isOpen
-                  ? "bg-neutral-50 text-neutral-900 ring-1 ring-neutral-200"
-                  : "text-neutral-700 hover:bg-neutral-50",
+                  ? "bg-slate-50 text-slate-900"
+                  : "text-slate-700 hover:bg-slate-50/80",
             )}
             aria-expanded={isOpen}
           >
-            <span
+            <MenuIcon className={cn("mr-3 shrink-0 text-slate-500", compact ? "h-4 w-4" : "h-4 w-4")} aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            <ChevronRight
               className={cn(
-                "mr-3 h-4 w-1 rounded-full transition-opacity",
-                active ? "bg-neutral-950 opacity-100" : "bg-neutral-300 opacity-0",
-              )}
-              aria-hidden="true"
-            />
-            <MenuIcon className={cn("mr-2", compact ? "h-3.5 w-3.5" : "h-4 w-4")} aria-hidden="true" />
-            <span className="flex-1">{item.label}</span>
-            <ChevronDown
-              className={cn(
-                compact ? "h-3.5 w-3.5 transition-transform duration-200" : "h-4 w-4 transition-transform duration-200",
-                isOpen ? "rotate-180" : "rotate-0",
+                "h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200",
+                isOpen ? "rotate-90" : "rotate-0",
               )}
               aria-hidden="true"
             />
           </button>
-          <div
-            className={cn(
-              "grid transition-[grid-template-rows,opacity] duration-200 ease-out",
-              isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-            )}
-          >
-            <div className="overflow-hidden">
-              <div
-                className={cn(
-                  "ml-4 grid gap-1 border-l pl-3 pt-1 transition-colors",
-                  compact && "ml-3 pl-2.5",
-                  active || isOpen ? "border-neutral-300" : "border-neutral-200",
-                )}
-              >
+          <div className={cn(isOpen ? "block" : "hidden")}>
+            <div className="space-y-0.5 pt-1">
               {item.children?.map((child) => renderMenuItem(child, depth + 1, compact))}
-              </div>
             </div>
           </div>
         </div>
@@ -333,30 +325,56 @@ export function AdminPanelShell({
         href={item.href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "relative flex items-center rounded-xl font-medium transition-all",
-          compact ? "px-2.5 py-2 text-[13px]" : "px-3 py-2 text-sm",
-          depth > 0 && !compact && "py-2 text-[13px]",
+          "flex w-full items-center rounded-lg font-normal transition-colors",
+          compact ? "h-10 px-2.5 text-[14px]" : "h-11 px-3 text-[15px]",
+          depth > 0 && (compact ? "h-10 pl-9" : "h-10 pl-10 text-[14px]"),
           active
-            ? "bg-neutral-100 font-semibold text-neutral-950 shadow-sm ring-1 ring-neutral-200"
-            : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950",
+            ? "bg-blue-50 font-medium text-blue-700 shadow-none"
+            : "text-slate-700 hover:bg-slate-50/80 hover:text-slate-950",
         )}
       >
-        <span
-          className={cn(
-            "mr-3 h-4 w-1 rounded-full transition-opacity",
-            active ? "bg-neutral-950 opacity-100" : "bg-neutral-300 opacity-0",
-          )}
-          aria-hidden="true"
-        />
-        {depth === 0 ? <MenuIcon className={cn("mr-2", compact ? "h-3.5 w-3.5" : "h-4 w-4")} aria-hidden="true" /> : null}
-        {item.label}
+        <MenuIcon className={cn("mr-3 shrink-0 text-slate-500", compact ? "h-4 w-4" : "h-4 w-4")} aria-hidden="true" />
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
       </Link>
     );
   }
 
+  function filterMenuTree(item: MenuItem, query: string): MenuItem | null {
+    const normalizedQuery = query.trim().toLocaleLowerCase("tr-TR");
+
+    if (!normalizedQuery) {
+      return item;
+    }
+
+    const selfMatches = item.label.toLocaleLowerCase("tr-TR").includes(normalizedQuery);
+    const filteredChildren = item.children
+      ?.map((child) => filterMenuTree(child, normalizedQuery))
+      .filter((child): child is MenuItem => child !== null);
+
+    if (selfMatches) {
+      return {
+        ...item,
+        children: filteredChildren,
+      };
+    }
+
+    if (filteredChildren && filteredChildren.length > 0) {
+      return {
+        ...item,
+        children: filteredChildren,
+      };
+    }
+
+    return null;
+  }
+
+  const visibleMenuItems = menuItems
+    .map((item) => filterMenuTree(item, menuSearch))
+    .filter((item): item is MenuItem => item !== null);
+
   return (
-    <main className="min-h-screen bg-neutral-50">
-      <div className="mx-auto grid items-start max-w-screen-2xl gap-3 px-2 py-2 lg:grid-cols-[260px_1fr]">
+    <main className="min-h-screen bg-[#f5f7fb]">
+      <div className="mx-auto grid min-h-screen max-w-screen-2xl items-start gap-3 px-2 py-2 lg:grid-cols-[280px_1fr]">
         {mobileMenuOpen ? (
           <div className="fixed inset-0 z-50 lg:hidden">
             <button
@@ -365,48 +383,95 @@ export function AdminPanelShell({
               className="absolute inset-0 bg-black/35 backdrop-blur-[1px]"
               onClick={() => setMobileMenuOpen(false)}
             />
-            <aside className="absolute left-0 top-0 h-full w-[min(84vw,300px)] overflow-hidden rounded-r-3xl border-r border-neutral-200 bg-white p-2.5 shadow-2xl">
-              <div className="flex items-center justify-between rounded-2xl border border-neutral-200 bg-gradient-to-br from-white to-neutral-50 px-3 py-2">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-400">Backoffice</p>
-                  <h1 className="mt-1 text-base font-semibold tracking-tight text-neutral-950">{title}</h1>
-                </div>
-                <Button type="button" variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)} aria-label="Kapat">
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
+            <aside className="absolute left-0 top-0 flex h-full w-[min(88vw,332px)] flex-col overflow-hidden rounded-r-[24px] border-r border-slate-200 bg-white shadow-2xl">
+              <Card className="flex h-full flex-col rounded-none border-0 shadow-none">
+                <CardHeader className="space-y-3 border-b border-slate-200 px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+                        <Store className="h-4 w-4 text-slate-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Backoffice</p>
+                        <CardTitle className="truncate text-base text-slate-900">{title}</CardTitle>
+                      </div>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)} aria-label="Kapat">
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      value={menuSearch}
+                      onChange={(event) => setMenuSearch(event.target.value)}
+                      placeholder="Ara"
+                      className="h-10 rounded-xl border-slate-200 bg-slate-50 pl-9 text-sm shadow-none focus-visible:ring-slate-300"
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="flex min-h-0 flex-1 flex-col px-0 pb-4 pt-0">
+                  <div className="shrink-0 border-b border-slate-100 px-4 py-3">
+                    <p className="truncate text-sm font-semibold text-slate-900">{userName}</p>
+                    <div className="mt-1 flex min-w-0 items-center gap-2 text-[11px] text-slate-500">
+                      <p className="truncate">{userEmail}</p>
+                      <Badge variant="secondary" className="shrink-0 rounded-md bg-slate-100 uppercase text-slate-600">{userRole}</Badge>
+                    </div>
+                  </div>
 
-              <div className="mt-3 rounded-2xl border border-neutral-200 bg-neutral-50/80 px-3 py-2.5">
-                <p className="truncate text-sm font-semibold text-neutral-950">{userName}</p>
-                <div className="mt-1 flex min-w-0 items-center gap-2 text-[11px] text-neutral-500">
-                  <p className="truncate">{userEmail}</p>
-                  <span aria-hidden="true" className="text-neutral-300">•</span>
-                  <p className="shrink-0 rounded-full bg-white px-2 py-0.5 font-medium uppercase tracking-wide text-neutral-600">
-                    {userRole}
-                  </p>
-                </div>
-              </div>
+                  <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-3 py-3 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]">
+                    {visibleMenuItems.map((item) => renderMenuItem(item, 0, true))}
+                  </nav>
 
-              <nav className="mt-3 grid gap-1 overflow-y-auto pr-1 [scrollbar-width:thin]">
-                {menuItems.map((item) => renderMenuItem(item, 0, true))}
-              </nav>
+                  <div className="shrink-0 px-4">
+                    <Separator className="mb-3 bg-slate-200" />
+                    <div className="grid gap-2">
+                      <Button asChild variant="secondary" className="h-10 justify-between rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200">
+                        <Link href={`/${locale}`} onClick={() => setMobileMenuOpen(false)}>
+                          {storeLabel}
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      <LogoutButton locale={locale} label={logoutLabel} loadingLabel={loadingLabel} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </aside>
           </div>
         ) : null}
 
-        <aside className="hidden overflow-hidden rounded-2xl border border-neutral-200 bg-white/95 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.05)] lg:sticky lg:top-4 lg:block lg:h-[calc(100vh-2rem)]">
-          <div className="rounded-2xl border border-neutral-200 bg-gradient-to-br from-white to-neutral-50 px-3 py-2.5">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-400">Backoffice</p>
-            <h1 className="mt-1.5 text-lg font-semibold tracking-tight text-neutral-950">{title}</h1>
-          </div>
-
-          <nav className="mt-4 grid gap-1 overflow-y-auto pr-1 [scrollbar-width:thin]">
-            {menuItems.map((item) => renderMenuItem(item))}
-          </nav>
-
+        <aside className="hidden lg:sticky lg:top-0 lg:block lg:h-screen lg:min-h-0">
+          <Card className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-l-0 border-r border-slate-200 bg-white shadow-none">
+            <CardHeader className="space-y-3 border-b border-slate-200 px-4 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+                  <Store className="h-4 w-4 text-slate-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Backoffice</p>
+                  <CardTitle className="truncate text-base text-slate-900">{title}</CardTitle>
+                </div>
+              </div>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={menuSearch}
+                  onChange={(event) => setMenuSearch(event.target.value)}
+                  placeholder="Ara"
+                  className="h-10 rounded-xl border-slate-200 bg-slate-50 pl-9 text-sm shadow-none focus-visible:ring-slate-300"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="flex min-h-0 flex-1 px-0 pb-4 pt-0">
+              <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 py-3 [scrollbar-width:thin]">
+                {visibleMenuItems.map((item) => renderMenuItem(item))}
+              </nav>
+            </CardContent>
+          </Card>
         </aside>
 
-        <section className="grid content-start gap-4">
+        <section className="grid min-h-0 content-start gap-4">
           <header className="flex h-[72px] items-center justify-between gap-3 overflow-hidden rounded-2xl border border-neutral-200 bg-white px-3 py-2">
             <div className="min-w-0 flex flex-1 items-center gap-2">
               <div className="flex items-center gap-2 lg:hidden">

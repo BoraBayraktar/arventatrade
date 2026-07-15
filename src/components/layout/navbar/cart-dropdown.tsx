@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Compass, CreditCard, ShoppingCart, TicketPercent } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import styles from "@/ui/shop/surface.module.css";
 
 type CartDropdownLabels = {
@@ -95,12 +98,13 @@ export function CartDropdown({ locale, labels }: { locale: string; labels: CartD
 
 	return (
 		<div className="relative" ref={rootRef}>
-			<button
+			<Button
 				type="button"
 				aria-haspopup="dialog"
 				aria-label={labels.cartTitle}
 				onClick={() => setOpen((prev) => !prev)}
-				className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100/90 hover:text-neutral-950"
+				variant="ghost"
+				className="h-10 gap-2 px-3 text-neutral-700 hover:bg-neutral-100/90 hover:text-neutral-950"
 			>
 				<span className="relative inline-flex">
 					<ShoppingCart className="h-[18px] w-[18px]" />
@@ -112,7 +116,7 @@ export function CartDropdown({ locale, labels }: { locale: string; labels: CartD
 				</span>
 				<span className="hidden lg:inline">{labels.cartTitle}</span>
 				<ChevronDown className="h-[14px] w-[14px] text-neutral-500" />
-			</button>
+			</Button>
 
 			{open ? (
 				<div className={`${styles.panelSoft} absolute right-0 top-full z-50 mt-2 w-[min(92vw,340px)] overflow-hidden shadow-[0_12px_30px_-12px_rgba(0,0,0,0.24)]`}>
@@ -125,12 +129,12 @@ export function CartDropdown({ locale, labels }: { locale: string; labels: CartD
 						<div className="rounded-xl border border-neutral-200 p-2">
 							<div className="relative">
 								<TicketPercent className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-								<input
+								<Input
 									type="text"
 									value={promotionCode}
 									onChange={(event) => setPromotionCode(event.target.value)}
 									placeholder={labels.promotionCode}
-									className="h-10 w-full rounded-lg border border-neutral-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+									className="h-10 border-neutral-200 bg-white pl-9"
 								/>
 							</div>
 						</div>

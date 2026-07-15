@@ -74,6 +74,14 @@ function parseFeatures(value: string | undefined) {
   }).filter((item) => item.key && item.value);
 }
 
+function normalizeSlug(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function normalizeLookup(value: string) {
+  return value.trim().toLocaleLowerCase("tr-TR");
+}
+
 export class CatalogImportService {
   async importProductsFromCsv(csvText: string): Promise<AdminProductImportResult> {
     const { headers, rows } = parseCsv(csvText);
@@ -87,10 +95,10 @@ export class CatalogImportService {
     }
 
     const headerIndex = new Map(headers.map((header, index) => [header, index]));
-    const brands = new Map((await catalogAdminService.listBrands()).map((item) => [item.slug, item.id]));
-    const suppliers = new Map((await catalogAdminService.listSuppliers()).map((item) => [item.name.toLowerCase(), item.id]));
-    const categories = new Map((await catalogAdminService.listCategories({ page: 1, pageSize: 500 })).items.map((item) => [item.slug, item.id]));
-    const warehouses = new Map((await catalogAdminService.listWarehousesForProductAdmin()).map((item) => [item.code, item.id]));
+    const brands = new Map((await catalogAdminService.listBrands()).map((item) => [normalizeSlug(item.slug), item.id]));
+    const suppliers = new Map((await catalogAdminService.listSuppliers()).map((item) => [normalizeLookup(item.name), item.id]));
+    const categories = new Map((await catalogAdminService.listCategories({ page: 1, pageSize: 500 })).items.map((item) => [normalizeSlug(item.slug), item.id]));
+    const warehouses = new Map((await catalogAdminService.listWarehousesForProductAdmin()).map((item) => [item.code.trim().toUpperCase(), item.id]));
 
     const result: AdminProductImportResult = {
       createdCount: 0,
@@ -134,31 +142,41 @@ export class CatalogImportService {
 
         let brandId: string | null = null;
         if (parsed.brandSlug || parsed.brandName) {
-          const candidateSlug = (parsed.brandSlug ?? parsed.brandName ?? "").trim().toLowerCase().replace(/\s+/g, "-");
+          const candidateSlug = normalizeSlug(parsed.brandSlug ?? parsed.brandName ?? "");
           brandId = brands.get(candidateSlug) ?? null;
-          if (!brandId && parsed.brandName) {
-            const brand = await catalogAdminService.createBrand({
-              slug: candidateSlug,
-              name: parsed.brandName,
-            });
-            brandId = brand.id;
-            brands.set(brand.slug, brand.id);
+          if (!brandId) {
+            throw new Error(`Marka kaydi bulunamadi: ${parsed.brandName ?? parsed.brandSlug}. Once merkezi marka tanimini olusturun.`);
           }
         }
 
         let primarySupplierId: string | null = null;
         if (parsed.supplierName) {
-          const supplierKey = parsed.supplierName.toLowerCase();
+          const supplierKey = normalizeLookup(parsed.supplierName);
           primarySupplierId = suppliers.get(supplierKey) ?? null;
           if (!primarySupplierId) {
-            const slug = supplierKey.replace(/\s+/g, "-");
-            const supplier = await catalogAdminService.createSupplier({
-              slug,
-              name: parsed.supplierName,
-            });
-            primarySupplierId = supplier.id;
-            suppliers.set(supplierKey, supplier.id);
+            throw new Error(`Tedarikci kaydi bulunamadi: ${parsed.supplierName}. Once merkezi tedarikci tanimini olusturun.`);
           }
+        }
+
+        const categoryId = parsed.categorySlug
+          ? (categories.get(normalizeSlug(parsed.categorySlug)) ?? null)
+          : null;
+        if (parsed.categorySlug && !categoryId) {
+          throw new Error(`Kategori kaydi bulunamadi: ${parsed.categorySlug}. Once merkezi kategori tanimini olusturun.`);
+        }
+
+        const preferredSalesWarehouseId = parsed.preferredSalesWarehouseCode
+          ? (warehouses.get(parsed.preferredSalesWarehouseCode.trim().toUpperCase()) ?? null)
+          : null;
+        if (parsed.preferredSalesWarehouseCode && !preferredSalesWarehouseId) {
+          throw new Error(`Satis deposu bulunamadi: ${parsed.preferredSalesWarehouseCode}. Once merkezi depo tanimini olusturun.`);
+        }
+
+        const preferredPurchaseWarehouseId = parsed.preferredPurchaseWarehouseCode
+          ? (warehouses.get(parsed.preferredPurchaseWarehouseCode.trim().toUpperCase()) ?? null)
+          : null;
+        if (parsed.preferredPurchaseWarehouseCode && !preferredPurchaseWarehouseId) {
+          throw new Error(`Satin alma deposu bulunamadi: ${parsed.preferredPurchaseWarehouseCode}. Once merkezi depo tanimini olusturun.`);
         }
 
         await catalogAdminService.createProduct({
@@ -181,9 +199,9 @@ export class CatalogImportService {
           purchaseEnabled: parsed.purchaseEnabled,
           brandId,
           primarySupplierId,
-          categoryId: parsed.categorySlug ? (categories.get(parsed.categorySlug) ?? null) : null,
-          preferredSalesWarehouseId: parsed.preferredSalesWarehouseCode ? (warehouses.get(parsed.preferredSalesWarehouseCode) ?? null) : null,
-          preferredPurchaseWarehouseId: parsed.preferredPurchaseWarehouseCode ? (warehouses.get(parsed.preferredPurchaseWarehouseCode) ?? null) : null,
+          categoryId,
+          preferredSalesWarehouseId,
+          preferredPurchaseWarehouseId,
           searchKeywords: parsed.searchKeywords,
           internalNote: parsed.internalNote,
           imageUrl: parsed.imageUrl,

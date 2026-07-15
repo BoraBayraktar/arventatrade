@@ -5,6 +5,7 @@ export type AdminSupplierPayablesQuery = {
 };
 
 export type AdminSupplierPayableSummary = {
+  supplierId: string | null;
   supplierKey: string;
   supplierName: string;
   currency: string;

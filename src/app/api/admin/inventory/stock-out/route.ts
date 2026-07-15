@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       warehouseCode: payload.warehouseCode,
       quantity: payload.quantity,
       type: "DAMAGE_WRITE_OFF",
-      note: payload.note ?? "Inventory manager stock out",
+      note: payload.note ?? "Stok yöneticisi stok çıkışı",
       documentType: payload.documentType,
       sourceDocumentNumber: payload.sourceDocumentNumber,
       sourceDocumentReference: payload.sourceDocumentReference,

@@ -3,7 +3,11 @@
 import { useMemo, useState } from "react";
 import { Maximize2, Minimize2, X } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 type JobStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
 type Channel = "TRENDYOL" | "N11" | "EDOCS_MOCK";
@@ -441,46 +445,48 @@ export function IntegrationManager({
       <div className="border-b border-neutral-200 bg-white/90 p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <input
+            <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={labels.filterSearch}
-              className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
             />
-            <select
-              value={channelFilter}
-              onChange={(event) => setChannelFilter(event.target.value as "all" | Channel)}
-              className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-            >
-              <option value="all">{labels.filterChannel}: {labels.all}</option>
-              <option value="TRENDYOL">TRENDYOL</option>
-              <option value="N11">N11</option>
-              <option value="EDOCS_MOCK">EDOCS_MOCK</option>
-            </select>
-            <select
-              value={jobTypeFilter}
-              onChange={(event) => setJobTypeFilter(event.target.value as "all" | JobType)}
-              className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-            >
-              <option value="all">{labels.filterJobType}: {labels.all}</option>
-              <option value="PRODUCT_SYNC">PRODUCT_SYNC</option>
-              <option value="PRICE_SYNC">PRICE_SYNC</option>
-              <option value="STOCK_SYNC">STOCK_SYNC</option>
-              <option value="DOCUMENT_OUTBOUND">DOCUMENT_OUTBOUND</option>
-              <option value="DOCUMENT_STATUS_SYNC">DOCUMENT_STATUS_SYNC</option>
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as "all" | JobStatus)}
-              className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-            >
-              <option value="all">{labels.filterStatus}: {labels.all}</option>
-              <option value="PENDING">PENDING</option>
-              <option value="PROCESSING">PROCESSING</option>
-              <option value="SUCCESS">SUCCESS</option>
-              <option value="FAILED">FAILED</option>
-              <option value="DEAD_LETTER">DEAD_LETTER</option>
-            </select>
+            <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as "all" | Channel)}>
+              <SelectTrigger>
+                <SelectValue placeholder={`${labels.filterChannel}: ${labels.all}`} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{labels.filterChannel}: {labels.all}</SelectItem>
+                <SelectItem value="TRENDYOL">TRENDYOL</SelectItem>
+                <SelectItem value="N11">N11</SelectItem>
+                <SelectItem value="EDOCS_MOCK">EDOCS_MOCK</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={jobTypeFilter} onValueChange={(value) => setJobTypeFilter(value as "all" | JobType)}>
+              <SelectTrigger>
+                <SelectValue placeholder={`${labels.filterJobType}: ${labels.all}`} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{labels.filterJobType}: {labels.all}</SelectItem>
+                <SelectItem value="PRODUCT_SYNC">PRODUCT_SYNC</SelectItem>
+                <SelectItem value="PRICE_SYNC">PRICE_SYNC</SelectItem>
+                <SelectItem value="STOCK_SYNC">STOCK_SYNC</SelectItem>
+                <SelectItem value="DOCUMENT_OUTBOUND">DOCUMENT_OUTBOUND</SelectItem>
+                <SelectItem value="DOCUMENT_STATUS_SYNC">DOCUMENT_STATUS_SYNC</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as "all" | JobStatus)}>
+              <SelectTrigger>
+                <SelectValue placeholder={`${labels.filterStatus}: ${labels.all}`} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{labels.filterStatus}: {labels.all}</SelectItem>
+                <SelectItem value="PENDING">PENDING</SelectItem>
+                <SelectItem value="PROCESSING">PROCESSING</SelectItem>
+                <SelectItem value="SUCCESS">SUCCESS</SelectItem>
+                <SelectItem value="FAILED">FAILED</SelectItem>
+                <SelectItem value="DEAD_LETTER">DEAD_LETTER</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button type="button" variant="secondary" onClick={() => {
@@ -524,9 +530,9 @@ export function IntegrationManager({
                   <p className="font-medium text-neutral-900">{item.channel}</p>
                   <p className="text-neutral-700">{item.jobType}</p>
                   <p>
-                    <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${statusClass(item.status)}`}>
+                    <Badge className={statusClass(item.status)}>
                       {item.status}
-                    </span>
+                    </Badge>
                   </p>
                   <div className="min-w-0">
                     <p className="break-all text-neutral-700">{item.entityId}</p>
@@ -607,29 +613,38 @@ export function IntegrationManager({
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-1">
                       <label className="text-xs font-medium text-neutral-600">{labels.channel}</label>
-                      <select value={channel} onChange={(event) => setChannel(event.target.value as Channel)} className="h-11 rounded-xl border border-neutral-300 px-3 text-sm">
-                        <option value="TRENDYOL">TRENDYOL</option>
-                        <option value="N11">N11</option>
-                        <option value="EDOCS_MOCK">EDOCS_MOCK</option>
-                      </select>
+                      <Select value={channel} onValueChange={(value) => setChannel(value as Channel)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={labels.channel} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="TRENDYOL">TRENDYOL</SelectItem>
+                          <SelectItem value="N11">N11</SelectItem>
+                          <SelectItem value="EDOCS_MOCK">EDOCS_MOCK</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="grid gap-1">
                       <label className="text-xs font-medium text-neutral-600">{labels.jobType}</label>
-                      <select
+                      <Select
                         value={jobType}
-                        onChange={(event) => {
-                          const nextJobType = event.target.value as JobType;
+                        onValueChange={(value) => {
+                          const nextJobType = value as JobType;
                           setJobType(nextJobType);
                           setTrigger(defaultTriggerForJobType(nextJobType));
                         }}
-                        className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
                       >
-                        <option value="PRODUCT_SYNC">PRODUCT_SYNC</option>
-                        <option value="PRICE_SYNC">PRICE_SYNC</option>
-                        <option value="STOCK_SYNC">STOCK_SYNC</option>
-                        <option value="DOCUMENT_OUTBOUND">DOCUMENT_OUTBOUND</option>
-                        <option value="DOCUMENT_STATUS_SYNC">DOCUMENT_STATUS_SYNC</option>
-                      </select>
+                        <SelectTrigger>
+                          <SelectValue placeholder={labels.jobType} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PRODUCT_SYNC">PRODUCT_SYNC</SelectItem>
+                          <SelectItem value="PRICE_SYNC">PRICE_SYNC</SelectItem>
+                          <SelectItem value="STOCK_SYNC">STOCK_SYNC</SelectItem>
+                          <SelectItem value="DOCUMENT_OUTBOUND">DOCUMENT_OUTBOUND</SelectItem>
+                          <SelectItem value="DOCUMENT_STATUS_SYNC">DOCUMENT_STATUS_SYNC</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -643,12 +658,11 @@ export function IntegrationManager({
 
                   <div className="grid gap-1">
                     <label className="text-xs font-medium text-neutral-600">{labels.entityIds}</label>
-                    <textarea
+                    <Textarea
                       value={entityIds}
                       onChange={(event) => setEntityIds(event.target.value)}
                       rows={6}
                       placeholder={labels.entityIdsHint}
-                      className="rounded-xl border border-neutral-300 px-3 py-3 text-sm"
                     />
                     <p className="text-xs text-neutral-500">{labels.entityIdsHint}</p>
                   </div>
@@ -656,22 +670,20 @@ export function IntegrationManager({
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-1">
                       <label className="text-xs font-medium text-neutral-600">{labels.maxAttempts}</label>
-                      <input
+                      <Input
                         type="number"
                         min={1}
                         max={10}
                         value={maxAttempts}
                         onChange={(event) => setMaxAttempts(event.target.value)}
-                        className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
                       />
                     </div>
                     {isStockSync ? (
                       <div className="grid gap-1">
                         <label className="text-xs font-medium text-neutral-600">{labels.idempotencySuffix}</label>
-                        <input
+                        <Input
                           value={idempotencySuffix}
                           onChange={(event) => setIdempotencySuffix(event.target.value)}
-                          className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
                         />
                       </div>
                     ) : null}
@@ -681,26 +693,26 @@ export function IntegrationManager({
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="grid gap-1">
                         <label className="text-xs font-medium text-neutral-600">{labels.integrationReference}</label>
-                        <input
+                        <Input
                           value={reference}
                           onChange={(event) => setReference(event.target.value)}
-                          className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
                         />
                         <p className="text-xs text-neutral-500">{labels.stockSyncReferenceHint}</p>
                       </div>
                       <div className="grid gap-1">
                         <label className="text-xs font-medium text-neutral-600">{labels.triggerPreset}</label>
-                        <select
-                          value={trigger}
-                          onChange={(event) => setTrigger(event.target.value)}
-                          className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
-                        >
-                          {triggerOptions.map((option) => (
-                            <option key={option} value={option}>
+                        <Select value={trigger} onValueChange={(value) => setTrigger(value)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder={labels.triggerPreset} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {triggerOptions.map((option) => (
+                              <SelectItem key={option} value={option}>
                               {triggerLabel(option, labels)}
-                            </option>
-                          ))}
-                        </select>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <p className="text-xs text-neutral-500">{labels.stockSyncTriggerHint}</p>
                       </div>
                     </div>
@@ -714,13 +726,12 @@ export function IntegrationManager({
               ) : (
                 <div className="grid gap-1">
                   <label className="text-xs font-medium text-neutral-600">{labels.queueLimit}</label>
-                  <input
+                  <Input
                     type="number"
                     min={1}
                     max={100}
                     value={queueLimit}
                     onChange={(event) => setQueueLimit(event.target.value)}
-                    className="h-11 rounded-xl border border-neutral-300 px-3 text-sm"
                   />
                 </div>
               )}

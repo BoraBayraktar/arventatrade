@@ -30,6 +30,9 @@ type Item = {
 type OrderDetail = {
   id: string;
   orderNumber: string;
+  customerAccountId: string | null;
+  customerAccountName: string | null;
+  customerAccountEmail: string | null;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   subtotal: number;
@@ -103,6 +106,7 @@ type Labels = {
   orderDiscount: string;
   promotionCode: string;
   orderDate: string;
+  customerAccount: string;
   updateStatus: string;
   deleteOrder: string;
   operationFailed: string;
@@ -299,6 +303,18 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
       </div>
 
       <div className="grid gap-4 border-b border-neutral-200 p-5 md:grid-cols-4">
+        <article className="rounded-xl border border-neutral-200 p-4 md:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.customerAccount}</p>
+          <p className="mt-2 text-sm font-semibold text-neutral-950">{order.customerAccountName ?? labels.notSpecified}</p>
+          {order.customerAccountEmail ? (
+            <p className="mt-1 text-sm text-neutral-500">{order.customerAccountEmail}</p>
+          ) : null}
+          {order.customerAccountId ? (
+            <Link href={`/${locale}/admin/customer-accounts`} className="mt-2 inline-flex text-sm text-neutral-700 underline underline-offset-4">
+              {labels.customerAccount}
+            </Link>
+          ) : null}
+        </article>
         <article className="rounded-xl border border-neutral-200 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.orderStatus}</p>
           <p className="mt-2 text-sm font-semibold text-neutral-950">{order.status === "CONFIRMED" ? labels.orderStatusConfirmed : labels.orderStatusCancelled}</p>

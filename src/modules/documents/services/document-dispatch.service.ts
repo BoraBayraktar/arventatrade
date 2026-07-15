@@ -40,6 +40,8 @@ function mapDetail(item: Awaited<ReturnType<DocumentRepository["findBusinessDocu
     externalSystemStatus: item.externalSystemStatus,
     providerConfigId: item.providerConfig?.id ?? null,
     providerDisplayName: item.providerConfig?.displayName ?? null,
+    supplierId: item.supplier?.id ?? null,
+    customerAccountId: item.customerAccount?.id ?? null,
     counterpartyName: item.counterpartyName,
     orderId: item.order?.id ?? null,
     orderNumber: item.order?.orderNumber ?? null,
@@ -53,7 +55,17 @@ function mapDetail(item: Awaited<ReturnType<DocumentRepository["findBusinessDocu
     counterpartyEmail: item.counterpartyEmail,
     counterpartyAddress: item.counterpartyAddress,
     note: item.note,
-    lines: item.lines.map((line) => ({
+    lines: item.lines.map((line: {
+      id: string;
+      productId: string | null;
+      productSku: string;
+      productName: string;
+      quantity: number;
+      unitPrice: { toNumber: () => number } | null;
+      lineTotal: { toNumber: () => number } | null;
+      currency: string;
+      note: string | null;
+    }) => ({
       id: line.id,
       productId: line.productId,
       productSku: line.productSku,
@@ -64,7 +76,18 @@ function mapDetail(item: Awaited<ReturnType<DocumentRepository["findBusinessDocu
       currency: line.currency,
       note: line.note,
     })),
-    dispatches: item.dispatches.map((dispatch) => ({
+    dispatches: item.dispatches.map((dispatch: {
+      id: string;
+      integrationJobId: string | null;
+      channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+      providerKey: string;
+      status: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED";
+      externalReference: string | null;
+      errorMessage: string | null;
+      queuedAt: Date;
+      dispatchedAt: Date | null;
+      createdAt: Date;
+    }) => ({
       id: dispatch.id,
       integrationJobId: dispatch.integrationJobId ?? null,
       channel: dispatch.channel,
@@ -129,7 +152,15 @@ export class DocumentDispatchService {
       counterpartyTaxNumber: document.counterpartyTaxNumber,
       currency: document.currency,
       totalAmount: toNumber(document.totalAmount),
-      lines: document.lines.map((line) => ({
+      lines: document.lines.map((line: {
+        id: string;
+        productSku: string;
+        productName: string;
+        quantity: number;
+        unitPrice: { toNumber: () => number } | null;
+        lineTotal: { toNumber: () => number } | null;
+        currency: string;
+      }) => ({
         id: line.id,
         productSku: line.productSku,
         productName: line.productName,

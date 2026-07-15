@@ -23,6 +23,8 @@ function mapDocument(item: Awaited<ReturnType<DocumentRepository["findBusinessDo
     externalSystemStatus: item.externalSystemStatus,
     providerConfigId: item.providerConfig?.id ?? null,
     providerDisplayName: item.providerConfig?.displayName ?? null,
+    supplierId: item.supplier?.id ?? null,
+    customerAccountId: item.customerAccount?.id ?? null,
     counterpartyName: item.counterpartyName,
     counterpartyTaxNumber: item.counterpartyTaxNumber,
     counterpartyTaxOffice: item.counterpartyTaxOffice,
@@ -36,7 +38,17 @@ function mapDocument(item: Awaited<ReturnType<DocumentRepository["findBusinessDo
     lineCount: item.lines.length,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
-    lines: item.lines.map((line) => ({
+    lines: item.lines.map((line: {
+      id: string;
+      productId: string | null;
+      productSku: string;
+      productName: string;
+      quantity: number;
+      unitPrice: { toNumber: () => number } | null;
+      lineTotal: { toNumber: () => number } | null;
+      currency: string;
+      note: string | null;
+    }) => ({
       id: line.id,
       productId: line.productId,
       productSku: line.productSku,
@@ -47,7 +59,18 @@ function mapDocument(item: Awaited<ReturnType<DocumentRepository["findBusinessDo
       currency: line.currency,
       note: line.note,
     })),
-    dispatches: item.dispatches.map((dispatch) => ({
+    dispatches: item.dispatches.map((dispatch: {
+      id: string;
+      integrationJobId: string | null;
+      channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+      providerKey: string;
+      status: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED";
+      externalReference: string | null;
+      errorMessage: string | null;
+      queuedAt: Date;
+      dispatchedAt: Date | null;
+      createdAt: Date;
+    }) => ({
       id: dispatch.id,
       integrationJobId: dispatch.integrationJobId ?? null,
       channel: dispatch.channel,

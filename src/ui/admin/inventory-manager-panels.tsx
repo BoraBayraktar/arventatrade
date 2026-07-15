@@ -2,6 +2,13 @@
 
 import { useState, type RefObject } from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import type { AdminSupplierItem } from "@/modules/catalog/contracts/catalog-admin.contract";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type { Locale } from "@/lib/i18n";
 import type {
   AdminExternalStockEventMonitoring,
@@ -1180,6 +1187,7 @@ type InventoryTransactionsPanelProps = {
   warehouses: AdminWarehouseItem[];
   transactionResult: AdminInventoryTransactionListResult;
   formatDate: (value: string | null, locale: Locale, fallback: string) => string;
+  formatInventoryNote: (note: string | null | undefined) => string | null | undefined;
   formatSourceDocument: (source: { type: string | null; number: string | null }) => string | null;
   formatSourceDocumentMeta: (
     source: { date: string | null; externalReference: string | null; externalSystemStatus: string | null; counterpartyName: string | null },
@@ -1199,6 +1207,7 @@ export function InventoryTransactionsPanel({
   warehouses,
   transactionResult,
   formatDate,
+  formatInventoryNote,
   formatSourceDocument,
   formatSourceDocumentMeta,
   formatTransactionType,
@@ -1219,27 +1228,37 @@ export function InventoryTransactionsPanel({
         <input type="hidden" name="reservationFilter" value={query.reservationFilter} readOnly />
         <input type="hidden" name="warehouseFilter" value={query.warehouseFilter} readOnly />
         <input type="hidden" name="movementTypeFilter" value={query.movementTypeFilter} readOnly />
-        <input type="search" name="transactionSearch" defaultValue={query.transactionSearch} placeholder={labels.transactionSearch} aria-label={labels.transactionSearch} className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500" />
-        <select name="transactionType" defaultValue={query.transactionType} className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500">
-          <option value="all">{labels.transactionFilterType}: {labels.all}</option>
-          <option value="MANUAL_ADJUSTMENT">{labels.transactionFilterType}: {labels.inventoryMovementManualAdjustment}</option>
-          <option value="STOCK_IN">{labels.transactionFilterType}: {labels.inventoryMovementPurchaseReceipt}</option>
-          <option value="STOCK_OUT">{labels.transactionFilterType}: {labels.inventoryMovementDamageWriteOff}</option>
-          <option value="TRANSFER">{labels.transactionFilterType}: {labels.transferStock}</option>
-          <option value="STOCK_COUNT">{labels.transactionFilterType}: {labels.stockCountTitle}</option>
-        </select>
-        <select name="transactionWarehouse" defaultValue={query.transactionWarehouse} className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500">
-          <option value="all">{labels.transactionFilterWarehouse}: {labels.allWarehouses}</option>
-          {warehouses.map((warehouse) => (
-            <option key={`transaction-warehouse-${warehouse.id}`} value={warehouse.code}>
-              {labels.transactionFilterWarehouse}: {warehouse.code}
-            </option>
-          ))}
-        </select>
-        <input type="search" name="transactionSku" defaultValue={query.transactionSku} placeholder={labels.transactionFilterSku} aria-label={labels.transactionFilterSku} className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500" />
-        <input type="date" name="transactionStartDate" defaultValue={query.transactionStartDate} aria-label={labels.transactionFilterStartDate} className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500" />
-        <input type="date" name="transactionEndDate" defaultValue={query.transactionEndDate} aria-label={labels.transactionFilterEndDate} className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500" />
-        <button type="submit" className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800">{labels.search}</button>
+        <Input type="search" name="transactionSearch" defaultValue={query.transactionSearch} placeholder={labels.transactionSearch} aria-label={labels.transactionSearch} />
+        <Select name="transactionType" defaultValue={query.transactionType}>
+          <SelectTrigger>
+            <SelectValue placeholder={`${labels.transactionFilterType}: ${labels.all}`} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{labels.transactionFilterType}: {labels.all}</SelectItem>
+            <SelectItem value="MANUAL_ADJUSTMENT">{labels.transactionFilterType}: {labels.inventoryMovementManualAdjustment}</SelectItem>
+            <SelectItem value="STOCK_IN">{labels.transactionFilterType}: {labels.inventoryMovementPurchaseReceipt}</SelectItem>
+            <SelectItem value="STOCK_OUT">{labels.transactionFilterType}: {labels.inventoryMovementDamageWriteOff}</SelectItem>
+            <SelectItem value="TRANSFER">{labels.transactionFilterType}: {labels.transferStock}</SelectItem>
+            <SelectItem value="STOCK_COUNT">{labels.transactionFilterType}: {labels.stockCountTitle}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select name="transactionWarehouse" defaultValue={query.transactionWarehouse}>
+          <SelectTrigger>
+            <SelectValue placeholder={`${labels.transactionFilterWarehouse}: ${labels.allWarehouses}`} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{labels.transactionFilterWarehouse}: {labels.allWarehouses}</SelectItem>
+            {warehouses.map((warehouse) => (
+              <SelectItem key={`transaction-warehouse-${warehouse.id}`} value={warehouse.code}>
+                {labels.transactionFilterWarehouse}: {warehouse.code}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input type="search" name="transactionSku" defaultValue={query.transactionSku} placeholder={labels.transactionFilterSku} aria-label={labels.transactionFilterSku} />
+        <Input type="date" name="transactionStartDate" defaultValue={query.transactionStartDate} aria-label={labels.transactionFilterStartDate} />
+        <Input type="date" name="transactionEndDate" defaultValue={query.transactionEndDate} aria-label={labels.transactionFilterEndDate} />
+        <Button type="submit">{labels.search}</Button>
           </form>
       </section>
 
@@ -1251,20 +1270,25 @@ export function InventoryTransactionsPanel({
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${getTransactionBadgeClass(transaction.type)}`}>
+                  <Badge className={getTransactionBadgeClass(transaction.type)}>
                     {formatTransactionType(transaction.type)}
-                  </span>
-                  <span className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[11px] font-semibold text-neutral-700">
+                  </Badge>
+                  <Badge variant="secondary">
                     {transaction.lines.length} satır
-                  </span>
+                  </Badge>
                 </div>
                 <h4 className="mt-3 text-base font-semibold text-neutral-950">{transaction.transactionNumber}</h4>
                 <p className="mt-1 text-xs text-neutral-500">{formatDate(transaction.createdAt, locale, labels.notSpecified)}</p>
-                <p className="mt-3 text-sm text-neutral-600">{transaction.note ?? transaction.reference ?? labels.notSpecified}</p>
+                <p className="mt-3 text-sm text-neutral-600">{formatInventoryNote(transaction.note) ?? transaction.reference ?? labels.notSpecified}</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Belge Tipi</p>
-                    <p className="mt-1 text-sm font-semibold text-neutral-950">{transaction.sourceDocument.type ?? labels.notSpecified}</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-950">
+                      {formatSourceDocument({
+                        type: transaction.sourceDocument.type,
+                        number: null,
+                      }) ?? labels.notSpecified}
+                    </p>
                   </div>
                   <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Belge Numarası</p>
@@ -2017,6 +2041,7 @@ type InventoryDrawerMovementsPanelProps = {
   drawerMovementTotalPages: number;
   movementTypeOptions: Array<{ value: string; label: string }>;
   formatDate: (value: string | null, locale: Locale, fallback: string) => string;
+  formatInventoryNote: (note: string | null | undefined) => string | null | undefined;
   formatSourceDocument: (source: {
     type: string | null;
     number: string | null;
@@ -2039,6 +2064,7 @@ export function InventoryDrawerMovementsPanel({
   drawerMovementTotalPages,
   movementTypeOptions,
   formatDate,
+  formatInventoryNote,
   formatSourceDocument,
   movementTypeClass,
   movementTypeLabel,
@@ -2103,7 +2129,7 @@ export function InventoryDrawerMovementsPanel({
               </span>
               <div className="flex flex-col gap-1">
                 <span className="text-neutral-500">{formatDate(movement.createdAt, locale, labels.notSpecified)}</span>
-                <span>{movement.note ?? labels.notSpecified}</span>
+                <span>{formatInventoryNote(movement.note) ?? labels.notSpecified}</span>
                 {formatSourceDocument({
                   type: movement.sourceDocumentType,
                   number: movement.sourceDocumentNumber,
@@ -2160,6 +2186,7 @@ type InventoryDrawerOperationPanelProps = {
   labels: InventoryDrawerLabels;
   locale: Locale;
   warehouses: AdminWarehouseItem[];
+  suppliers: AdminSupplierItem[];
   drawerMode: DrawerMode;
   pendingRowKey: string | null;
   drawerTargetOnHand: string;
@@ -2171,7 +2198,7 @@ type InventoryDrawerOperationPanelProps = {
   drawerTransferQuantity: string;
   drawerTransferNote: string;
   drawerPurchaseDocumentNumber: string;
-  drawerPurchaseSupplierName: string;
+  drawerPurchaseSupplierId: string;
   drawerPurchaseDocumentDate: string;
   drawerPurchaseDocumentType: "PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH";
   drawerPurchaseReference: string;
@@ -2187,13 +2214,14 @@ type InventoryDrawerOperationPanelProps = {
   setDrawerTransferQuantity: (value: string) => void;
   setDrawerTransferNote: (value: string) => void;
   setDrawerPurchaseDocumentNumber: (value: string) => void;
-  setDrawerPurchaseSupplierName: (value: string) => void;
+  setDrawerPurchaseSupplierId: (value: string) => void;
   setDrawerPurchaseDocumentDate: (value: string) => void;
   setDrawerPurchaseDocumentType: (value: "PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH") => void;
   setDrawerPurchaseReference: (value: string) => void;
   setDrawerPurchaseExternalStatus: (value: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED") => void;
   setDrawerPurchaseUnitCost: (value: string) => void;
   formatDate: (value: string | null, locale: Locale, fallback: string) => string;
+  formatInventoryNote: (note: string | null | undefined) => string | null | undefined;
   formatSourceDocument: (source: {
     type: string | null;
     number: string | null;
@@ -2212,6 +2240,7 @@ export function InventoryDrawerOperationPanel({
   labels,
   locale,
   warehouses,
+  suppliers,
   drawerMode,
   pendingRowKey,
   drawerTargetOnHand,
@@ -2223,7 +2252,7 @@ export function InventoryDrawerOperationPanel({
   drawerTransferQuantity,
   drawerTransferNote,
   drawerPurchaseDocumentNumber,
-  drawerPurchaseSupplierName,
+  drawerPurchaseSupplierId,
   drawerPurchaseDocumentDate,
   drawerPurchaseDocumentType,
   drawerPurchaseReference,
@@ -2239,13 +2268,14 @@ export function InventoryDrawerOperationPanel({
   setDrawerTransferQuantity,
   setDrawerTransferNote,
   setDrawerPurchaseDocumentNumber,
-  setDrawerPurchaseSupplierName,
+  setDrawerPurchaseSupplierId,
   setDrawerPurchaseDocumentDate,
   setDrawerPurchaseDocumentType,
   setDrawerPurchaseReference,
   setDrawerPurchaseExternalStatus,
   setDrawerPurchaseUnitCost,
   formatDate,
+  formatInventoryNote,
   formatSourceDocument,
   movementTypeClass,
   movementTypeLabel,
@@ -2467,7 +2497,7 @@ export function InventoryDrawerOperationPanel({
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-3 text-sm text-neutral-700">{movement.note ?? labels.notSpecified}</p>
+                      <p className="mt-3 text-sm text-neutral-700">{formatInventoryNote(movement.note) ?? labels.notSpecified}</p>
                       <div className="mt-2 space-y-1 text-xs text-neutral-500">
                         <p>{formatDate(movement.createdAt, locale, labels.notSpecified)}</p>
                         {formatSourceDocument({
@@ -2540,25 +2570,25 @@ export function InventoryDrawerOperationPanel({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
               <label className="text-xs font-medium text-neutral-600">{labels.targetOnHandStock}</label>
-              <input type="number" min={0} value={drawerTargetOnHand} onChange={(event) => setDrawerTargetOnHand(event.target.value)} className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm" required />
+              <Input type="number" min={0} value={drawerTargetOnHand} onChange={(event) => setDrawerTargetOnHand(event.target.value)} required />
             </div>
             <div className="grid gap-2">
               <label className="text-xs font-medium text-neutral-600">{labels.targetReorderPoint}</label>
-              <input type="number" min={0} value={drawerReorderPoint} onChange={(event) => setDrawerReorderPoint(event.target.value)} className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm" required />
+              <Input type="number" min={0} value={drawerReorderPoint} onChange={(event) => setDrawerReorderPoint(event.target.value)} required />
             </div>
             <div className="grid gap-2 md:col-span-2">
               <label className="text-xs font-medium text-neutral-600">{labels.targetSafetyStock}</label>
-              <input type="number" min={0} value={drawerSafetyStock} onChange={(event) => setDrawerSafetyStock(event.target.value)} className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm" required />
+              <Input type="number" min={0} value={drawerSafetyStock} onChange={(event) => setDrawerSafetyStock(event.target.value)} required />
             </div>
           </div>
           <div className="grid gap-2">
             <label className="text-xs font-medium text-neutral-600">{labels.adjustmentNote}</label>
-            <textarea value={drawerNote} onChange={(event) => setDrawerNote(event.target.value)} placeholder={labels.adjustmentNote} rows={4} className="rounded-2xl border border-neutral-300 bg-white px-3 py-3 text-sm" />
+            <Textarea value={drawerNote} onChange={(event) => setDrawerNote(event.target.value)} placeholder={labels.adjustmentNote} rows={4} />
           </div>
           <div className="flex justify-end">
-            <button type="submit" disabled={Boolean(pendingRowKey)} className="h-11 rounded-2xl border border-neutral-300 bg-neutral-900 px-5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60">
+            <Button type="submit" disabled={Boolean(pendingRowKey)}>
               {pendingRowKey ? "..." : labels.applyAdjustment}
-            </button>
+            </Button>
           </div>
         </form>
       ) : drawerMode === "stock_in" || drawerMode === "stock_out" ? (
@@ -2581,7 +2611,7 @@ export function InventoryDrawerOperationPanel({
           </div>
           <div className="grid gap-2">
             <label className="text-xs font-medium text-neutral-600">{labels.movementQuantity}</label>
-            <input type="number" min={1} step={1} value={drawerMovementQuantity} onChange={(event) => setDrawerMovementQuantity(event.target.value)} className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm" required />
+            <Input type="number" min={1} step={1} value={drawerMovementQuantity} onChange={(event) => setDrawerMovementQuantity(event.target.value)} required />
           </div>
           {drawerMode === "stock_in" ? (
             <div className="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-4">
@@ -2592,53 +2622,76 @@ export function InventoryDrawerOperationPanel({
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="grid gap-2">
                   <label className="text-xs font-medium text-neutral-600">Belge tipi</label>
-                  <select value={drawerPurchaseDocumentType} onChange={(event) => setDrawerPurchaseDocumentType(event.target.value as "PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH")} className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm">
-                    <option value="PURCHASE_DOCUMENT">Satın alma belgesi</option>
-                    <option value="DELIVERY_NOTE">İrsaliye</option>
-                    <option value="E_INVOICE">E-fatura</option>
-                    <option value="E_DISPATCH">E-irsaliye</option>
-                  </select>
+                  <Select value={drawerPurchaseDocumentType} onValueChange={(value) => setDrawerPurchaseDocumentType(value as "PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Belge tipi" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PURCHASE_DOCUMENT">Satın alma belgesi</SelectItem>
+                      <SelectItem value="DELIVERY_NOTE">İrsaliye</SelectItem>
+                      <SelectItem value="E_INVOICE">E-fatura</SelectItem>
+                      <SelectItem value="E_DISPATCH">E-irsaliye</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid gap-2">
                   <label className="text-xs font-medium text-neutral-600">Belge numarası</label>
-                  <input value={drawerPurchaseDocumentNumber} onChange={(event) => setDrawerPurchaseDocumentNumber(event.target.value)} placeholder="ALIŞ-2026-001" className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm" />
+                  <Input value={drawerPurchaseDocumentNumber} onChange={(event) => setDrawerPurchaseDocumentNumber(event.target.value)} placeholder="ALIS-2026-001" />
                 </div>
                 <div className="grid gap-2">
                   <label className="text-xs font-medium text-neutral-600">Tedarikçi</label>
-                  <input value={drawerPurchaseSupplierName} onChange={(event) => setDrawerPurchaseSupplierName(event.target.value)} placeholder="Tedarikçi adı" className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm" />
+                  <SearchableSelect
+                    value={drawerPurchaseSupplierId}
+                    onValueChange={setDrawerPurchaseSupplierId}
+                    options={suppliers
+                      .filter((supplier) => supplier.isActive)
+                      .map((supplier) => ({
+                        value: supplier.id,
+                        label: supplier.name,
+                        description: supplier.taxNumber || supplier.email || supplier.phone || undefined,
+                      }))}
+                    placeholder="Tedarikçi seç"
+                    searchPlaceholder="Tedarikçi ara"
+                    emptyLabel="Eşleşen tedarikçi bulunamadı."
+                  />
                 </div>
                 <div className="grid gap-2">
                   <label className="text-xs font-medium text-neutral-600">Belge tarihi</label>
-                  <input type="datetime-local" value={drawerPurchaseDocumentDate} onChange={(event) => setDrawerPurchaseDocumentDate(event.target.value)} className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm" />
+                  <Input type="datetime-local" value={drawerPurchaseDocumentDate} onChange={(event) => setDrawerPurchaseDocumentDate(event.target.value)} />
                 </div>
                 <div className="grid gap-2">
                   <label className="text-xs font-medium text-neutral-600">Harici referans</label>
-                  <input value={drawerPurchaseReference} onChange={(event) => setDrawerPurchaseReference(event.target.value)} placeholder="İrsaliye / e-fatura no" className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm" />
+                  <Input value={drawerPurchaseReference} onChange={(event) => setDrawerPurchaseReference(event.target.value)} placeholder="Irsaliye / e-fatura no" />
                 </div>
                 <div className="grid gap-2">
                   <label className="text-xs font-medium text-neutral-600">Dış sistem durumu</label>
-                  <select value={drawerPurchaseExternalStatus} onChange={(event) => setDrawerPurchaseExternalStatus(event.target.value as "NOT_SENT" | "QUEUED" | "SENT" | "FAILED")} className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm">
-                    <option value="NOT_SENT">Gönderilmedi</option>
-                    <option value="QUEUED">Kuyrukta</option>
-                    <option value="SENT">Gönderildi</option>
-                    <option value="FAILED">Hata aldı</option>
-                  </select>
+                  <Select value={drawerPurchaseExternalStatus} onValueChange={(value) => setDrawerPurchaseExternalStatus(value as "NOT_SENT" | "QUEUED" | "SENT" | "FAILED")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Dis sistem durumu" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NOT_SENT">Gonderilmedi</SelectItem>
+                      <SelectItem value="QUEUED">Kuyrukta</SelectItem>
+                      <SelectItem value="SENT">Gonderildi</SelectItem>
+                      <SelectItem value="FAILED">Hata aldi</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid gap-2 md:col-span-2">
                   <label className="text-xs font-medium text-neutral-600">Birim maliyet</label>
-                  <input type="number" min={0} step="0.01" value={drawerPurchaseUnitCost} onChange={(event) => setDrawerPurchaseUnitCost(event.target.value)} placeholder="0.00" className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm" />
+                  <Input type="number" min={0} step="0.01" value={drawerPurchaseUnitCost} onChange={(event) => setDrawerPurchaseUnitCost(event.target.value)} placeholder="0.00" />
                 </div>
               </div>
             </div>
           ) : null}
           <div className="grid gap-2">
             <label className="text-xs font-medium text-neutral-600">{labels.adjustmentNote}</label>
-            <textarea value={drawerNote} onChange={(event) => setDrawerNote(event.target.value)} placeholder={labels.adjustmentNote} rows={4} className="rounded-2xl border border-neutral-300 bg-white px-3 py-3 text-sm" />
+            <Textarea value={drawerNote} onChange={(event) => setDrawerNote(event.target.value)} placeholder={labels.adjustmentNote} rows={4} />
           </div>
           <div className="flex justify-end">
-            <button type="submit" disabled={Boolean(pendingRowKey)} className="h-11 rounded-2xl border border-neutral-300 bg-neutral-900 px-5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60">
+            <Button type="submit" disabled={Boolean(pendingRowKey)}>
               {pendingRowKey ? "..." : drawerMode === "stock_in" ? labels.stockIn : labels.stockOut}
-            </button>
+            </Button>
           </div>
         </form>
       ) : drawerMode === "transfer" ? (
@@ -2655,29 +2708,37 @@ export function InventoryDrawerOperationPanel({
           </div>
           <div className="grid gap-2">
             <label className="text-xs font-medium text-neutral-600">{labels.transferTargetWarehouse}</label>
-            <select value={drawerTransferWarehouseCode} onChange={(event) => setDrawerTransferWarehouseCode(event.target.value)} className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm" required>
-              <option value="">{labels.notSpecified}</option>
-              {warehouses
-                .filter((warehouse) => warehouse.isActive && warehouse.code !== item.warehouseCode)
-                .map((warehouse) => (
-                  <option key={`transfer-${warehouse.id}`} value={warehouse.code}>
-                    {warehouse.code} - {warehouse.name}
-                  </option>
-                ))}
-            </select>
+            <Select
+              value={drawerTransferWarehouseCode || "__empty__"}
+              onValueChange={(value) => setDrawerTransferWarehouseCode(value === "__empty__" ? "" : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={labels.notSpecified} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__empty__">{labels.notSpecified}</SelectItem>
+                {warehouses
+                  .filter((warehouse) => warehouse.isActive && warehouse.code !== item.warehouseCode)
+                  .map((warehouse) => (
+                    <SelectItem key={`transfer-${warehouse.id}`} value={warehouse.code}>
+                      {warehouse.code} - {warehouse.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-2">
             <label className="text-xs font-medium text-neutral-600">{labels.transferQuantity}</label>
-            <input type="number" min={1} step={1} value={drawerTransferQuantity} onChange={(event) => setDrawerTransferQuantity(event.target.value)} className="h-11 rounded-2xl border border-neutral-300 bg-white px-3 text-sm" required />
+            <Input type="number" min={1} step={1} value={drawerTransferQuantity} onChange={(event) => setDrawerTransferQuantity(event.target.value)} required />
           </div>
           <div className="grid gap-2">
             <label className="text-xs font-medium text-neutral-600">{labels.transferNote}</label>
-            <textarea value={drawerTransferNote} onChange={(event) => setDrawerTransferNote(event.target.value)} placeholder={labels.transferNote} rows={4} className="rounded-2xl border border-neutral-300 bg-white px-3 py-3 text-sm" />
+            <Textarea value={drawerTransferNote} onChange={(event) => setDrawerTransferNote(event.target.value)} placeholder={labels.transferNote} rows={4} />
           </div>
           <div className="flex justify-end">
-            <button type="submit" disabled={Boolean(pendingRowKey)} className="h-11 rounded-2xl border border-neutral-300 bg-neutral-900 px-5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60">
+            <Button type="submit" disabled={Boolean(pendingRowKey)}>
               {pendingRowKey ? "..." : labels.applyTransfer}
-            </button>
+            </Button>
           </div>
         </form>
       ) : (

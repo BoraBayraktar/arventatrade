@@ -859,6 +859,21 @@ export class CatalogAdminRepository {
       },
       select: {
         id: true,
+        slug: true,
+        name: true,
+        taxNumber: true,
+        email: true,
+        phone: true,
+        isActive: true,
+        _count: {
+          select: {
+            primaryProducts: {
+              where: {
+                deleted: false,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -921,18 +936,43 @@ export class CatalogAdminRepository {
   }
 
   async listCategories(args: AdminCategoryListQuery) {
-    return prisma.category.findMany({
-      where: {
-        deleted: false,
-        ...(args.search
-          ? {
-              OR: [
-                { name: { contains: args.search, mode: "insensitive" as const } },
-                { slug: { contains: args.search, mode: "insensitive" as const } },
-              ],
-            }
+    const where = {
+      deleted: false,
+      ...(args.search
+        ? {
+            OR: [
+              { name: { contains: args.search, mode: "insensitive" as const } },
+              { slug: { contains: args.search, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+      ...(args.rootOnly
+        ? { parentId: null }
+        : args.parentId
+          ? { parentId: args.parentId }
           : {}),
-      },
+      ...(args.hasProducts === "with_products"
+        ? {
+            products: {
+              some: {
+                deleted: false,
+              },
+            },
+          }
+        : {}),
+      ...(args.hasProducts === "without_products"
+        ? {
+            products: {
+              none: {
+                deleted: false,
+              },
+            },
+          }
+        : {}),
+    };
+
+    return prisma.category.findMany({
+      where,
       select: {
         id: true,
         slug: true,
@@ -948,15 +988,20 @@ export class CatalogAdminRepository {
           },
         },
       },
-      orderBy: {
-        updatedAt: "desc",
-      },
+      orderBy:
+        args.sort === "name_asc"
+          ? { name: "asc" }
+          : args.sort === "name_desc"
+            ? { name: "desc" }
+            : args.sort === "product_count_desc"
+              ? { products: { _count: "desc" } }
+              : { updatedAt: "desc" },
       skip: ((args.page ?? 1) - 1) * (args.pageSize ?? 10),
       take: args.pageSize,
     });
   }
 
-  async countCategories(args: Pick<AdminCategoryListQuery, "search">) {
+  async countCategories(args: Pick<AdminCategoryListQuery, "search" | "parentId" | "rootOnly" | "hasProducts">) {
     return prisma.category.count({
       where: {
         deleted: false,
@@ -966,6 +1011,29 @@ export class CatalogAdminRepository {
                 { name: { contains: args.search, mode: "insensitive" as const } },
                 { slug: { contains: args.search, mode: "insensitive" as const } },
               ],
+            }
+          : {}),
+        ...(args.rootOnly
+          ? { parentId: null }
+          : args.parentId
+            ? { parentId: args.parentId }
+            : {}),
+        ...(args.hasProducts === "with_products"
+          ? {
+              products: {
+                some: {
+                  deleted: false,
+                },
+              },
+            }
+          : {}),
+        ...(args.hasProducts === "without_products"
+          ? {
+              products: {
+                none: {
+                  deleted: false,
+                },
+              },
             }
           : {}),
       },

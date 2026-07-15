@@ -90,8 +90,9 @@ export default async function AdminOrdersPage({ params, searchParams }: OrdersPa
       </div>
 
       <div className="overflow-hidden rounded-b-2xl">
-        <div className="hidden grid-cols-[1fr_120px_120px_160px_180px_90px_140px_140px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+        <div className="hidden grid-cols-[1fr_1fr_120px_120px_160px_180px_90px_140px_140px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
           <span>{dictionary.admin.orderNumber}</span>
+          <span>{dictionary.admin.customerAccountsTitle}</span>
           <span>{dictionary.admin.orderStatus}</span>
           <span>{dictionary.admin.paymentStatus}</span>
           <span>{dictionary.admin.inventoryRestockStatus}</span>
@@ -107,12 +108,13 @@ export default async function AdminOrdersPage({ params, searchParams }: OrdersPa
         ) : (
           <div className="divide-y divide-neutral-200">
             {result.items.map((item) => (
-              <article key={item.id} className="grid gap-3 p-4 lg:grid-cols-[1fr_120px_120px_160px_180px_90px_140px_140px_190px] lg:items-center">
+              <article key={item.id} className="grid gap-3 p-4 lg:grid-cols-[1fr_1fr_120px_120px_160px_180px_90px_140px_140px_190px] lg:items-center">
                 <p className="font-medium text-neutral-950">
                   <Link href={`/${locale}/admin/orders/${item.id}`} className="underline-offset-4 hover:underline">
                     {item.orderNumber}
                   </Link>
                 </p>
+                <p className="text-sm text-neutral-700">{item.customerAccountName ?? dictionary.common.notSpecified}</p>
                 <p>
                   <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${item.status === "CONFIRMED" ? "bg-emerald-100 text-emerald-700" : "bg-neutral-200 text-neutral-700"}`}>
                     {item.status === "CONFIRMED" ? dictionary.admin.orderStatusConfirmed : dictionary.admin.orderStatusCancelled}

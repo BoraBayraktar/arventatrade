@@ -86,14 +86,15 @@ export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
 
 	return (
 		<div className="relative" ref={rootRef}>
-			<button
+			<Button
 				type="button"
 				onClick={() => setOpen((prev) => !prev)}
-				className="inline-flex h-9 items-center gap-1 rounded-md px-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 hover:text-black"
+				variant="ghost"
+				className="h-9 items-center gap-1 px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-black"
 			>
 				<span className="max-w-[140px] truncate">{initialUser.name || labels.account}</span>
 				<ChevronDown className="h-4 w-4" />
-			</button>
+			</Button>
 
 			{open ? (
 				<div className={`${styles.panelSoft} absolute right-0 top-full z-40 mt-1 w-56 p-2 shadow-xl`}>
@@ -115,10 +116,10 @@ export function UserMenu({ locale, initialUser = null }: UserMenuProps) {
 						<MessageSquare className="h-4 w-4" />
 						{labels.messages}
 					</Link>
-					<button type="button" onClick={logout} className="mt-1 inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
+					<Button type="button" onClick={logout} variant="ghost" className="mt-1 w-full justify-start gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 hover:text-red-700">
 						<LogOut className="h-4 w-4" />
 						{labels.logout}
-					</button>
+					</Button>
 				</div>
 			) : null}
 		</div>

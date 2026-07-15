@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { AdminSupplierPayableSummary } from "@/modules/finance/contracts/payables.contract";
 
 type Labels = {
@@ -42,12 +45,11 @@ export function SupplierPayablesManager({ locale, items, initialSearch, labels }
           <p className="text-sm text-neutral-600">{labels.description}</p>
         </div>
         <form action={`/${locale}/admin/finance/payables`} className="mt-4">
-          <input
+          <Input
             type="search"
             name="search"
             defaultValue={initialSearch}
             placeholder={labels.search}
-            className="h-11 w-full rounded-2xl border border-neutral-300 bg-white px-4 text-sm"
           />
         </form>
       </section>
@@ -70,13 +72,13 @@ export function SupplierPayablesManager({ locale, items, initialSearch, labels }
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setDetail(item)}
-                  className="h-10 rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700"
+                  variant="secondary"
                 >
                   {labels.viewDetail}
-                </button>
+                </Button>
                 <Link
                   href={`/${locale}/admin/finance/payables/${encodeURIComponent(item.supplierKey)}`}
                   className="inline-flex h-10 items-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700"
@@ -97,9 +99,9 @@ export function SupplierPayablesManager({ locale, items, initialSearch, labels }
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.totalAmount}</p>
                 <h3 className="mt-1 text-xl font-semibold text-neutral-950">{detail.supplierName}</h3>
               </div>
-              <button type="button" onClick={() => setDetail(null)} className="rounded-full border border-neutral-200 px-3 py-2 text-sm">
+              <Button type="button" onClick={() => setDetail(null)} variant="secondary" size="sm">
                 {labels.close}
-              </button>
+              </Button>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-neutral-200 p-4 text-sm text-neutral-700">
@@ -121,8 +123,8 @@ export function SupplierPayablesManager({ locale, items, initialSearch, labels }
               {detail.documents.map((document) => (
                 <article key={document.id} className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-neutral-200 px-3 py-1 text-xs font-semibold text-neutral-700">{document.documentType}</span>
-                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">{document.status}</span>
+                    <Badge variant="secondary">{document.documentType}</Badge>
+                    <Badge className="border-emerald-200 bg-emerald-100 text-emerald-700">{document.status}</Badge>
                   </div>
                   <h4 className="mt-3 font-semibold text-neutral-950">{document.documentNumber}</h4>
                   <div className="mt-3 grid gap-2 md:grid-cols-2">

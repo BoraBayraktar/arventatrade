@@ -5,7 +5,12 @@ import { Download, Maximize2, Minimize2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type { Locale } from "@/lib/i18n";
+import type { AdminSupplierItem } from "@/modules/catalog/contracts/catalog-admin.contract";
 import type {
   AdminInventoryAlertSummary,
   AdminExternalStockEventMonitoring,
@@ -485,6 +490,7 @@ type Props = {
   result: AdminInventoryListResult;
   transactionResult: AdminInventoryTransactionListResult;
   warehouses: AdminWarehouseItem[];
+  suppliers: AdminSupplierItem[];
   alertResult: {
     items: Array<{
       id: string;
@@ -560,6 +566,46 @@ type Props = {
   initialSection?: InventorySectionId;
 };
 
+function formatSourceDocumentType(type: string | null) {
+  if (!type) {
+    return null;
+  }
+
+  const typeLabelMap: Record<string, string> = {
+    INVENTORY_ADJUSTMENT: "Stok Düzeltme",
+    WAREHOUSE_TRANSFER: "Depo Transferi",
+    PURCHASE_RECEIPT: "Stok Girişi",
+    STOCK_WRITE_OFF: "Stok Çıkışı",
+    STOCK_COUNT: "Stok Sayımı",
+    ORDER: "Sipariş",
+    RETURN: "İade",
+    INVOICE: "Fatura",
+    WAYBILL: "İrsaliye",
+    PURCHASE_DOCUMENT: "Satın Alma Belgesi",
+    DELIVERY_NOTE: "İrsaliye",
+    E_INVOICE: "E-Fatura",
+    E_DISPATCH: "E-İrsaliye",
+  };
+
+  return typeLabelMap[type] ?? type;
+}
+
+function formatInventoryNote(note: string | null | undefined) {
+  if (!note) {
+    return note ?? null;
+  }
+
+  const noteLabelMap: Record<string, string> = {
+    "Inventory manager stock in": "Stok yöneticisi stok girişi",
+    "Inventory manager stock out": "Stok yöneticisi stok çıkışı",
+    "Inventory manager manual adjustment": "Stok yöneticisi manuel stok düzeltmesi",
+    "Inventory manager warehouse transfer": "Stok yöneticisi depo transferi",
+    "Catalog admin initial stock setup": "Ürün yönetimi ilk stok kurulumu",
+  };
+
+  return noteLabelMap[note] ?? note;
+}
+
 function formatSourceDocument(source: {
   type: string | null;
   number: string | null;
@@ -568,23 +614,7 @@ function formatSourceDocument(source: {
     return null;
   }
 
-  const typeLabelMap: Record<string, string> = {
-    INVENTORY_ADJUSTMENT: "Stok Duzeltme",
-    WAREHOUSE_TRANSFER: "Depo Transferi",
-    PURCHASE_RECEIPT: "Stok Girisi",
-    STOCK_WRITE_OFF: "Stok Cikisi",
-    STOCK_COUNT: "Stok Sayimi",
-    ORDER: "Siparis",
-    RETURN: "Iade",
-    INVOICE: "Fatura",
-    WAYBILL: "Irsaliye",
-    PURCHASE_DOCUMENT: "Satin Alma Belgesi",
-    DELIVERY_NOTE: "Irsaliye",
-    E_INVOICE: "E-Fatura",
-    E_DISPATCH: "E-Irsaliye",
-  };
-
-  const typeLabel = source.type ? (typeLabelMap[source.type] ?? source.type) : "Belge";
+  const typeLabel = formatSourceDocumentType(source.type) ?? "Belge";
   return source.number ? `${typeLabel} • ${source.number}` : typeLabel;
 }
 
@@ -595,10 +625,10 @@ function formatSourceDocumentMeta(source: {
   counterpartyName: string | null;
 }, locale: Locale, fallback: string) {
   const externalStatusLabelMap: Record<string, string> = {
-    NOT_SENT: "Dis sisteme gonderilmedi",
-    QUEUED: "Dis sistem kuyrugunda",
-    SENT: "Dis sisteme gonderildi",
-    FAILED: "Dis sistem hatasi",
+    NOT_SENT: "Dış sisteme gönderilmedi",
+    QUEUED: "Dış sistem kuyruğunda",
+    SENT: "Dış sisteme gönderildi",
+    FAILED: "Dış sistem hatası",
   };
 
   const parts = [
@@ -775,6 +805,7 @@ export function InventoryManager({
   result,
   transactionResult,
   warehouses,
+  suppliers,
   alertResult,
   stockCounts,
   reports,
@@ -818,7 +849,7 @@ export function InventoryManager({
   const [drawerNote, setDrawerNote] = useState("");
   const [drawerMovementQuantity, setDrawerMovementQuantity] = useState("1");
   const [drawerPurchaseDocumentNumber, setDrawerPurchaseDocumentNumber] = useState("");
-  const [drawerPurchaseSupplierName, setDrawerPurchaseSupplierName] = useState("");
+  const [drawerPurchaseSupplierId, setDrawerPurchaseSupplierId] = useState("");
   const [drawerPurchaseDocumentDate, setDrawerPurchaseDocumentDate] = useState("");
   const [drawerPurchaseDocumentType, setDrawerPurchaseDocumentType] = useState<"PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH">("PURCHASE_DOCUMENT");
   const [drawerPurchaseReference, setDrawerPurchaseReference] = useState("");
@@ -1672,7 +1703,7 @@ export function InventoryManager({
     setDrawerNote("");
     setDrawerMovementQuantity("1");
     setDrawerPurchaseDocumentNumber("");
-    setDrawerPurchaseSupplierName("");
+    setDrawerPurchaseSupplierId("");
     setDrawerPurchaseDocumentDate("");
     setDrawerPurchaseDocumentType("PURCHASE_DOCUMENT");
     setDrawerPurchaseReference("");
@@ -1702,7 +1733,7 @@ export function InventoryManager({
     setDrawerNote("");
     setDrawerMovementQuantity("1");
     setDrawerPurchaseDocumentNumber("");
-    setDrawerPurchaseSupplierName("");
+    setDrawerPurchaseSupplierId("");
     setDrawerPurchaseDocumentDate("");
     setDrawerPurchaseDocumentType("PURCHASE_DOCUMENT");
     setDrawerPurchaseReference("");
@@ -2102,7 +2133,7 @@ export function InventoryManager({
           targetOnHandStock,
           reorderPoint,
           safetyStock,
-          note: drawerNote.trim() || "Inventory manager manual adjustment",
+          note: drawerNote.trim() || "Stok yöneticisi manuel stok düzeltmesi",
         }),
       });
 
@@ -2149,7 +2180,7 @@ export function InventoryManager({
           fromWarehouseCode: drawerItem.warehouseCode,
           toWarehouseCode: drawerTransferWarehouseCode,
           quantity,
-          note: drawerTransferNote.trim() || "Inventory manager warehouse transfer",
+          note: drawerTransferNote.trim() || "Stok yöneticisi depo transferi",
         }),
       });
 
@@ -2196,12 +2227,12 @@ export function InventoryManager({
           sku: drawerItem.sku,
           warehouseCode: drawerItem.warehouseCode,
           quantity,
-          note: drawerNote.trim() || (mode === "stock_in" ? "Inventory manager stock in" : "Inventory manager stock out"),
+          note: drawerNote.trim() || (mode === "stock_in" ? "Stok yöneticisi stok girişi" : "Stok yöneticisi stok çıkışı"),
           ...(mode === "stock_in" && drawerPurchaseDocumentNumber.trim()
             ? {
                 documentType: drawerPurchaseDocumentType,
                 sourceDocumentNumber: drawerPurchaseDocumentNumber.trim(),
-                sourceDocumentSupplier: drawerPurchaseSupplierName.trim() || undefined,
+                sourceDocumentSupplierId: drawerPurchaseSupplierId || undefined,
                 sourceDocumentDate: drawerPurchaseDocumentDate ? new Date(drawerPurchaseDocumentDate).toISOString() : undefined,
                 sourceDocumentReference: drawerPurchaseReference.trim() || undefined,
                 externalSystemStatus: drawerPurchaseExternalStatus,
@@ -2860,6 +2891,7 @@ export function InventoryManager({
                 warehouses={warehouses}
                 transactionResult={transactionResult}
                 formatDate={formatDate}
+                formatInventoryNote={formatInventoryNote}
                 formatSourceDocument={formatSourceDocument}
                 formatSourceDocumentMeta={formatSourceDocumentMeta}
                 formatTransactionType={(type) => formatTransactionType(type, labels)}
@@ -2964,6 +2996,7 @@ export function InventoryManager({
               warehouses={warehouses}
               transactionResult={transactionResult}
               formatDate={formatDate}
+              formatInventoryNote={formatInventoryNote}
               formatSourceDocument={formatSourceDocument}
               formatSourceDocumentMeta={formatSourceDocumentMeta}
               formatTransactionType={(type) => formatTransactionType(type, labels)}
@@ -3176,97 +3209,100 @@ export function InventoryManager({
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Liste Filtreleri</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="submit" className="h-11 rounded-2xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800">
+              <Button type="submit">
                 {labels.search}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => router.push(`${overviewPath}/products`)}
-                className="h-11 rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+                variant="secondary"
               >
                 Filtreleri Temizle
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => void exportVisibleRowsCsv()}
                 aria-label={labels.exportCsv}
                 title={labels.exportCsv}
-                className="inline-flex h-11 items-center justify-center rounded-2xl border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+                variant="secondary"
               >
                 <Download className="mr-2 h-5 w-5" />
                 {labels.exportCsv}
-              </button>
+              </Button>
             </div>
           </div>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-[1.4fr_1fr_1fr]">
             <label className="grid gap-2">
               <span className="text-xs font-medium text-neutral-600">{labels.search}</span>
-              <input
+              <Input
                 type="search"
                 name="search"
                 defaultValue={query.search}
                 placeholder="Ürün adı, SKU veya barkod ara"
                 aria-label={labels.search}
-                className="h-11 w-full rounded-2xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
               />
             </label>
 
             <label className="grid gap-2">
               <span className="text-xs font-medium text-neutral-600">{labels.stockFilter}</span>
-              <select
-                name="stockStatusFilter"
-                defaultValue={query.stockStatusFilter}
-                className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-              >
-                <option value="all">{labels.all}</option>
-                <option value="in_stock">{labels.inStock}</option>
-                <option value="low_stock">{labels.lowStock}</option>
-                <option value="out_of_stock">{labels.outOfStock}</option>
-              </select>
+              <Select name="stockStatusFilter" defaultValue={query.stockStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder={labels.stockFilter} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{labels.all}</SelectItem>
+                  <SelectItem value="in_stock">{labels.inStock}</SelectItem>
+                  <SelectItem value="low_stock">{labels.lowStock}</SelectItem>
+                  <SelectItem value="out_of_stock">{labels.outOfStock}</SelectItem>
+                </SelectContent>
+              </Select>
             </label>
 
             <label className="grid gap-2">
               <span className="text-xs font-medium text-neutral-600">{labels.reservationFilter}</span>
-              <select
-                name="reservationFilter"
-                defaultValue={query.reservationFilter}
-                className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-              >
-                <option value="all">{labels.all}</option>
-                <option value="with_reserved">{labels.withReservations}</option>
-                <option value="without_reserved">{labels.withoutReservations}</option>
-              </select>
+              <Select name="reservationFilter" defaultValue={query.reservationFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder={labels.reservationFilter} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{labels.all}</SelectItem>
+                  <SelectItem value="with_reserved">{labels.withReservations}</SelectItem>
+                  <SelectItem value="without_reserved">{labels.withoutReservations}</SelectItem>
+                </SelectContent>
+              </Select>
             </label>
           </div>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             <label className="grid gap-2">
               <span className="text-xs font-medium text-neutral-600">{labels.warehouseFilter}</span>
-              <select
-                name="warehouseFilter"
-                defaultValue={query.warehouseFilter}
-                className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-              >
-                {warehouseOptions.map((warehouseCode) => (
-                  <option key={warehouseCode} value={warehouseCode}>
-                    {warehouseCode === "all" ? labels.allWarehouses : warehouseCode}
-                  </option>
-                ))}
-              </select>
+              <Select name="warehouseFilter" defaultValue={query.warehouseFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder={labels.warehouseFilter} />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouseOptions.map((warehouseCode) => (
+                    <SelectItem key={warehouseCode} value={warehouseCode}>
+                      {warehouseCode === "all" ? labels.allWarehouses : warehouseCode}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
 
             <label className="grid gap-2">
               <span className="text-xs font-medium text-neutral-600">{labels.movementTypeFilter}</span>
-              <select
-                name="movementTypeFilter"
-                defaultValue={query.movementTypeFilter}
-                className="h-11 rounded-2xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-              >
-                {movementTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+              <Select name="movementTypeFilter" defaultValue={query.movementTypeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder={labels.movementTypeFilter} />
+                </SelectTrigger>
+                <SelectContent>
+                  {movementTypeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
           </div>
 
@@ -3481,6 +3517,7 @@ export function InventoryManager({
                   drawerMovementTotalPages={drawerMovementTotalPages}
                   movementTypeOptions={movementTypeOptions}
                   formatDate={formatDate}
+                  formatInventoryNote={formatInventoryNote}
                   formatSourceDocument={formatSourceDocument}
                   movementTypeClass={movementTypeClass}
                   movementTypeLabel={(movementType, inventoryLabels) => movementTypeLabel(movementType, inventoryLabels as Labels)}
@@ -3499,6 +3536,7 @@ export function InventoryManager({
                 labels={labels}
                 locale={locale}
                 warehouses={warehouses}
+                suppliers={suppliers}
                 drawerMode={drawerMode}
                 pendingRowKey={pendingRowKey}
                 drawerTargetOnHand={drawerTargetOnHand}
@@ -3510,7 +3548,7 @@ export function InventoryManager({
                 drawerTransferQuantity={drawerTransferQuantity}
                 drawerTransferNote={drawerTransferNote}
                 drawerPurchaseDocumentNumber={drawerPurchaseDocumentNumber}
-                drawerPurchaseSupplierName={drawerPurchaseSupplierName}
+                drawerPurchaseSupplierId={drawerPurchaseSupplierId}
                 drawerPurchaseDocumentDate={drawerPurchaseDocumentDate || defaultDateTimeLocal}
                 drawerPurchaseDocumentType={drawerPurchaseDocumentType}
                 drawerPurchaseReference={drawerPurchaseReference}
@@ -3526,13 +3564,14 @@ export function InventoryManager({
                 setDrawerTransferQuantity={setDrawerTransferQuantity}
                 setDrawerTransferNote={setDrawerTransferNote}
                 setDrawerPurchaseDocumentNumber={setDrawerPurchaseDocumentNumber}
-                setDrawerPurchaseSupplierName={setDrawerPurchaseSupplierName}
+                setDrawerPurchaseSupplierId={setDrawerPurchaseSupplierId}
                 setDrawerPurchaseDocumentDate={setDrawerPurchaseDocumentDate}
                 setDrawerPurchaseDocumentType={setDrawerPurchaseDocumentType}
                 setDrawerPurchaseReference={setDrawerPurchaseReference}
                 setDrawerPurchaseExternalStatus={setDrawerPurchaseExternalStatus}
                 setDrawerPurchaseUnitCost={setDrawerPurchaseUnitCost}
                 formatDate={formatDate}
+                formatInventoryNote={formatInventoryNote}
                 formatSourceDocument={formatSourceDocument}
                 movementTypeClass={movementTypeClass}
                 movementTypeLabel={(movementType, inventoryLabels) => movementTypeLabel(movementType, inventoryLabels as Labels)}
@@ -3561,72 +3600,65 @@ export function InventoryManager({
                   {warehouseDrawerMode === "create" ? labels.createWarehouse : labels.editWarehouse}
                 </h3>
               </div>
-              <button type="button" onClick={closeWarehouseDrawer} className="rounded-full border border-neutral-200 p-2 text-neutral-600 transition hover:bg-neutral-100">
+              <Button type="button" onClick={closeWarehouseDrawer} variant="secondary" size="icon">
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
             <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
               <div>
                 <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.warehouseCode}</label>
-                <input
+                <Input
                   value={warehouseCode}
                   onChange={(event) => setWarehouseCode(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
                 />
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.warehouseName}</label>
-                <input
+                <Input
                   value={warehouseName}
                   onChange={(event) => setWarehouseName(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
                 />
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.warehouseDescription}</label>
-                <textarea
+                <Textarea
                   value={warehouseDescription}
                   onChange={(event) => setWarehouseDescription(event.target.value)}
                   rows={3}
-                  className="w-full rounded-xl border border-neutral-300 px-3 py-3 text-sm outline-none transition focus:border-neutral-500"
                 />
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.warehouseAddress}</label>
-                <textarea
+                <Textarea
                   value={warehouseAddress}
                   onChange={(event) => setWarehouseAddress(event.target.value)}
                   rows={3}
-                  className="w-full rounded-xl border border-neutral-300 px-3 py-3 text-sm outline-none transition focus:border-neutral-500"
                 />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.warehouseContactName}</label>
-                  <input
+                  <Input
                     value={warehouseContactName}
                     onChange={(event) => setWarehouseContactName(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
                   />
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.warehouseContactPhone}</label>
-                  <input
+                  <Input
                     value={warehouseContactPhone}
                     onChange={(event) => setWarehouseContactPhone(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
                   />
                 </div>
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.warehousePriority}</label>
-                <input
+                <Input
                   type="number"
                   min="0"
                   step="1"
                   value={warehousePriority}
                   onChange={(event) => setWarehousePriority(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
                 />
               </div>
               <label className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
@@ -3639,17 +3671,16 @@ export function InventoryManager({
               </label>
             </div>
             <div className="flex items-center justify-end gap-3 border-t border-neutral-200 px-5 py-4">
-              <button type="button" onClick={closeWarehouseDrawer} className="h-11 rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100">
+              <Button type="button" onClick={closeWarehouseDrawer} variant="secondary">
                 {labels.prev}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 disabled={pendingWarehouse}
                 onClick={saveWarehouse}
-                className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {labels.saveWarehouse}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -3675,44 +3706,42 @@ export function InventoryManager({
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.stockCountWarehouseScope}</label>
-                    <select
-                      value={stockCountWarehouseCode}
-                      onChange={(event) => setStockCountWarehouseCode(event.target.value)}
-                      className="h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-                    >
-                      <option value="all">{labels.allWarehouses}</option>
-                      {warehouses.filter((warehouse) => warehouse.isActive).map((warehouse) => (
-                        <option key={`count-create-${warehouse.id}`} value={warehouse.code}>
-                          {warehouse.code} - {warehouse.name}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={stockCountWarehouseCode} onValueChange={setStockCountWarehouseCode}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={labels.stockCountWarehouseScope} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{labels.allWarehouses}</SelectItem>
+                        {warehouses.filter((warehouse) => warehouse.isActive).map((warehouse) => (
+                          <SelectItem key={`count-create-${warehouse.id}`} value={warehouse.code}>
+                            {warehouse.code} - {warehouse.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.stockCountDate}</label>
-                    <input
+                    <Input
                       type="datetime-local"
                       value={stockCountDate || defaultDateTimeLocal}
                       onChange={(event) => setStockCountDate(event.target.value)}
-                      className="h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
                     />
                   </div>
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.stockCountSearch}</label>
-                  <input
+                  <Input
                     value={stockCountSearch}
                     onChange={(event) => setStockCountSearch(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
                   />
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-neutral-700">{labels.stockCountNote}</label>
-                  <textarea
+                  <Textarea
                     value={stockCountNote}
                     onChange={(event) => setStockCountNote(event.target.value)}
                     rows={4}
-                    className="w-full rounded-xl border border-neutral-300 px-3 py-3 text-sm outline-none transition focus:border-neutral-500"
                   />
                 </div>
               </div>

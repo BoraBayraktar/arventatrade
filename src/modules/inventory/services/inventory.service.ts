@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { redisCache } from "@/lib/redis";
+import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { identityAdminService } from "@/modules/identity/services/identity-admin.service";
 import { integrationService } from "@/modules/integration/services/integration.service";
 import type {
@@ -107,6 +108,7 @@ const recordInventoryMovementSchema = z.object({
   documentType: z.enum(["PURCHASE_DOCUMENT", "DELIVERY_NOTE", "E_INVOICE", "E_DISPATCH"]).optional(),
   sourceDocumentNumber: z.string().trim().min(1).max(120).optional(),
   sourceDocumentDate: z.string().datetime().optional(),
+  sourceDocumentSupplierId: z.string().trim().min(1).optional(),
   sourceDocumentSupplier: z.string().trim().min(2).max(160).optional(),
   sourceDocumentReference: z.string().trim().min(1).max(160).optional(),
   externalSystemStatus: z.enum(["NOT_SENT", "QUEUED", "SENT", "FAILED"]).optional(),
@@ -115,14 +117,14 @@ const recordInventoryMovementSchema = z.object({
   const wantsPurchaseDocument = Boolean(
     value.type === "PURCHASE_RECEIPT"
     && (value.documentType === undefined || value.documentType === "PURCHASE_DOCUMENT")
-    && (value.sourceDocumentNumber || value.sourceDocumentSupplier || value.sourceDocumentDate || value.sourceDocumentReference || value.unitCost !== undefined),
+    && (value.sourceDocumentNumber || value.sourceDocumentSupplierId || value.sourceDocumentSupplier || value.sourceDocumentDate || value.sourceDocumentReference || value.unitCost !== undefined),
   );
 
   if (!wantsPurchaseDocument) {
     return true;
   }
 
-  return Boolean(value.sourceDocumentNumber && value.sourceDocumentSupplier && value.sourceDocumentDate);
+  return Boolean(value.sourceDocumentNumber && (value.sourceDocumentSupplierId || value.sourceDocumentSupplier) && value.sourceDocumentDate);
 }, {
   message: "Satın alma belgesi için belge numarası, tedarikçi ve belge tarihi zorunludur.",
 });
@@ -2294,8 +2296,17 @@ export class InventoryService {
 
   async recordProductInventoryMovement(input: RecordProductInventoryMovementInput): Promise<void> {
     const parsed = recordInventoryMovementSchema.parse(input);
+    const resolvedSupplier = parsed.sourceDocumentSupplierId
+      ? await catalogAdminService.getSupplierById(parsed.sourceDocumentSupplierId)
+      : null;
+
+    if (parsed.sourceDocumentSupplierId && !resolvedSupplier) {
+      throw new Error("SUPPLIER_NOT_FOUND");
+    }
+
     await this.repository.recordProductInventoryMovement({
       ...parsed,
+      sourceDocumentSupplier: resolvedSupplier?.name ?? parsed.sourceDocumentSupplier,
       sourceDocumentDate: parsed.sourceDocumentDate ? new Date(parsed.sourceDocumentDate) : undefined,
     });
     const product = await this.repository.listActiveProductInventoryByIds([parsed.productId]);
@@ -2329,7 +2340,8 @@ export class InventoryService {
         quantity: parsed.quantity,
         documentType: parsed.documentType ?? null,
         sourceDocumentNumber: parsed.sourceDocumentNumber ?? null,
-        sourceDocumentSupplier: parsed.sourceDocumentSupplier ?? null,
+        sourceDocumentSupplierId: parsed.sourceDocumentSupplierId ?? null,
+        sourceDocumentSupplier: resolvedSupplier?.name ?? parsed.sourceDocumentSupplier ?? null,
         sourceDocumentReference: parsed.sourceDocumentReference ?? null,
         externalSystemStatus: parsed.externalSystemStatus ?? null,
       },

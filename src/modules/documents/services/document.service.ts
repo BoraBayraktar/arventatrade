@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
+import { customerAccountService } from "@/modules/customers/services/customer-account.service";
 import type {
   AdminBusinessDocumentDetail,
   AdminBusinessDocumentListItem,
@@ -41,7 +43,8 @@ const createSchema = z.object({
   externalReference: z.string().trim().max(160).optional().nullable(),
   externalSystemStatus: z.enum(["NOT_SENT", "QUEUED", "SENT", "FAILED"]).optional(),
   providerConfigId: z.string().trim().min(1).optional().nullable(),
-  counterpartyName: z.string().trim().max(160).optional().nullable(),
+  supplierId: z.string().trim().min(1).optional().nullable(),
+  customerAccountId: z.string().trim().min(1).optional().nullable(),
   counterpartyTaxNumber: z.string().trim().max(64).optional().nullable(),
   counterpartyTaxOffice: z.string().trim().max(120).optional().nullable(),
   counterpartyEmail: z.string().trim().email().max(160).optional().nullable(),
@@ -49,8 +52,32 @@ const createSchema = z.object({
   note: z.string().trim().max(500).optional().nullable(),
   orderNumber: z.string().trim().max(120).optional().nullable(),
   inventoryTransactionNumber: z.string().trim().max(120).optional().nullable(),
-}).refine((value) => Boolean(value.orderNumber || value.inventoryTransactionNumber), {
-  message: "Belgeyi bir siparişe veya stok işlemine bağlamalısınız.",
+}).superRefine((value, ctx) => {
+  if (!value.orderNumber && !value.inventoryTransactionNumber) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["orderNumber"],
+      message: "Belgeyi bir siparişe veya stok işlemine bağlamalısınız.",
+    });
+  }
+
+  const requiresSupplier = value.documentType === "PURCHASE_DOCUMENT" || value.documentType === "DELIVERY_NOTE";
+  if (requiresSupplier && !value.supplierId) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["supplierId"],
+      message: "Bu belge tipi için merkezi tedarikçi seçmelisiniz.",
+    });
+  }
+
+  const requiresCustomerAccount = value.documentType === "E_INVOICE" || value.documentType === "E_DISPATCH";
+  if (requiresCustomerAccount && !value.customerAccountId) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["customerAccountId"],
+      message: "Bu belge tipi için merkezi müşteri kartı seçmelisiniz.",
+    });
+  }
 });
 
 const updateSchema = z.object({
@@ -112,6 +139,8 @@ function mapDocument(item: Awaited<ReturnType<DocumentRepository["findBusinessDo
     externalSystemStatus: item.externalSystemStatus,
     providerConfigId: item.providerConfig?.id ?? null,
     providerDisplayName: item.providerConfig?.displayName ?? null,
+    supplierId: item.supplier?.id ?? null,
+    customerAccountId: item.customerAccount?.id ?? null,
     counterpartyName: item.counterpartyName,
     counterpartyTaxNumber: item.counterpartyTaxNumber,
     counterpartyTaxOffice: item.counterpartyTaxOffice,
@@ -125,7 +154,17 @@ function mapDocument(item: Awaited<ReturnType<DocumentRepository["findBusinessDo
     lineCount: item.lines.length,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
-    lines: item.lines.map((line) => ({
+    lines: item.lines.map((line: {
+      id: string;
+      productId: string | null;
+      productSku: string;
+      productName: string;
+      quantity: number;
+      unitPrice: { toNumber: () => number } | null;
+      lineTotal: { toNumber: () => number } | null;
+      currency: string;
+      note: string | null;
+    }) => ({
       id: line.id,
       productId: line.productId,
       productSku: line.productSku,
@@ -136,7 +175,18 @@ function mapDocument(item: Awaited<ReturnType<DocumentRepository["findBusinessDo
       currency: line.currency,
       note: line.note,
     })),
-    dispatches: item.dispatches.map((dispatch) => ({
+    dispatches: item.dispatches.map((dispatch: {
+      id: string;
+      integrationJobId: string | null;
+      channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+      providerKey: string;
+      status: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED";
+      externalReference: string | null;
+      errorMessage: string | null;
+      queuedAt: Date;
+      dispatchedAt: Date | null;
+      createdAt: Date;
+    }) => ({
       id: dispatch.id,
       integrationJobId: dispatch.integrationJobId ?? null,
       channel: dispatch.channel,
@@ -218,6 +268,8 @@ function mapDocumentListItem(item: Awaited<ReturnType<DocumentRepository["listBu
     externalSystemStatus: item.externalSystemStatus,
     providerConfigId: item.providerConfig?.id ?? null,
     providerDisplayName: item.providerConfig?.displayName ?? null,
+    supplierId: item.supplier?.id ?? null,
+    customerAccountId: item.customerAccount?.id ?? null,
     counterpartyName: item.counterpartyName,
     orderId: item.order?.id ?? null,
     orderNumber: item.order?.orderNumber ?? null,
@@ -288,17 +340,20 @@ export class DocumentService {
 
     const invoicedOrderIds = new Set(
       issuedInvoices
-        .map((item) => item.orderId)
-        .filter((item): item is string => Boolean(item)),
+        .map((item: { orderId: string | null }) => item.orderId)
+        .filter((item: string | null): item is string => Boolean(item)),
     );
     const invoicedTransactionIds = new Set(
       issuedInvoices
-        .map((item) => item.inventoryTransactionId)
-        .filter((item): item is string => Boolean(item)),
+        .map((item: { inventoryTransactionId: string | null }) => item.inventoryTransactionId)
+        .filter((item: string | null): item is string => Boolean(item)),
     );
 
     const pendingItems: AdminPendingInvoiceDeliveryNoteListItem[] = candidateNotes
-      .filter((item) => {
+      .filter((item: {
+        orderId: string | null;
+        inventoryTransactionId: string | null;
+      }) => {
         if (item.orderId && invoicedOrderIds.has(item.orderId)) {
           return false;
         }
@@ -309,7 +364,11 @@ export class DocumentService {
 
         return true;
       })
-      .map((item) => ({
+      .map((item: {
+        documentNumber: string;
+        order: { orderNumber: string } | null;
+        inventoryTransaction: { transactionNumber: string } | null;
+      }) => ({
         ...mapDocumentListItem(item),
         sourceLabel: item.order?.orderNumber ?? item.inventoryTransaction?.transactionNumber ?? item.documentNumber,
       }));
@@ -365,8 +424,15 @@ export class DocumentService {
 
   async createBusinessDocument(input: AdminCreateBusinessDocumentInput): Promise<AdminBusinessDocumentDetail> {
     const parsed = createSchema.parse(input);
+    const requiresSupplier = parsed.documentType === "PURCHASE_DOCUMENT" || parsed.documentType === "DELIVERY_NOTE";
     const orderSource = parsed.orderNumber ? await this.repository.findOrderDocumentSource(parsed.orderNumber) : null;
     const transactionSource = parsed.inventoryTransactionNumber ? await this.repository.findInventoryTransactionDocumentSource(parsed.inventoryTransactionNumber) : null;
+    const selectedSupplier = requiresSupplier && parsed.supplierId
+      ? (await catalogAdminService.listSuppliers()).find((item) => item.id === parsed.supplierId) ?? null
+      : null;
+    const selectedCustomerAccount = !requiresSupplier && parsed.customerAccountId
+      ? await customerAccountService.getCustomerAccountById(parsed.customerAccountId)
+      : null;
 
     if (parsed.orderNumber && !orderSource) {
       throw new DocumentAdminError("Bağlanacak sipariş bulunamadı.", 404);
@@ -381,6 +447,14 @@ export class DocumentService {
       if (!provider || !provider.isActive) {
         throw new DocumentAdminError("Seçilen belge sağlayıcısı bulunamadı veya aktif değil.", 404);
       }
+    }
+
+    if (requiresSupplier && !selectedSupplier) {
+      throw new DocumentAdminError("Seçilen tedarikçi bulunamadı.", 404);
+    }
+
+    if (!requiresSupplier && !selectedCustomerAccount) {
+      throw new DocumentAdminError("Seçilen müşteri kartı bulunamadı.", 404);
     }
 
     const resolvedLines = orderSource
@@ -411,7 +485,12 @@ export class DocumentService {
       resolvedOrderId: orderSource?.id ?? null,
       resolvedInventoryTransactionId: transactionSource?.id ?? null,
       resolvedProviderConfigId: parsed.providerConfigId ?? null,
-      resolvedCounterpartyName: parsed.counterpartyName?.trim() || transactionSource?.counterpartyName || "Belirtilmedi",
+      resolvedSupplierId: selectedSupplier?.id ?? null,
+      resolvedCustomerAccountId: selectedCustomerAccount?.id ?? null,
+      resolvedCounterpartyName: (selectedSupplier?.name ?? selectedCustomerAccount?.name ?? transactionSource?.counterpartyName) || "Belirtilmedi",
+      resolvedCounterpartyTaxNumber: selectedSupplier?.taxNumber ?? selectedCustomerAccount?.taxNumber ?? parsed.counterpartyTaxNumber ?? null,
+      resolvedCounterpartyEmail: selectedSupplier?.email ?? selectedCustomerAccount?.email ?? parsed.counterpartyEmail ?? null,
+      resolvedCounterpartyAddress: selectedCustomerAccount?.address ?? parsed.counterpartyAddress ?? null,
       resolvedCurrency: parsed.currency ?? orderSource?.currency ?? "TRY",
       resolvedTotalAmount: parsed.totalAmount ?? orderSource?.total.toNumber() ?? null,
       resolvedLines,

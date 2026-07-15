@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
 
@@ -57,7 +58,7 @@ export async function loadInventoryRouteContext(
     notFound();
   }
 
-  const [result, transactionResult, warehouses] = await Promise.all([
+  const [result, transactionResult, warehouses, suppliers] = await Promise.all([
     inventoryService.listInventoryOverview({
       search: searchParams.search,
       stockStatusFilter:
@@ -109,6 +110,7 @@ export async function loadInventoryRouteContext(
       pageSize: 8,
     }),
     inventoryService.listWarehouses(),
+    catalogAdminService.listSuppliers(),
   ]);
 
   const [alertResult, stockCounts, reports] = await Promise.all([
@@ -224,6 +226,7 @@ export async function loadInventoryRouteContext(
     result,
     transactionResult,
     warehouses,
+    suppliers,
     alertResult,
     stockCounts,
     reports,

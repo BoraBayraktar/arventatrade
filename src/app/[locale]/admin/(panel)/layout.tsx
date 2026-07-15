@@ -32,14 +32,34 @@ export default async function AdminPanelLayout({
   const adminMenuItems: MenuItem[] =
     user.role === "ADMIN"
       ? [
-          { href: `/${locale}/admin/customers`, label: dictionary.admin.customerManager },
-          { href: `/${locale}/admin/users`, label: dictionary.admin.userManager },
-          { href: `/${locale}/admin/audit-logs`, label: dictionary.admin.auditLogMenu },
+          {
+            href: `/${locale}/admin/users`,
+            label: dictionary.admin.userManagerGroup,
+            children: [
+              { href: `/${locale}/admin/customers`, label: dictionary.admin.customerManager },
+              { href: `/${locale}/admin/users`, label: dictionary.admin.userManager },
+              { href: `/${locale}/admin/audit-logs`, label: dictionary.admin.auditLogMenu },
+            ],
+          },
         ]
       : [];
 
   const menuItems: MenuItem[] = [
-    { href: `/${locale}/admin/products`, label: dictionary.admin.productManager },
+    {
+      href: `/${locale}/admin/products`,
+      label: dictionary.admin.productManager,
+      children: [
+        { href: `/${locale}/admin/products`, label: "Ürünler" },
+        { href: `/${locale}/admin/product-questions`, label: dictionary.admin.questionManager },
+        { href: `/${locale}/admin/categories`, label: dictionary.admin.categoryManager },
+        { href: `/${locale}/admin/storefront`, label: dictionary.admin.storefrontManager },
+        { href: `/${locale}/admin/product-attributes`, label: dictionary.admin.productAttributesTitle },
+        { href: `/${locale}/admin/orders`, label: dictionary.admin.orderManager },
+        { href: `/${locale}/admin/brands`, label: dictionary.admin.brandsTitle },
+        { href: `/${locale}/admin/suppliers`, label: dictionary.admin.suppliersTitle },
+        { href: `/${locale}/admin/customer-accounts`, label: dictionary.admin.customerAccountsTitle },
+      ],
+    },
     {
       href: `/${locale}/admin/inventory`,
       label: dictionary.admin.inventoryManager,
@@ -51,13 +71,8 @@ export default async function AdminPanelLayout({
         { href: `/${locale}/admin/inventory/counts`, label: dictionary.admin.inventoryStockCountTitle },
         { href: `/${locale}/admin/inventory/warehouses`, label: dictionary.admin.inventoryWarehousesTitle },
         { href: `/${locale}/admin/inventory/exports`, label: "Dışa Aktarım Geçmişi" },
-        { href: `/${locale}/admin/inventory/external-events`, label: "Harici Stok Eventleri" },
       ],
     },
-    { href: `/${locale}/admin/product-questions`, label: dictionary.admin.questionManager },
-    { href: `/${locale}/admin/categories`, label: dictionary.admin.categoryManager },
-    { href: `/${locale}/admin/storefront`, label: dictionary.admin.storefrontManager },
-    { href: `/${locale}/admin/orders`, label: dictionary.admin.orderManager },
     {
       href: `/${locale}/admin/documents`,
       label: dictionary.admin.documentManager,
@@ -81,7 +96,14 @@ export default async function AdminPanelLayout({
         { href: `/${locale}/admin/finance/reports`, label: dictionary.admin.financeMenuReports },
       ],
     },
-    { href: `/${locale}/admin/integrations`, label: dictionary.admin.integrationManager },
+    {
+      href: `/${locale}/admin/integrations`,
+      label: dictionary.admin.integrationManager,
+      children: [
+        { href: `/${locale}/admin/integrations`, label: dictionary.admin.integrationManager },
+        { href: `/${locale}/admin/inventory/external-events`, label: "Harici Stok Eventleri" },
+      ],
+    },
     ...adminMenuItems,
   ];
 

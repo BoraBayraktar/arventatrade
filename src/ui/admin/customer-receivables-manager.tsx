@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { AdminReceivablesResult } from "@/modules/finance/contracts/receivables.contract";
 
 type Labels = {
@@ -88,17 +91,16 @@ export function CustomerReceivablesManager({
           <p className="text-sm text-neutral-600">{labels.description}</p>
         </div>
         <form action={`/${locale}/admin/finance/receivables`} className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <input
+          <Input
             type="search"
             name="search"
             defaultValue={initialSearch}
             placeholder={labels.search}
-            className="h-11 w-full rounded-2xl border border-neutral-300 bg-white px-4 text-sm"
           />
           <input type="hidden" name="paymentStatus" value={initialPaymentStatus === "all" ? "" : initialPaymentStatus} />
-          <button type="submit" className="h-11 rounded-2xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700">
+          <Button type="submit" variant="secondary">
             {labels.search}
-          </button>
+          </Button>
         </form>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href={buildStatusHref(locale, "all", initialSearch)} className={`rounded-full px-3 py-2 text-sm ${initialPaymentStatus === "all" ? "bg-neutral-950 text-white" : "bg-neutral-100 text-neutral-700"}`}>{labels.allStatuses}</Link>
@@ -138,9 +140,9 @@ export function CustomerReceivablesManager({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-lg font-semibold text-neutral-950">{item.orderNumber}</h2>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${resolveStatusBadge(item.paymentStatus)}`}>
+                  <Badge className={resolveStatusBadge(item.paymentStatus)}>
                     {item.paymentStatus}
-                  </span>
+                  </Badge>
                 </div>
                 <div className="mt-3 grid gap-2 text-sm text-neutral-700 md:grid-cols-2 xl:grid-cols-3">
                   <p>{labels.counterparty}: {item.counterpartyName}</p>

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
@@ -263,55 +267,54 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
 
       <div className="border-b border-neutral-200 bg-white/95 p-5">
         <form className="grid gap-3 lg:grid-cols-[1.4fr_220px_220px_180px_180px_auto]">
-          <input
+          <Input
             type="search"
             name="search"
             defaultValue={query.search ?? ""}
             placeholder="Kayıt, ürün, kullanıcı veya özet ara"
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
           />
-          <select
-            name="entityType"
-            defaultValue={query.entityType ?? "all"}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          >
-            <option value="all">Tüm varlıklar</option>
-            <option value="PRODUCT">Ürün</option>
-            <option value="USER">Kullanıcı</option>
-            <option value="CATEGORY">Kategori</option>
-            <option value="ORDER">Sipariş</option>
-            <option value="WAREHOUSE">Depo</option>
-            <option value="STOREFRONT_ITEM">Mağaza İçeriği</option>
-            <option value="AUTH">Oturum</option>
-          </select>
-          <select
-            name="action"
-            defaultValue={query.action ?? "all"}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
-          >
-            <option value="all">Tüm aksiyonlar</option>
-            <option value="CREATE">Oluşturma</option>
-            <option value="UPDATE">Güncelleme</option>
-            <option value="DELETE">Silme</option>
-            <option value="STATUS_UPDATE">Durum Güncelleme</option>
-            <option value="LOGIN">Giriş</option>
-            <option value="LOGOUT">Çıkış</option>
-          </select>
-          <input
+          <Select name="entityType" defaultValue={query.entityType ?? "all"}>
+            <SelectTrigger>
+              <SelectValue placeholder="Tüm varlıklar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tüm varlıklar</SelectItem>
+              <SelectItem value="PRODUCT">Ürün</SelectItem>
+              <SelectItem value="USER">Kullanıcı</SelectItem>
+              <SelectItem value="CATEGORY">Kategori</SelectItem>
+              <SelectItem value="ORDER">Sipariş</SelectItem>
+              <SelectItem value="WAREHOUSE">Depo</SelectItem>
+              <SelectItem value="STOREFRONT_ITEM">Mağaza İçeriği</SelectItem>
+              <SelectItem value="AUTH">Oturum</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select name="action" defaultValue={query.action ?? "all"}>
+            <SelectTrigger>
+              <SelectValue placeholder="Tüm aksiyonlar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tüm aksiyonlar</SelectItem>
+              <SelectItem value="CREATE">Oluşturma</SelectItem>
+              <SelectItem value="UPDATE">Güncelleme</SelectItem>
+              <SelectItem value="DELETE">Silme</SelectItem>
+              <SelectItem value="STATUS_UPDATE">Durum Güncelleme</SelectItem>
+              <SelectItem value="LOGIN">Giriş</SelectItem>
+              <SelectItem value="LOGOUT">Çıkış</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
             type="date"
             name="startDate"
             defaultValue={query.startDate ?? ""}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
           />
-          <input
+          <Input
             type="date"
             name="endDate"
             defaultValue={query.endDate ?? ""}
-            className="h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-neutral-500"
           />
-          <button type="submit" className="h-11 rounded-xl border border-neutral-300 bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800">
+          <Button type="submit">
             Filtrele
-          </button>
+          </Button>
         </form>
       </div>
 
@@ -327,12 +330,12 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${getEntityBadgeClass(item.entityType)}`}>
+                      <Badge className={getEntityBadgeClass(item.entityType)}>
                         {getEntityTypeLabel(item.entityType)}
-                      </span>
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${getActionBadgeClass(item.action)}`}>
+                      </Badge>
+                      <Badge className={getActionBadgeClass(item.action)}>
                         {getActionLabel(item.action)}
-                      </span>
+                      </Badge>
                     </div>
                     <h3 className="mt-3 text-base font-semibold text-neutral-950">{item.entityLabel}</h3>
                     <p className="mt-2 text-sm leading-6 text-neutral-600">

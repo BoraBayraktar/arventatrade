@@ -49,7 +49,7 @@ export class DocumentRepository {
     externalReference?: string | null;
     providerConfigId: string;
   }) {
-    return prisma.businessDocument.findFirst({
+    return (prisma.businessDocument as any).findFirst({
       where: {
         deleted: false,
         providerConfigId: args.providerConfigId,
@@ -59,6 +59,8 @@ export class DocumentRepository {
         ],
       },
       include: {
+        supplier: { select: { id: true } },
+        customerAccount: { select: { id: true } },
         order: { select: { id: true, orderNumber: true } },
         inventoryTransaction: { select: { id: true, transactionNumber: true } },
         providerConfig: { select: { id: true, displayName: true } },
@@ -143,7 +145,7 @@ export class DocumentRepository {
   }
 
   async listBusinessDocuments(args: Required<Pick<AdminBusinessDocumentListQuery, "page" | "pageSize">> & Pick<AdminBusinessDocumentListQuery, "search" | "documentType" | "status">) {
-    return prisma.businessDocument.findMany({
+    return (prisma.businessDocument as any).findMany({
       where: {
         deleted: false,
         ...(args.documentType && args.documentType !== "all" ? { documentType: args.documentType } : {}),
@@ -164,6 +166,8 @@ export class DocumentRepository {
       skip: (args.page - 1) * args.pageSize,
       take: args.pageSize,
       include: {
+        supplier: { select: { id: true } },
+        customerAccount: { select: { id: true } },
         order: { select: { id: true, orderNumber: true } },
         inventoryTransaction: { select: { id: true, transactionNumber: true } },
         providerConfig: { select: { id: true, displayName: true } },
@@ -173,7 +177,7 @@ export class DocumentRepository {
   }
 
   async countBusinessDocuments(args: Pick<AdminBusinessDocumentListQuery, "search" | "documentType" | "status">) {
-    return prisma.businessDocument.count({
+    return (prisma.businessDocument as any).count({
       where: {
         deleted: false,
         ...(args.documentType && args.documentType !== "all" ? { documentType: args.documentType } : {}),
@@ -194,7 +198,7 @@ export class DocumentRepository {
   }
 
   async listPendingInvoiceCandidateDeliveryNotes(search?: string) {
-    return prisma.businessDocument.findMany({
+    return (prisma.businessDocument as any).findMany({
       where: {
         deleted: false,
         documentType: "DELIVERY_NOTE",
@@ -213,6 +217,8 @@ export class DocumentRepository {
       },
       orderBy: [{ issueDate: "desc" }, { createdAt: "desc" }],
       include: {
+        supplier: { select: { id: true } },
+        customerAccount: { select: { id: true } },
         order: { select: { id: true, orderNumber: true } },
         inventoryTransaction: { select: { id: true, transactionNumber: true } },
         providerConfig: { select: { id: true, displayName: true } },
@@ -222,7 +228,7 @@ export class DocumentRepository {
   }
 
   async listIssuedInvoiceDocuments() {
-    return prisma.businessDocument.findMany({
+    return (prisma.businessDocument as any).findMany({
       where: {
         deleted: false,
         documentType: "E_INVOICE",
@@ -258,6 +264,8 @@ export class DocumentRepository {
       },
       orderBy: [{ counterpartyName: "asc" }, { issueDate: "desc" }],
       include: {
+        supplier: { select: { id: true } },
+        customerAccount: { select: { id: true } },
         order: { select: { id: true, orderNumber: true } },
         inventoryTransaction: { select: { id: true, transactionNumber: true } },
         providerConfig: { select: { id: true, displayName: true } },
@@ -267,7 +275,7 @@ export class DocumentRepository {
   }
 
   async findBusinessDocumentById(id: string) {
-    return prisma.businessDocument.findFirst({
+    return (prisma.businessDocument as any).findFirst({
       where: { id, deleted: false },
       include: {
         order: { select: { id: true, orderNumber: true } },
@@ -287,7 +295,7 @@ export class DocumentRepository {
       return null;
     }
 
-    return prisma.businessDocument.findFirst({
+    return (prisma.businessDocument as any).findFirst({
       where: {
         deleted: false,
         documentType: "E_INVOICE",
@@ -308,7 +316,7 @@ export class DocumentRepository {
   }
 
   async findDispatchableBusinessDocumentById(id: string) {
-    return prisma.businessDocument.findFirst({
+    return (prisma.businessDocument as any).findFirst({
       where: { id, deleted: false },
       select: {
         id: true,
@@ -415,7 +423,12 @@ export class DocumentRepository {
     resolvedOrderId?: string | null;
     resolvedInventoryTransactionId?: string | null;
     resolvedProviderConfigId?: string | null;
+    resolvedSupplierId?: string | null;
+    resolvedCustomerAccountId?: string | null;
     resolvedCounterpartyName: string;
+    resolvedCounterpartyTaxNumber?: string | null;
+    resolvedCounterpartyEmail?: string | null;
+    resolvedCounterpartyAddress?: string | null;
     resolvedCurrency: string;
     resolvedTotalAmount?: number | null;
     resolvedLines: Array<{
@@ -429,7 +442,7 @@ export class DocumentRepository {
       note?: string | null;
     }>;
   }) {
-    return prisma.businessDocument.create({
+    return (prisma.businessDocument as any).create({
       data: {
         documentNumber: args.input.documentNumber,
         documentType: args.input.documentType,
@@ -440,11 +453,13 @@ export class DocumentRepository {
         externalReference: args.input.externalReference ?? null,
         externalSystemStatus: args.input.externalSystemStatus ?? "NOT_SENT",
         providerConfigId: args.resolvedProviderConfigId ?? null,
+        supplierId: args.resolvedSupplierId ?? null,
+        customerAccountId: args.resolvedCustomerAccountId ?? null,
         counterpartyName: args.resolvedCounterpartyName,
-        counterpartyTaxNumber: args.input.counterpartyTaxNumber ?? null,
+        counterpartyTaxNumber: args.resolvedCounterpartyTaxNumber ?? null,
         counterpartyTaxOffice: args.input.counterpartyTaxOffice ?? null,
-        counterpartyEmail: args.input.counterpartyEmail ?? null,
-        counterpartyAddress: args.input.counterpartyAddress ?? null,
+        counterpartyEmail: args.resolvedCounterpartyEmail ?? null,
+        counterpartyAddress: args.resolvedCounterpartyAddress ?? null,
         note: args.input.note ?? null,
         orderId: args.resolvedOrderId ?? null,
         inventoryTransactionId: args.resolvedInventoryTransactionId ?? null,
@@ -462,6 +477,8 @@ export class DocumentRepository {
         },
       },
       include: {
+        supplier: { select: { id: true } },
+        customerAccount: { select: { id: true } },
         order: { select: { id: true, orderNumber: true } },
         inventoryTransaction: { select: { id: true, transactionNumber: true } },
         providerConfig: { select: { id: true, displayName: true } },
@@ -483,7 +500,7 @@ export class DocumentRepository {
       return null;
     }
 
-    return prisma.businessDocument.create({
+    return (prisma.businessDocument as any).create({
       data: {
         documentNumber: args.documentNumber,
         documentType: args.documentType,
@@ -494,6 +511,8 @@ export class DocumentRepository {
         externalReference: sourceDocument.externalReference,
         externalSystemStatus: "NOT_SENT",
         providerConfigId: sourceDocument.providerConfigId,
+        supplierId: sourceDocument.supplierId,
+        customerAccountId: sourceDocument.customerAccountId,
         counterpartyName: sourceDocument.counterpartyName,
         counterpartyTaxNumber: sourceDocument.counterpartyTaxNumber,
         counterpartyTaxOffice: sourceDocument.counterpartyTaxOffice,
@@ -503,7 +522,16 @@ export class DocumentRepository {
         orderId: sourceDocument.orderId,
         inventoryTransactionId: sourceDocument.inventoryTransactionId,
         lines: {
-          create: sourceDocument.lines.map((line) => ({
+          create: sourceDocument.lines.map((line: {
+            productId: string | null;
+            productSku: string;
+            productName: string;
+            quantity: number;
+            unitPrice: Prisma.Decimal | null;
+            lineTotal: Prisma.Decimal | null;
+            currency: string;
+            note: string | null;
+          }) => ({
             productId: line.productId,
             productSku: line.productSku,
             productName: line.productName,
@@ -516,6 +544,8 @@ export class DocumentRepository {
         },
       },
       include: {
+        supplier: { select: { id: true } },
+        customerAccount: { select: { id: true } },
         order: { select: { id: true, orderNumber: true } },
         inventoryTransaction: { select: { id: true, transactionNumber: true } },
         providerConfig: { select: { id: true, displayName: true } },
@@ -533,7 +563,7 @@ export class DocumentRepository {
     providerConfigId?: string | null;
     note?: string | null;
   }) {
-    return prisma.businessDocument.update({
+    return (prisma.businessDocument as any).update({
       where: { id: args.id },
       data: {
         ...(args.status !== undefined ? { status: args.status } : {}),
@@ -543,6 +573,8 @@ export class DocumentRepository {
         ...(args.note !== undefined ? { note: args.note } : {}),
       },
       include: {
+        supplier: { select: { id: true } },
+        customerAccount: { select: { id: true } },
         order: { select: { id: true, orderNumber: true } },
         inventoryTransaction: { select: { id: true, transactionNumber: true } },
         providerConfig: { select: { id: true, displayName: true } },
@@ -559,7 +591,7 @@ export class DocumentRepository {
     providerKey: string;
     requestPayload?: Prisma.InputJsonValue | null;
   }) {
-    return prisma.businessDocument.update({
+    return (prisma.businessDocument as any).update({
       where: { id: args.id },
       data: {
         externalSystemStatus: "QUEUED",
@@ -605,7 +637,7 @@ export class DocumentRepository {
       },
     });
 
-    return prisma.businessDocument.update({
+    return (prisma.businessDocument as any).update({
       where: { id: args.id },
       data: {
         externalSystemStatus: "SENT",
@@ -655,7 +687,7 @@ export class DocumentRepository {
       });
     }
 
-    return prisma.businessDocument.update({
+    return (prisma.businessDocument as any).update({
       where: { id: args.id },
       data: {
         externalSystemStatus: "FAILED",

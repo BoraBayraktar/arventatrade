@@ -56,8 +56,32 @@ model Supplier {
   deletedUserId   String?
   paymentRecords  PaymentRecord[]
   primaryProducts Product[]
+  businessDocuments BusinessDocument[]
 
   @@index([deleted, isActive])
+  @@index([taxNumber])
+}
+
+model CustomerAccount {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  email         String?
+  phone         String?
+  taxNumber     String?
+  address       String?
+  note          String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deleted       Boolean  @default(false)
+  deletedDate   DateTime?
+  deletedUserId String?
+  orders        Order[]
+  businessDocuments BusinessDocument[]
+
+  @@index([deleted, isActive])
+  @@index([email])
   @@index([taxNumber])
 }
 
@@ -290,6 +314,7 @@ model Order {
   deleted              Boolean                     @default(false)
   deletedDate          DateTime?
   deletedUserId        String?
+  customerAccountId    String?
   discountTotal        Decimal                     @default(0) @db.Decimal(10, 2)
   paymentStatus        PaymentStatus               @default(PENDING)
   promotionCode        String?
@@ -301,11 +326,13 @@ model Order {
   stockReservations    StockReservation[]
   statusHistory        OrderStatusHistory[]
   businessDocuments    BusinessDocument[]
+  customerAccount      CustomerAccount?            @relation(fields: [customerAccountId], references: [id])
 
   @@index([deleted])
   @@index([createdAt])
   @@index([paymentStatus])
   @@index([status])
+  @@index([customerAccountId])
 }
 
 model OrderItem {
@@ -438,6 +465,8 @@ model BusinessDocument {
   counterpartyEmail     String?
   counterpartyAddress   String?
   note                  String?
+  supplierId            String?
+  customerAccountId     String?
   orderId               String?
   inventoryTransactionId String?
   createdAt             DateTime                     @default(now())
@@ -447,6 +476,8 @@ model BusinessDocument {
   deletedUserId         String?
   dispatches            BusinessDocumentDispatch[]
   lines                 BusinessDocumentLine[]
+  supplier              Supplier?                    @relation(fields: [supplierId], references: [id])
+  customerAccount       CustomerAccount?             @relation(fields: [customerAccountId], references: [id])
   order                 Order?                       @relation(fields: [orderId], references: [id])
   inventoryTransaction  InventoryTransaction?        @relation(fields: [inventoryTransactionId], references: [id])
   providerConfig        DocumentProviderConfig?      @relation(fields: [providerConfigId], references: [id])
@@ -454,6 +485,8 @@ model BusinessDocument {
   @@index([documentType, issueDate])
   @@index([status, issueDate])
   @@index([providerConfigId])
+  @@index([supplierId])
+  @@index([customerAccountId])
   @@index([orderId])
   @@index([inventoryTransactionId])
   @@index([deleted, issueDate])

@@ -29,6 +29,7 @@ function hasRequiredDelegates(client: PrismaClient | undefined): client is Prism
     integrationSyncJob?: unknown;
     collectionRecord?: unknown;
     paymentRecord?: unknown;
+    customerAccount?: unknown;
   };
 
   return (
@@ -44,12 +45,45 @@ function hasRequiredDelegates(client: PrismaClient | undefined): client is Prism
     && typeof delegateCheck.integrationSyncJob !== "undefined"
     && typeof delegateCheck.collectionRecord !== "undefined"
     && typeof delegateCheck.paymentRecord !== "undefined"
+    && typeof delegateCheck.customerAccount !== "undefined"
   );
 }
 
-export const prisma =
-  hasRequiredDelegates(global.prismaClient) ? global.prismaClient : createPrismaClient();
+function resolvePrismaClient() {
+  if (hasRequiredDelegates(global.prismaClient)) {
+    return global.prismaClient;
+  }
+
+  const nextClient = createPrismaClient();
+  if (process.env.NODE_ENV !== "production") {
+    global.prismaClient = nextClient;
+  }
+
+  return nextClient;
+}
+
+const prismaClient = resolvePrismaClient();
+
+export const prisma = new Proxy(prismaClient, {
+  get(target, prop, receiver) {
+    const value = Reflect.get(target, prop, receiver);
+    if (typeof value !== "undefined") {
+      return value;
+    }
+
+    if (typeof prop !== "string" || prop.startsWith("$")) {
+      return value;
+    }
+
+    const refreshedClient = createPrismaClient();
+    if (process.env.NODE_ENV !== "production") {
+      global.prismaClient = refreshedClient;
+    }
+
+    return Reflect.get(refreshedClient, prop, refreshedClient);
+  },
+});
 
 if (process.env.NODE_ENV !== "production") {
-  global.prismaClient = prisma;
+  global.prismaClient = prismaClient;
 }

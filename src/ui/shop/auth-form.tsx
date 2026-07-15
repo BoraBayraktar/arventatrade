@@ -59,6 +59,8 @@ const heroIcon = {
   register: Sparkles,
 } as const;
 
+const checkboxClassName = "h-4 w-4 rounded border-neutral-300 text-neutral-950 focus:ring-2 focus:ring-neutral-300";
+
 export function AuthForm({
   locale,
   mode,
@@ -193,11 +195,11 @@ export function AuthForm({
                     <span>{labels.socialGoogle}</span>
                   </Link>
                 ) : (
-                  <button type="button" className={styles.socialButton} disabled>
+                  <Button type="button" variant="ghost" className={styles.socialButton} disabled>
                     <GoogleIcon className="h-4 w-4" />
                     <span>{labels.socialGoogle}</span>
                     <small>{labels.socialComingSoon}</small>
-                  </button>
+                  </Button>
                 )}
                 {socialAppleHref ? (
                   <Link href={socialAppleHref} className={styles.socialButton}>
@@ -205,11 +207,11 @@ export function AuthForm({
                     <span>{labels.socialApple}</span>
                   </Link>
                 ) : (
-                  <button type="button" className={styles.socialButton} disabled>
+                  <Button type="button" variant="ghost" className={styles.socialButton} disabled>
                     <AppleIcon className="h-4 w-4" />
                     <span>{labels.socialApple}</span>
                     <small>{labels.socialComingSoon}</small>
-                  </button>
+                  </Button>
                 )}
                 {socialFacebookHref ? (
                   <Link href={socialFacebookHref} className={styles.socialButton}>
@@ -217,11 +219,11 @@ export function AuthForm({
                     <span>{labels.socialFacebook}</span>
                   </Link>
                 ) : (
-                  <button type="button" className={styles.socialButton} disabled>
+                  <Button type="button" variant="ghost" className={styles.socialButton} disabled>
                     <FacebookIcon className="h-4 w-4" />
                     <span>{labels.socialFacebook}</span>
                     <small>{labels.socialComingSoon}</small>
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -274,6 +276,7 @@ export function AuthForm({
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(event) => setRememberMe(event.target.checked)}
+                  className={checkboxClassName}
                 />
                 <span>{labels.rememberMe}</span>
               </label>
@@ -299,14 +302,16 @@ export function AuthForm({
                   required
                   className={styles.authInputWithButton}
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   className={styles.visibilityToggle}
                   onClick={() => setShowPassword((current) => !current)}
                   aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+                </Button>
               </div>
             </div>
 

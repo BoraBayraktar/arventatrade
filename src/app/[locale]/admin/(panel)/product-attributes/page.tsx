@@ -1,0 +1,59 @@
+import { notFound } from "next/navigation";
+
+import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
+import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { AttributeDefinitionManager } from "@/ui/admin/attribute-definition-manager";
+
+export default async function AdminProductAttributesPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  const user = await getCurrentUserFromContext();
+  if (!user) {
+    notFound();
+  }
+
+  const dictionary = getDictionary(locale as Locale);
+  const items = await catalogAdminService.listAttributeDefinitions();
+
+  return (
+    <AttributeDefinitionManager
+      items={items}
+      labels={{
+        title: dictionary.admin.productAttributesTitle,
+        description: dictionary.admin.productAttributesDescription,
+        createTitle: dictionary.admin.productAttributesCreateTitle,
+        empty: dictionary.admin.productAttributesEmpty,
+        slug: dictionary.admin.slug,
+        attributeName: dictionary.admin.attributeName,
+        attributeDisplayType: dictionary.admin.attributeDisplayType,
+        attributeDisplayText: dictionary.admin.attributeDisplayText,
+        attributeDisplayColor: dictionary.admin.attributeDisplayColor,
+        attributeDisplayNumber: dictionary.admin.attributeDisplayNumber,
+        variantAxisUsageCount: dictionary.admin.variantAxisUsageCount,
+        page: dictionary.admin.page,
+        create: dictionary.admin.create,
+        save: dictionary.admin.save,
+        edit: dictionary.admin.edit,
+        delete: dictionary.admin.delete,
+        cancel: dictionary.admin.cancel,
+        saving: dictionary.common.loading,
+        search: dictionary.admin.search,
+        importCsv: dictionary.admin.importCsv,
+        exportCsv: dictionary.admin.exportCsv,
+        status: dictionary.admin.status,
+        statusActive: dictionary.admin.productStatusActive,
+        statusArchived: dictionary.admin.productStatusArchived,
+        selectedCount: dictionary.admin.selectedCount,
+      }}
+    />
+  );
+}

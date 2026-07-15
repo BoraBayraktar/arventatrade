@@ -10,7 +10,7 @@ type ListOperationalReceivablesArgs = {
 
 export class FinanceRepository {
   async listOperationalReceivables(args: ListOperationalReceivablesArgs) {
-    return prisma.order.findMany({
+    return (prisma.order as any).findMany({
       where: {
         deleted: false,
         status: "CONFIRMED",
@@ -27,6 +27,13 @@ export class FinanceRepository {
           : {}),
       },
       include: {
+        customerAccount: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         items: {
           where: {
             deleted: false,
@@ -227,6 +234,22 @@ export class FinanceRepository {
       },
     });
   }
+
+  async listSuppliers() {
+    return prisma.supplier.findMany({
+      where: {
+        deleted: false,
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+  }
+
 }
 
 export const financeRepository = new FinanceRepository();
