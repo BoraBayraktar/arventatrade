@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { AUTH_COOKIE_NAME, AUTH_TOKEN_TTL_SECONDS } from "@/lib/auth";
-import { logError, logInfo } from "@/lib/observability";
 import { identityService } from "@/modules/identity/services/identity.service";
 
 export async function GET(request: Request) {
@@ -20,12 +19,6 @@ export async function GET(request: Request) {
   const parsedState = rawState ? JSON.parse(rawState) as { state: string; redirectTo: string } : null;
 
   if (!state || !code || !parsedState || parsedState.state !== state) {
-    logError("Google OAuth callback state validation failed", {
-      scope: "identity.oauth.google",
-      hasState: Boolean(state),
-      hasCode: Boolean(code),
-      hasParsedState: Boolean(parsedState),
-    });
     return NextResponse.redirect(new URL("/?oauth=failed", request.url));
   }
 
@@ -44,18 +37,11 @@ export async function GET(request: Request) {
   });
 
   if (!tokenResponse.ok) {
-    logError("Google OAuth token exchange failed", {
-      scope: "identity.oauth.google",
-      status: tokenResponse.status,
-    });
     return NextResponse.redirect(new URL("/?oauth=failed", request.url));
   }
 
   const tokenPayload = await tokenResponse.json() as { id_token?: string };
   if (!tokenPayload.id_token) {
-    logError("Google OAuth token payload did not include id_token", {
-      scope: "identity.oauth.google",
-    });
     return NextResponse.redirect(new URL("/?oauth=failed", request.url));
   }
 
@@ -70,13 +56,6 @@ export async function GET(request: Request) {
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: AUTH_TOKEN_TTL_SECONDS,
-  });
-  logInfo("Google OAuth login completed", {
-    scope: "identity.oauth.google",
-    userId: result.user.id,
-    redirectUrl: redirectUrl.toString(),
-    appUrl: config.appUrl,
-    requestOrigin: new URL(request.url).origin,
   });
   response.cookies.set({
     name: "oauth_google_state",
