@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { logError } from "@/lib/observability";
 import { catalogService } from "@/modules/catalog/services/catalog.service";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
@@ -35,7 +36,7 @@ export default async function AdminProductsPage({
   }
 
   const query = await searchParams;
-  const [productResult, categories, warehouses, brands, suppliers, attributeDefinitions] = await Promise.all([
+  const adminProductRequests = await Promise.allSettled([
     catalogAdminService.listProducts({
       search: query.search,
       categoryId: query.categoryId,
@@ -51,6 +52,39 @@ export default async function AdminProductsPage({
     catalogAdminService.listSuppliers(),
     catalogAdminService.listAttributeDefinitions(),
   ]);
+
+  const adminProductRequestLabels = [
+    "catalogAdminService.listProducts",
+    "catalogService.listCategories",
+    "inventoryService.listWarehouses",
+    "catalogAdminService.listBrands",
+    "catalogAdminService.listSuppliers",
+    "catalogAdminService.listAttributeDefinitions",
+  ] as const;
+
+  const failedRequestIndex = adminProductRequests.findIndex((result) => result.status === "rejected");
+  if (failedRequestIndex >= 0) {
+    const failedRequest = adminProductRequests[failedRequestIndex];
+    logError("Admin products page data load failed", {
+      scope: "admin.products",
+      failedRequest: adminProductRequestLabels[failedRequestIndex],
+      error: failedRequest.status === "rejected" ? String(failedRequest.reason) : undefined,
+    });
+    throw failedRequest.status === "rejected"
+      ? failedRequest.reason
+      : new Error("Admin products page request result was unexpectedly fulfilled");
+  }
+
+  const productResult = adminProductRequests[0].status === "fulfilled" ? adminProductRequests[0].value : null;
+  const categories = adminProductRequests[1].status === "fulfilled" ? adminProductRequests[1].value : [];
+  const warehouses = adminProductRequests[2].status === "fulfilled" ? adminProductRequests[2].value : [];
+  const brands = adminProductRequests[3].status === "fulfilled" ? adminProductRequests[3].value : [];
+  const suppliers = adminProductRequests[4].status === "fulfilled" ? adminProductRequests[4].value : [];
+  const attributeDefinitions = adminProductRequests[5].status === "fulfilled" ? adminProductRequests[5].value : [];
+
+  if (!productResult) {
+    throw new Error("Admin products page product list was not loaded");
+  }
 
   return (
     <ProductManager
