@@ -6,6 +6,11 @@ import { useState, useTransition } from "react";
 
 import type { AdminCollectionsResult } from "@/modules/finance/contracts/collections.contract";
 
+type AccountOption = {
+  id: string;
+  label: string;
+};
+
 type Labels = {
   title: string;
   description: string;
@@ -17,6 +22,11 @@ type Labels = {
   recordedCount: string;
   counterparty: string;
   paymentStatus: string;
+  financeStatus: string;
+  financeStatusPending: string;
+  financeStatusPartial: string;
+  financeStatusCompleted: string;
+  financeStatusFailed: string;
   orderDate: string;
   amount: string;
   remainingAmount: string;
@@ -27,11 +37,14 @@ type Labels = {
   creatingRecord: string;
   createRecordSuccess: string;
   createRecordFailed: string;
+  account: string;
+  accountRequired: string;
   noResults: string;
 };
 
 type Props = {
   result: AdminCollectionsResult;
+  accountOptions: AccountOption[];
   labels: Labels;
 };
 
@@ -50,13 +63,49 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-export function CollectionReadinessManager({ result, labels }: Props) {
+function getFinanceStatus(item: AdminCollectionsResult["items"][number], labels: Labels) {
+  if (item.remainingAmount <= 0) {
+    return {
+      label: labels.financeStatusCompleted,
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    };
+  }
+
+  if (item.paymentStatus === "FAILED") {
+    return {
+      label: labels.financeStatusFailed,
+      className: "border-rose-200 bg-rose-50 text-rose-700",
+    };
+  }
+
+  if (item.recordedCollectionCount > 0) {
+    return {
+      label: labels.financeStatusPartial,
+      className: "border-blue-200 bg-blue-50 text-blue-700",
+    };
+  }
+
+  return {
+    label: labels.financeStatusPending,
+    className: "border-amber-200 bg-amber-50 text-amber-700",
+  };
+}
+
+export function CollectionReadinessManager({ result, accountOptions, labels }: Props) {
   const router = useRouter();
   const [busyOrderId, setBusyOrderId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
 
   function createCollectionRecord(orderId: string, amount: number) {
+    const financialAccountId = selectedAccountIds[orderId] ?? accountOptions[0]?.id ?? "";
+
+    if (!financialAccountId) {
+      setMessage(labels.accountRequired);
+      return;
+    }
+
     setBusyOrderId(orderId);
     setMessage(null);
 
@@ -69,6 +118,7 @@ export function CollectionReadinessManager({ result, labels }: Props) {
           },
           body: JSON.stringify({
             orderId,
+            financialAccountId,
             amount,
             collectedAt: new Date().toISOString(),
           }),
@@ -141,12 +191,23 @@ export function CollectionReadinessManager({ result, labels }: Props) {
           </article>
         ) : result.items.map((item) => (
           <article key={item.orderId} className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+            {(() => {
+              const financeStatus = getFinanceStatus(item, labels);
+
+              return (
+                <>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-semibold text-neutral-950">{item.orderNumber}</h2>
                 <div className="mt-3 grid gap-2 text-sm text-neutral-700 md:grid-cols-2 xl:grid-cols-4">
                   <p>{labels.counterparty}: {item.counterpartyName}</p>
                   <p>{labels.paymentStatus}: {item.paymentStatus}</p>
+                  <p>
+                    {labels.financeStatus}:{" "}
+                    <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${financeStatus.className}`}>
+                      {financeStatus.label}
+                    </span>
+                  </p>
                   <p>{labels.orderDate}: {formatDate(item.createdAt)}</p>
                   <p>{labels.amount}: {formatMoney(item.totalAmount, item.currency)}</p>
                   <p>{labels.remainingAmount}: {formatMoney(item.remainingAmount, item.currency)}</p>
@@ -154,6 +215,16 @@ export function CollectionReadinessManager({ result, labels }: Props) {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
+                <select
+                  value={selectedAccountIds[item.orderId] ?? accountOptions[0]?.id ?? ""}
+                  onChange={(event) => setSelectedAccountIds((current) => ({ ...current, [item.orderId]: event.target.value }))}
+                  className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700"
+                >
+                  {accountOptions.length === 0 ? <option value="">{labels.account}</option> : null}
+                  {accountOptions.map((option) => (
+                    <option key={option.id} value={option.id}>{option.label}</option>
+                  ))}
+                </select>
                 <button
                   type="button"
                   disabled={item.remainingAmount <= 0 || busyOrderId === item.orderId || isPending}
@@ -170,6 +241,9 @@ export function CollectionReadinessManager({ result, labels }: Props) {
                 </Link>
               </div>
             </div>
+                </>
+              );
+            })()}
           </article>
         ))}
       </section>

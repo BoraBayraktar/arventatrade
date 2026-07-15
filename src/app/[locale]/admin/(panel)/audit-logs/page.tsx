@@ -30,6 +30,8 @@ function getEntityBadgeClass(entityType: string) {
       return "bg-sky-100 text-sky-700";
     case "CATEGORY":
       return "bg-violet-100 text-violet-700";
+    case "CUSTOMER_ACCOUNT":
+      return "bg-teal-100 text-teal-700";
     case "ORDER":
       return "bg-amber-100 text-amber-700";
     case "WAREHOUSE":
@@ -49,6 +51,8 @@ function getEntityTypeLabel(entityType: string) {
       return "Kullanıcı";
     case "CATEGORY":
       return "Kategori";
+    case "CUSTOMER_ACCOUNT":
+      return "Cari Müşteri Kartı";
     case "ORDER":
       return "Sipariş";
     case "WAREHOUSE":
@@ -178,6 +182,7 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
     entityType:
       query.entityType === "USER" ||
       query.entityType === "PRODUCT" ||
+      query.entityType === "CUSTOMER_ACCOUNT" ||
       query.entityType === "CATEGORY" ||
       query.entityType === "ORDER" ||
       query.entityType === "WAREHOUSE" ||
@@ -281,6 +286,7 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
               <SelectItem value="all">Tüm varlıklar</SelectItem>
               <SelectItem value="PRODUCT">Ürün</SelectItem>
               <SelectItem value="USER">Kullanıcı</SelectItem>
+              <SelectItem value="CUSTOMER_ACCOUNT">Cari Müşteri Kartı</SelectItem>
               <SelectItem value="CATEGORY">Kategori</SelectItem>
               <SelectItem value="ORDER">Sipariş</SelectItem>
               <SelectItem value="WAREHOUSE">Depo</SelectItem>

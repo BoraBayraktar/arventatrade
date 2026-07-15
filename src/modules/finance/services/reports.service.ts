@@ -5,7 +5,9 @@ import type {
   AdminFinanceReportsOverview,
 } from "@/modules/finance/contracts/reports.contract";
 import { accountsService } from "@/modules/finance/services/accounts.service";
+import { cashTransactionsService } from "@/modules/finance/services/cash-transactions.service";
 import { collectionsService } from "@/modules/finance/services/collections.service";
+import { financialAccountsService } from "@/modules/finance/services/financial-accounts.service";
 import { payablesService } from "@/modules/finance/services/payables.service";
 import { paymentsService } from "@/modules/finance/services/payments.service";
 import { receivablesService } from "@/modules/finance/services/receivables.service";
@@ -49,14 +51,17 @@ function resolveTone(value: number): "neutral" | "success" | "warning" {
 
 export class ReportsService {
   async getOverview(locale: string): Promise<AdminFinanceReportsOverview> {
-    const [accounts, payables, receivables] = await Promise.all([
+    const [accounts, payables, receivables, financialAccounts, transactions] = await Promise.all([
       accountsService.listAccountEntries(locale),
       payablesService.listSupplierPayables(),
       receivablesService.getReceivablesSummary(),
+      financialAccountsService.listAccounts(),
+      cashTransactionsService.listTransactions(),
     ]);
 
     const totalPayables = payables.reduce((sum, item) => sum + item.totalAmount, 0);
     const netOperationalBalance = receivables.totalOpenAmount - totalPayables;
+    const cashPositionGap = financialAccounts.summary.totalBalance - transactions.summary.netAmount;
 
     return {
       metrics: [
@@ -69,27 +74,28 @@ export class ReportsService {
           hint: "Açık alacak ve borç farkı",
         },
         {
-          label: "Toplam açık alacak",
-          value: receivables.totalOpenAmount,
-          currency: receivables.currency,
+          label: "Kasa ve banka bakiyesi",
+          value: financialAccounts.summary.totalBalance,
+          currency: financialAccounts.summary.currency,
           tone: "success",
-          href: `/${locale}/admin/finance/receivables`,
-          hint: `${receivables.pendingCount + receivables.authorizedCount + receivables.failedCount} açık kayıt`,
+          href: `/${locale}/admin/finance/bank-cash`,
+          hint: `${financialAccounts.summary.activeAccountCount} aktif hesap`,
         },
         {
-          label: "Toplam açık borç",
-          value: totalPayables,
-          currency: payables[0]?.currency ?? "TRY",
-          tone: "warning",
-          href: `/${locale}/admin/finance/payables`,
-          hint: `${payables.length} tedarikçi özeti`,
+          label: "Kayıtlı net nakit",
+          value: transactions.summary.netAmount,
+          currency: transactions.summary.currency,
+          tone: resolveTone(transactions.summary.netAmount),
+          href: `/${locale}/admin/finance/transactions`,
+          hint: `${transactions.summary.transactionCount} finans hareketi`,
         },
         {
-          label: "Cari hareket adedi",
-          value: accounts.items.length,
-          tone: "neutral",
-          href: `/${locale}/admin/finance/accounts`,
-          hint: "Birleşik operasyonel hareket listesi",
+          label: "Nakit pozisyon farkı",
+          value: cashPositionGap,
+          currency: financialAccounts.summary.currency,
+          tone: resolveTone(cashPositionGap),
+          href: `/${locale}/admin/finance/reports/cashflow`,
+          hint: "Hesap bakiyesi eksi kayıtlı net nakit",
         },
       ],
       cards: [
@@ -183,13 +189,39 @@ export class ReportsService {
   }
 
   async getCashflowReport(locale: string): Promise<AdminFinanceReportDetail> {
-    const [collections, payments] = await Promise.all([
+    const [collections, payments, financialAccounts, transactions] = await Promise.all([
       collectionsService.listCollectionReadiness(locale),
       paymentsService.listPaymentReadiness(locale),
+      financialAccountsService.listAccounts(),
+      cashTransactionsService.listTransactions(),
     ]);
 
     const netExpected = collections.summary.totalPendingAmount - payments.summary.totalPendingAmount;
     const netRecorded = collections.summary.totalRecordedAmount - payments.summary.totalRecordedAmount;
+    const actualCashBalance = financialAccounts.summary.totalBalance;
+    const cashCoverageGap = actualCashBalance - netRecorded;
+
+    const accountRows: AdminFinanceReportDetailRow[] = financialAccounts.items.map((account) => {
+      const accountTransactions = transactions.items.filter((item) => item.accountId === account.id);
+      const incoming = accountTransactions
+        .filter((item) => item.direction === "IN" || item.direction === "TRANSFER")
+        .reduce((sum, item) => sum + item.amount, 0);
+      const outgoing = accountTransactions
+        .filter((item) => item.direction === "OUT")
+        .reduce((sum, item) => sum + item.amount, 0);
+
+      return {
+        id: account.id,
+        label: account.name,
+        supportingText: `${account.type === "CASH" ? "Kasa" : "Banka"} · ${account.transactionCount} hareket`,
+        primaryValue: account.currentBalance,
+        primaryCurrency: account.currency,
+        secondaryValue: Number((incoming - outgoing).toFixed(2)),
+        secondaryCurrency: account.currency,
+        tone: resolveTone(account.currentBalance),
+        href: `/${locale}/admin/finance/bank-cash`,
+      };
+    });
 
     return {
       title: "Nakit akış özeti",
@@ -210,11 +242,18 @@ export class ReportsService {
           hint: "Tahsilat eksi ödeme kaydı",
         },
         {
-          label: "Açık fark",
-          value: netExpected - netRecorded,
-          currency: collections.summary.currency,
-          tone: resolveTone(netExpected - netRecorded),
-          hint: "Beklenen ile kaydedilen arasındaki fark",
+          label: "Gerçek hesap bakiyesi",
+          value: actualCashBalance,
+          currency: financialAccounts.summary.currency,
+          tone: resolveTone(actualCashBalance),
+          hint: `${financialAccounts.summary.activeAccountCount} aktif finans hesabı`,
+        },
+        {
+          label: "Kasa uyum farkı",
+          value: cashCoverageGap,
+          currency: financialAccounts.summary.currency,
+          tone: resolveTone(cashCoverageGap),
+          hint: "Gerçek bakiye ile kayıtlı net nakit farkı",
         },
       ],
       rows: [
@@ -254,6 +293,7 @@ export class ReportsService {
           href: `/${locale}/admin/finance/payments`,
           tone: "warning",
         },
+        ...accountRows,
       ],
     };
   }

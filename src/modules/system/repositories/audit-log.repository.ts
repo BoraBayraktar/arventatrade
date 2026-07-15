@@ -215,4 +215,23 @@ export class AuditLogRepository {
       },
     });
   }
+
+  async findCustomerAccountsByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return (prisma.customerAccount as any).findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+  }
 }

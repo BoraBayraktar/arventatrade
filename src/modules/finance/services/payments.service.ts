@@ -6,10 +6,12 @@ import type {
   AdminPaymentsResult,
 } from "@/modules/finance/contracts/payments.contract";
 import { financeRepository } from "@/modules/finance/repositories/finance.repository";
+import { cashTransactionsService } from "@/modules/finance/services/cash-transactions.service";
 import { payablesService } from "@/modules/finance/services/payables.service";
 
 const createPaymentRecordSchema = z.object({
   supplierId: z.string().trim().min(1),
+  financialAccountId: z.string().trim().min(1),
   amount: z.coerce.number().positive(),
   paidAt: z.string().datetime(),
   note: z.string().trim().max(500).optional().nullable(),
@@ -20,6 +22,7 @@ function mapPaymentRecord(item: Awaited<ReturnType<typeof financeRepository.list
   return {
     id: item.id,
     supplierId: item.supplierId,
+    financialAccountId: (item as { financialAccountId?: string | null }).financialAccountId ?? null,
     amount: item.amount.toNumber(),
     currency: item.currency,
     status: item.status,
@@ -112,12 +115,31 @@ export class PaymentsService {
       throw new Error("Ödeme tutarı kalan borç tutarını aşamaz.");
     }
 
+    const financialAccount = await financeRepository.findFinancialAccountById(parsed.financialAccountId);
+
+    if (!financialAccount || !financialAccount.isActive) {
+      throw new Error("Ödeme için geçerli bir finans hesabı seçin.");
+    }
+
     const created = await financeRepository.createPaymentRecord({
       supplierId: parsed.supplierId,
+      financialAccountId: parsed.financialAccountId,
       amount: parsed.amount,
       currency: payable.currency,
       paidAt: new Date(parsed.paidAt),
       note: parsed.note ?? null,
+      recordedByUserId: parsed.recordedByUserId,
+    });
+
+    await cashTransactionsService.createTransaction({
+      accountId: parsed.financialAccountId,
+      direction: "OUT",
+      sourceType: "PAYMENT",
+      amount: parsed.amount,
+      transactionAt: parsed.paidAt,
+      title: `Ödeme • ${payable.supplierName}`,
+      note: parsed.note ?? `Tedarikçi ödemesi • ${payable.supplierName}`,
+      counterpartyName: payable.supplierName,
       recordedByUserId: parsed.recordedByUserId,
     });
 

@@ -30,6 +30,7 @@ export type AdminPaymentsResult = {
 export type AdminPaymentRecordItem = {
   id: string;
   supplierId: string;
+  financialAccountId: string | null;
   amount: number;
   currency: string;
   status: "RECORDED" | "CANCELLED";
@@ -41,6 +42,7 @@ export type AdminPaymentRecordItem = {
 
 export type AdminCreatePaymentRecordInput = {
   supplierId: string;
+  financialAccountId: string;
   amount: number;
   paidAt: string;
   note?: string | null;

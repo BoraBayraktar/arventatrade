@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
+import { MoreHorizontal, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AdminFinanceAccountsResult, AdminFinanceAccountEntryType } from "@/modules/finance/contracts/accounts.contract";
 
@@ -24,7 +27,9 @@ type Labels = {
   amount: string;
   openFinanceRoute: string;
   openSource: string;
+  openDetail: string;
   noResults: string;
+  cancel: string;
 };
 
 type Props = {
@@ -62,83 +67,191 @@ function buildTypeHref(locale: string, type: "all" | AdminFinanceAccountEntryTyp
   return query ? `/${locale}/admin/finance/accounts?${query}` : `/${locale}/admin/finance/accounts`;
 }
 
+function formatStatusLabel(value: string) {
+  if (value === "PENDING") {
+    return "Bekleyen ödeme";
+  }
+
+  if (value === "AUTHORIZED") {
+    return "Provizyonlu";
+  }
+
+  if (value === "FAILED") {
+    return "Başarısız ödeme";
+  }
+
+  return value;
+}
+
 export function FinanceAccountsManager({ locale, result, initialSearch, initialType, labels }: Props) {
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+
+  const selectedItem = useMemo(
+    () => result.items.find((item) => item.id === selectedEntryId) ?? null,
+    [result.items, selectedEntryId],
+  );
+
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold text-neutral-950">{labels.title}</h1>
-          <p className="text-sm text-neutral-600">{labels.description}</p>
+    <section className="rounded-2xl border border-neutral-200 bg-white">
+      <div className="flex flex-col gap-4 border-b border-neutral-200 p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.title}</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-950">{labels.title}</h2>
+          <p className="mt-1 text-sm text-neutral-500">{labels.description}</p>
         </div>
-        <form action={`/${locale}/admin/finance/accounts`} className="mt-4">
+      </div>
+
+      <div className="p-5">
+        <form action={`/${locale}/admin/finance/accounts`} className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
           <Input
             type="search"
             name="search"
             defaultValue={initialSearch}
             placeholder={labels.search}
           />
+          <Button type="submit" variant="secondary">
+            {labels.search}
+          </Button>
         </form>
+
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link href={buildTypeHref(locale, "all", initialSearch)} className={`rounded-full px-3 py-2 text-sm ${initialType === "all" ? "bg-neutral-950 text-white" : "bg-neutral-100 text-neutral-700"}`}>{labels.allTypes}</Link>
-          <Link href={buildTypeHref(locale, "RECEIVABLE", initialSearch)} className={`rounded-full px-3 py-2 text-sm ${initialType === "RECEIVABLE" ? "bg-neutral-950 text-white" : "bg-neutral-100 text-neutral-700"}`}>{labels.receivable}</Link>
-          <Link href={buildTypeHref(locale, "PAYABLE", initialSearch)} className={`rounded-full px-3 py-2 text-sm ${initialType === "PAYABLE" ? "bg-neutral-950 text-white" : "bg-neutral-100 text-neutral-700"}`}>{labels.payable}</Link>
+          <Link href={buildTypeHref(locale, "all", initialSearch)} className={`rounded-full px-3 py-2 text-sm font-medium no-underline transition-colors ${initialType === "all" ? "bg-neutral-950 !text-white hover:!text-white" : "bg-neutral-100 text-neutral-700 hover:text-neutral-950"}`}>{labels.allTypes}</Link>
+          <Link href={buildTypeHref(locale, "RECEIVABLE", initialSearch)} className={`rounded-full px-3 py-2 text-sm font-medium no-underline transition-colors ${initialType === "RECEIVABLE" ? "bg-neutral-950 !text-white hover:!text-white" : "bg-neutral-100 text-neutral-700 hover:text-neutral-950"}`}>{labels.receivable}</Link>
+          <Link href={buildTypeHref(locale, "PAYABLE", initialSearch)} className={`rounded-full px-3 py-2 text-sm font-medium no-underline transition-colors ${initialType === "PAYABLE" ? "bg-neutral-950 !text-white hover:!text-white" : "bg-neutral-100 text-neutral-700 hover:text-neutral-950"}`}>{labels.payable}</Link>
         </div>
-      </section>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">{labels.totalReceivableAmount}</p>
-          <p className="mt-3 text-2xl font-semibold text-emerald-950">{formatMoney(result.summary.totalReceivableAmount, result.summary.currency)}</p>
-        </article>
-        <article className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">{labels.totalPayableAmount}</p>
-          <p className="mt-3 text-2xl font-semibold text-amber-950">{formatMoney(result.summary.totalPayableAmount, result.summary.currency)}</p>
-        </article>
-        <article className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.receivableCount}</p>
-          <p className="mt-3 text-2xl font-semibold text-neutral-950">{result.summary.receivableCount}</p>
-        </article>
-        <article className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.payableCount}</p>
-          <p className="mt-3 text-2xl font-semibold text-neutral-950">{result.summary.payableCount}</p>
-        </article>
-      </section>
-
-      <section className="grid gap-3">
-        {result.items.length === 0 ? (
-          <article className="rounded-3xl border border-dashed border-neutral-300 bg-white p-6 text-sm text-neutral-500 shadow-sm">
-            {labels.noResults}
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">{labels.totalReceivableAmount}</p>
+            <p className="mt-3 text-2xl font-semibold text-emerald-950">{formatMoney(result.summary.totalReceivableAmount, result.summary.currency)}</p>
           </article>
-        ) : result.items.map((item) => (
-          <article key={item.id} className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className={item.type === "RECEIVABLE" ? "border-emerald-200 bg-emerald-100 text-emerald-700" : "border-amber-200 bg-amber-100 text-amber-700"}>
-                    {item.type === "RECEIVABLE" ? labels.receivable : labels.payable}
-                  </Badge>
-                  <h2 className="text-lg font-semibold text-neutral-950">{item.counterpartyName}</h2>
-                </div>
-                <div className="mt-3 grid gap-2 text-sm text-neutral-700 md:grid-cols-2 xl:grid-cols-5">
-                  <p>{labels.sourceNumber}: {item.sourceNumber}</p>
-                  <p>{labels.sourceDate}: {formatDate(item.sourceDate)}</p>
-                  <p>{labels.status}: {item.statusLabel}</p>
-                  <p>{labels.amount}: {formatMoney(item.totalAmount, item.currency)}</p>
-                  <p>{labels.counterparty}: {item.counterpartyName}</p>
-                </div>
+          <article className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">{labels.totalPayableAmount}</p>
+            <p className="mt-3 text-2xl font-semibold text-amber-950">{formatMoney(result.summary.totalPayableAmount, result.summary.currency)}</p>
+          </article>
+          <article className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.receivableCount}</p>
+            <p className="mt-3 text-2xl font-semibold text-neutral-950">{result.summary.receivableCount}</p>
+          </article>
+          <article className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.payableCount}</p>
+            <p className="mt-3 text-2xl font-semibold text-neutral-950">{result.summary.payableCount}</p>
+          </article>
+        </div>
+
+        <div className="mt-5 overflow-visible rounded-xl border border-neutral-200">
+          <div className="hidden grid-cols-[130px_1.2fr_1fr_180px_180px_88px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+            <span>{labels.status}</span>
+            <span>{labels.counterparty}</span>
+            <span>{labels.sourceNumber}</span>
+            <span>{labels.sourceDate}</span>
+            <span>{labels.amount}</span>
+            <span className="text-right">İşlem</span>
+          </div>
+
+          {result.items.length === 0 ? (
+            <p className="p-6 text-sm text-neutral-500">{labels.noResults}</p>
+          ) : (
+            <div className="divide-y divide-neutral-200">
+              {result.items.map((item) => (
+                <article key={item.id} className="grid gap-4 p-4 lg:grid-cols-[130px_1.2fr_1fr_180px_180px_88px] lg:items-center">
+                  <div>
+                    <Badge className={item.type === "RECEIVABLE" ? "border-emerald-200 bg-emerald-100 text-emerald-700" : "border-amber-200 bg-amber-100 text-amber-700"}>
+                      {item.type === "RECEIVABLE" ? labels.receivable : labels.payable}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-950">{item.counterpartyName}</p>
+                    <p className="mt-1 text-sm text-neutral-500">{labels.status}: {formatStatusLabel(item.statusLabel)}</p>
+                  </div>
+                  <p className="text-sm text-neutral-500">{item.sourceNumber}</p>
+                  <p className="text-sm text-neutral-500">{formatDate(item.sourceDate)}</p>
+                  <p className="text-sm font-medium text-neutral-950">{formatMoney(item.totalAmount, item.currency)}</p>
+                  <div className="relative flex justify-start lg:justify-end">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary"
+                      onClick={() => setOpenActionMenuId((current) => current === item.id ? null : item.id)}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                    {openActionMenuId === item.id ? (
+                      <div className="absolute bottom-11 right-0 z-10 min-w-44 rounded-xl border border-neutral-200 bg-white p-2 shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedEntryId(item.id);
+                            setOpenActionMenuId(null);
+                          }}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
+                        >
+                          {labels.openDetail}
+                        </button>
+                        <Link
+                          href={item.detailHref}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
+                          onClick={() => setOpenActionMenuId(null)}
+                        >
+                          {labels.openFinanceRoute}
+                        </Link>
+                        <Link
+                          href={item.sourceHref}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
+                          onClick={() => setOpenActionMenuId(null)}
+                        >
+                          {labels.openSource}
+                        </Link>
+                      </div>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {selectedItem ? (
+        <div className="fixed inset-0 z-50">
+          <button type="button" aria-label={labels.cancel} className="absolute inset-0 bg-black/30" onClick={() => setSelectedEntryId(null)} />
+          <aside className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-neutral-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-neutral-200 p-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.title}</p>
+                <h3 className="mt-1 text-xl font-semibold tracking-tight">{selectedItem.counterpartyName}</h3>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Link href={item.detailHref} className="inline-flex h-10 items-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700">
+              <Button type="button" size="icon" variant="ghost" onClick={() => setSelectedEntryId(null)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="grid gap-4 p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className={selectedItem.type === "RECEIVABLE" ? "border-emerald-200 bg-emerald-100 text-emerald-700" : "border-amber-200 bg-amber-100 text-amber-700"}>
+                  {selectedItem.type === "RECEIVABLE" ? labels.receivable : labels.payable}
+                </Badge>
+              </div>
+              <div className="grid gap-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+                <p className="text-sm text-neutral-700">{labels.counterparty}: <span className="font-medium text-neutral-950">{selectedItem.counterpartyName}</span></p>
+                <p className="text-sm text-neutral-700">{labels.sourceNumber}: <span className="font-medium text-neutral-950">{selectedItem.sourceNumber}</span></p>
+                <p className="text-sm text-neutral-700">{labels.sourceDate}: <span className="font-medium text-neutral-950">{formatDate(selectedItem.sourceDate)}</span></p>
+                <p className="text-sm text-neutral-700">{labels.status}: <span className="font-medium text-neutral-950">{formatStatusLabel(selectedItem.statusLabel)}</span></p>
+                <p className="text-sm text-neutral-700">{labels.amount}: <span className="font-medium text-neutral-950">{formatMoney(selectedItem.totalAmount, selectedItem.currency)}</span></p>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Link href={selectedItem.detailHref} className="inline-flex h-10 items-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700">
                   {labels.openFinanceRoute}
                 </Link>
-                <Link href={item.sourceHref} className="inline-flex h-10 items-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700">
+                <Link href={selectedItem.sourceHref} className="inline-flex h-10 items-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700">
                   {labels.openSource}
                 </Link>
               </div>
             </div>
-          </article>
-        ))}
-      </section>
-    </div>
+          </aside>
+        </div>
+      ) : null}
+    </section>
   );
 }

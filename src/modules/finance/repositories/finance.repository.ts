@@ -149,6 +149,7 @@ export class FinanceRepository {
 
   async createCollectionRecord(args: {
     orderId: string;
+    financialAccountId?: string | null;
     amount: number;
     currency: string;
     collectedAt: Date;
@@ -158,12 +159,13 @@ export class FinanceRepository {
     return prisma.collectionRecord.create({
       data: {
         orderId: args.orderId,
+        financialAccountId: args.financialAccountId ?? null,
         amount: args.amount,
         currency: args.currency,
         collectedAt: args.collectedAt,
         note: args.note ?? null,
         recordedByUserId: args.recordedByUserId,
-      },
+      } as any,
     });
   }
 
@@ -191,6 +193,7 @@ export class FinanceRepository {
 
   async createPaymentRecord(args: {
     supplierId: string;
+    financialAccountId?: string | null;
     amount: number;
     currency: string;
     paidAt: Date;
@@ -200,12 +203,13 @@ export class FinanceRepository {
     return prisma.paymentRecord.create({
       data: {
         supplierId: args.supplierId,
+        financialAccountId: args.financialAccountId ?? null,
         amount: args.amount,
         currency: args.currency,
         paidAt: args.paidAt,
         note: args.note ?? null,
         recordedByUserId: args.recordedByUserId,
-      },
+      } as any,
     });
   }
 
@@ -246,6 +250,179 @@ export class FinanceRepository {
       },
       orderBy: {
         name: "asc",
+      },
+    });
+  }
+
+  async listFinancialAccounts(args: { search?: string; type?: "CASH" | "BANK" }) {
+    return ((prisma as any).financialAccount).findMany({
+      where: {
+        deleted: false,
+        ...(args.type ? { type: args.type } : {}),
+        ...(args.search
+          ? {
+              name: {
+                contains: args.search,
+                mode: "insensitive" as const,
+              },
+            }
+          : {}),
+      },
+      include: {
+        transactions: {
+          where: {
+            deleted: false,
+            status: "RECORDED",
+          },
+          select: {
+            id: true,
+            direction: true,
+            amount: true,
+          },
+        },
+      },
+      orderBy: [
+        { isActive: "desc" },
+        { createdAt: "desc" },
+      ],
+    });
+  }
+
+  async findFinancialAccountById(id: string) {
+    return ((prisma as any).financialAccount).findFirst({
+      where: {
+        id,
+        deleted: false,
+      },
+    });
+  }
+
+  async createFinancialAccount(args: {
+    name: string;
+    type: "CASH" | "BANK";
+    currency: string;
+    openingBalance: number;
+    note?: string | null;
+  }) {
+    return ((prisma as any).financialAccount).create({
+      data: {
+        name: args.name,
+        type: args.type,
+        currency: args.currency,
+        openingBalance: args.openingBalance,
+        note: args.note ?? null,
+      },
+    });
+  }
+
+  async listCashTransactions(args: { search?: string; direction?: "IN" | "OUT" | "TRANSFER"; accountId?: string; fromDate?: Date; toDate?: Date }) {
+    return ((prisma as any).cashTransaction).findMany({
+      where: {
+        deleted: false,
+        status: "RECORDED",
+        ...(args.direction ? { direction: args.direction } : {}),
+        ...(args.accountId ? { accountId: args.accountId } : {}),
+        ...(args.fromDate || args.toDate
+          ? {
+              transactionAt: {
+                ...(args.fromDate ? { gte: args.fromDate } : {}),
+                ...(args.toDate ? { lte: args.toDate } : {}),
+              },
+            }
+          : {}),
+        ...(args.search
+          ? {
+              OR: [
+                {
+                  title: {
+                    contains: args.search,
+                    mode: "insensitive" as const,
+                  },
+                },
+                {
+                  counterpartyName: {
+                    contains: args.search,
+                    mode: "insensitive" as const,
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        account: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: [
+        { transactionAt: "desc" },
+        { createdAt: "desc" },
+      ],
+      take: 200,
+    });
+  }
+
+  async listCashTransactionsBySourceReferenceId(sourceReferenceId: string) {
+    return ((prisma as any).cashTransaction).findMany({
+      where: {
+        deleted: false,
+        status: "RECORDED",
+        sourceReferenceId,
+      },
+      include: {
+        account: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: [
+        { transactionAt: "desc" },
+        { createdAt: "desc" },
+      ],
+    });
+  }
+
+  async createCashTransaction(args: {
+    accountId: string;
+    direction: "IN" | "OUT" | "TRANSFER";
+    sourceType: "MANUAL" | "COLLECTION" | "PAYMENT" | "TRANSFER" | "ORDER" | "DOCUMENT" | "REFUND";
+    category?: "GENERAL_INCOME" | "GENERAL_EXPENSE" | "MARKETPLACE_COMMISSION" | "SHIPPING_EXPENSE" | "SERVICE_FEE" | "REFUND" | "TRANSFER" | null;
+    amount: number;
+    currency: string;
+    transactionAt: Date;
+    title: string;
+    note?: string | null;
+    counterpartyName?: string | null;
+    sourceReferenceId?: string | null;
+    createdByUserId?: string | null;
+  }) {
+    return ((prisma as any).cashTransaction).create({
+      data: {
+        accountId: args.accountId,
+        direction: args.direction,
+        sourceType: args.sourceType,
+        category: args.category ?? null,
+        amount: args.amount,
+        currency: args.currency,
+        transactionAt: args.transactionAt,
+        title: args.title,
+        note: args.note ?? null,
+        counterpartyName: args.counterpartyName ?? null,
+        sourceReferenceId: args.sourceReferenceId ?? null,
+        createdByUserId: args.createdByUserId ?? null,
+      },
+      include: {
+        account: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
   }

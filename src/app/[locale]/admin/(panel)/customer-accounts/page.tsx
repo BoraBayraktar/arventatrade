@@ -31,6 +31,15 @@ export default async function AdminCustomerAccountsPage({
         title: dictionary.admin.customerAccountsTitle,
         description: dictionary.admin.customerAccountsDescription,
         createTitle: dictionary.admin.customerAccountsCreateTitle,
+        listTitle: dictionary.admin.customerAccountsTitle,
+        search: dictionary.admin.customerAccountsSearch,
+        filterStatus: dictionary.admin.status,
+        filterAllStatuses: dictionary.admin.allStatuses,
+        filterActive: dictionary.admin.active,
+        filterPassive: dictionary.admin.passive,
+        sort: dictionary.admin.sort,
+        sortNameAsc: dictionary.admin.customerAccountsSortNameAsc,
+        sortNameDesc: dictionary.admin.customerAccountsSortNameDesc,
         slug: dictionary.admin.slug,
         name: dictionary.admin.name,
         email: dictionary.admin.email,
@@ -38,9 +47,12 @@ export default async function AdminCustomerAccountsPage({
         taxNumber: dictionary.admin.supplierTaxNumber,
         address: dictionary.admin.customerAccountsAddress,
         note: dictionary.admin.documentsNote,
+        status: dictionary.admin.status,
         create: dictionary.admin.create,
         saving: dictionary.common.loading,
+        cancel: dictionary.admin.cancel,
         empty: dictionary.admin.customerAccountsEmpty,
+        createFailed: dictionary.admin.customerAccountsCreateFailed,
       }}
     />
   );

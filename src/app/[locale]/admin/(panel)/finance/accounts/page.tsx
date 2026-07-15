@@ -59,7 +59,9 @@ export default async function AdminFinanceAccountsPage({
         amount: dictionary.admin.financeAccountsAmount,
         openFinanceRoute: dictionary.admin.financeAccountsOpenFinanceRoute,
         openSource: dictionary.admin.financeAccountsOpenSource,
+        openDetail: dictionary.admin.financeCollectionsOpenDetail,
         noResults: dictionary.admin.financeAccountsEmpty,
+        cancel: dictionary.admin.cancel,
       }}
     />
   );

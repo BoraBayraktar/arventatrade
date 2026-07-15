@@ -73,6 +73,19 @@ type OrderDetail = {
     note: string | null;
     createdAt: string;
   }[];
+  financialMovements: {
+    id: string;
+    accountName: string;
+    direction: "IN" | "OUT" | "TRANSFER";
+    sourceType: "MANUAL" | "COLLECTION" | "PAYMENT" | "TRANSFER" | "ORDER" | "DOCUMENT" | "REFUND";
+    category: "GENERAL_INCOME" | "GENERAL_EXPENSE" | "MARKETPLACE_COMMISSION" | "SHIPPING_EXPENSE" | "SERVICE_FEE" | "REFUND" | "TRANSFER" | null;
+    amount: number;
+    currency: string;
+    title: string;
+    note: string | null;
+    counterpartyName: string | null;
+    transactionAt: string;
+  }[];
   statusHistory: {
     id: string;
     fromStatus: OrderStatus | null;
@@ -123,12 +136,27 @@ type Labels = {
   paymentHistoryTitle: string;
   paymentHistoryFrom: string;
   paymentHistoryTo: string;
+  collectionSummaryTitle: string;
+  collectionRecordedAmount: string;
+  collectionRemainingAmount: string;
+  createCollection: string;
+  createCollectionSuccess: string;
+  createCollectionFailed: string;
+  collectionFinancialAccount: string;
+  collectionFinancialAccountRequired: string;
+  collectionAutoPaidTitle: string;
+  collectionAutoPaidDescription: string;
   orderDocumentsTitle: string;
   inventorySummaryTitle: string;
   inventoryReservations: string;
   inventoryReservedQuantity: string;
   inventoryRestockStatus: string;
   inventoryLastRestockedAt: string;
+  financialMovementsTitle: string;
+  financialMovementAccount: string;
+  financialMovementDirection: string;
+  financialMovementSource: string;
+  financialMovementCategory: string;
   inventoryMovementTitle: string;
   inventoryMovementType: string;
   inventoryMovementQuantity: string;
@@ -146,7 +174,14 @@ type Labels = {
   inventoryMovementRestockNone: string;
   inventoryMovementRestockPartial: string;
   inventoryMovementRestockDone: string;
+  refundFinancialAccount: string;
+  refundFinancialAccountRequired: string;
   notSpecified: string;
+};
+
+type AccountOption = {
+  id: string;
+  label: string;
 };
 
 function formatMoney(value: number, currency: string, locale: string) {
@@ -221,6 +256,18 @@ function movementBadgeClass(value: OrderDetail["inventoryMovements"][number]["ty
   }
 }
 
+function formatFinancialDirection(value: OrderDetail["financialMovements"][number]["direction"]) {
+  if (value === "IN") {
+    return "Gelir";
+  }
+
+  if (value === "OUT") {
+    return "Gider";
+  }
+
+  return "Transfer";
+}
+
 function formatDocumentType(value: OrderDetail["documents"][number]["documentType"]) {
   switch (value) {
     case "PURCHASE_DOCUMENT":
@@ -236,24 +283,95 @@ function formatDocumentType(value: OrderDetail["documents"][number]["documentTyp
   }
 }
 
-export function OrderDetailManager({ locale, order, labels, canManage }: { locale: string; order: OrderDetail; labels: Labels; canManage: boolean }) {
+function formatWarehouseCode(value: string | null, labels: Labels) {
+  if (!value) {
+    return labels.notSpecified;
+  }
+
+  if (value === "MAIN") {
+    return "Ana depo";
+  }
+
+  return value;
+}
+
+function formatPaymentStatus(value: PaymentStatus) {
+  if (value === "AUTHORIZED") {
+    return "Provizyonlu";
+  }
+
+  if (value === "PAID") {
+    return "Ödendi";
+  }
+
+  if (value === "FAILED") {
+    return "Başarısız ödeme";
+  }
+
+  if (value === "REFUNDED") {
+    return "İade edildi";
+  }
+
+  return "Bekleyen ödeme";
+}
+
+function formatOrderStatus(value: OrderStatus, labels: Labels) {
+  return value === "CONFIRMED" ? labels.orderStatusConfirmed : labels.orderStatusCancelled;
+}
+
+function formatSystemNote(value: string | null, orderNumber: string, labels: Labels) {
+  if (!value) {
+    return labels.notSpecified;
+  }
+
+  const replacements: Array<[RegExp, string]> = [
+    [/^Checkout inventory commit for\s+/i, "Checkout stok ayirma: "],
+    [/^Checkout reservation hold for\s+/i, "Checkout rezervasyon ayirma: "],
+    [/^Checkout created order$/i, "Checkout siparişi oluşturdu"],
+    [/^Checkout initialized payment status$/i, "Checkout ödeme durumunu başlattı"],
+    [/^Automatic payment status update after full collection\.$/i, "Tam tahsilat sonrası ödeme durumu otomatik güncellendi."],
+  ];
+
+  let formatted = value;
+
+  for (const [pattern, replacement] of replacements) {
+    formatted = formatted.replace(pattern, replacement);
+  }
+
+  return formatted.replace(orderNumber, orderNumber);
+}
+
+export function OrderDetailManager({ locale, order, labels, canManage, accountOptions }: { locale: string; order: OrderDetail; labels: Labels; canManage: boolean; accountOptions: AccountOption[] }) {
   const router = useRouter();
   const [status, setStatus] = useState<OrderStatus>(order.status);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(order.paymentStatus);
+  const [refundFinancialAccountId, setRefundFinancialAccountId] = useState(accountOptions[0]?.id ?? "");
+  const [collectionFinancialAccountId, setCollectionFinancialAccountId] = useState(accountOptions[0]?.id ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const recordedCollectionAmount = order.financialMovements
+    .filter((movement) => movement.sourceType === "COLLECTION" && movement.direction === "IN")
+    .reduce((sum, movement) => sum + movement.amount, 0);
+  const remainingCollectionAmount = Math.max(0, Number((order.total - recordedCollectionAmount).toFixed(2)));
+  const isAutoPaidByCollections = paymentStatus === "PAID" && recordedCollectionAmount >= order.total;
 
   async function updateStatus() {
     setLoading(true);
     setError(null);
 
     try {
+      if (paymentStatus === "REFUNDED" && order.paymentStatus !== "REFUNDED" && !refundFinancialAccountId) {
+        setError(labels.refundFinancialAccountRequired);
+        return;
+      }
+
       const response = await fetch(`/api/admin/orders/${order.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status, paymentStatus }),
+        body: JSON.stringify({ status, paymentStatus, refundFinancialAccountId }),
       });
 
       if (!response.ok) {
@@ -294,6 +412,43 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
     }
   }
 
+  async function createCollection() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (!collectionFinancialAccountId) {
+        setError(labels.collectionFinancialAccountRequired);
+        return;
+      }
+
+      const response = await fetch("/api/admin/finance/collections", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          financialAccountId: collectionFinancialAccountId,
+          amount: remainingCollectionAmount,
+          collectedAt: new Date().toISOString(),
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(payload?.message ?? labels.createCollectionFailed);
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      setError(labels.createCollectionFailed);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <section className="rounded-2xl border border-neutral-200 bg-white">
       <div className="flex flex-col gap-3 border-b border-neutral-200 p-5">
@@ -317,11 +472,11 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
         </article>
         <article className="rounded-xl border border-neutral-200 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.orderStatus}</p>
-          <p className="mt-2 text-sm font-semibold text-neutral-950">{order.status === "CONFIRMED" ? labels.orderStatusConfirmed : labels.orderStatusCancelled}</p>
+          <p className="mt-2 text-sm font-semibold text-neutral-950">{formatOrderStatus(order.status, labels)}</p>
         </article>
         <article className="rounded-xl border border-neutral-200 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.paymentStatus}</p>
-          <p className="mt-2 text-sm font-semibold text-neutral-950">{paymentStatus}</p>
+          <p className="mt-2 text-sm font-semibold text-neutral-950">{formatPaymentStatus(paymentStatus)}</p>
         </article>
         <article className="rounded-xl border border-neutral-200 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.orderSubtotal}</p>
@@ -347,11 +502,11 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
       <div className="p-5">
         <div className="overflow-hidden rounded-xl border border-neutral-200">
           <div className="hidden grid-cols-[80px_1.2fr_120px_130px_140px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
-            <span>Image</span>
+            <span>Görsel</span>
             <span>{labels.orderItems}</span>
-            <span>Qty</span>
-            <span>Unit</span>
-            <span>Total</span>
+            <span>Adet</span>
+            <span>Birim</span>
+            <span>Toplam</span>
           </div>
 
           <div className="divide-y divide-neutral-200">
@@ -413,12 +568,12 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
           <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.inventoryReservations}</p>
             <p className="mt-2 text-sm font-semibold text-neutral-950">{order.inventorySummary.reservationCount}</p>
-            <p className="mt-1 text-xs text-neutral-500">Committed: {order.inventorySummary.committedReservationCount} · Active: {order.inventorySummary.activeReservationCount}</p>
+            <p className="mt-1 text-xs text-neutral-500">Kesinleşen: {order.inventorySummary.committedReservationCount} · Aktif: {order.inventorySummary.activeReservationCount}</p>
           </article>
           <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.inventoryReservedQuantity}</p>
             <p className="mt-2 text-sm font-semibold text-neutral-950">{order.inventorySummary.totalReservedQuantity}</p>
-            <p className="mt-1 text-xs text-neutral-500">Released: {order.inventorySummary.releasedReservationCount} · Cancelled: {order.inventorySummary.cancelledReservationCount}</p>
+            <p className="mt-1 text-xs text-neutral-500">Serbest bırakılan: {order.inventorySummary.releasedReservationCount} · İptal edilen: {order.inventorySummary.cancelledReservationCount}</p>
           </article>
           <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.inventoryRestockStatus}</p>
@@ -432,12 +587,32 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
       </div>
 
       <div className="border-t border-neutral-200 p-5">
+        <h3 className="mb-3 text-lg font-semibold tracking-tight text-neutral-950">{labels.financialMovementsTitle}</h3>
+        <div className="space-y-3">
+          {order.financialMovements.map((movement) => (
+            <article key={movement.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <div className="grid gap-2 text-sm text-neutral-700 md:grid-cols-2">
+                <p><span className="font-medium text-neutral-900">{labels.financialMovementAccount}:</span> {movement.accountName}</p>
+                <p><span className="font-medium text-neutral-900">{labels.financialMovementDirection}:</span> {formatFinancialDirection(movement.direction)}</p>
+                <p><span className="font-medium text-neutral-900">{labels.financialMovementSource}:</span> {movement.sourceType}</p>
+                <p><span className="font-medium text-neutral-900">{labels.financialMovementCategory}:</span> {movement.category ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.orderTotal}:</span> {formatMoney(movement.amount, movement.currency, locale)}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyAt}:</span> {formatDate(movement.transactionAt, locale)}</p>
+                <p><span className="font-medium text-neutral-900">{labels.customerAccount}:</span> {movement.counterpartyName ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyNote}:</span> {movement.note ?? movement.title}</p>
+              </div>
+            </article>
+          ))}
+          {order.financialMovements.length === 0 ? <p className="text-sm text-neutral-500">{labels.notSpecified}</p> : null}
+        </div>
+      </div>
+
+      <div className="border-t border-neutral-200 p-5">
         <h3 className="mb-3 text-lg font-semibold tracking-tight text-neutral-950">{labels.inventoryMovementTitle}</h3>
         <div className="space-y-3">
           {order.inventoryMovements.map((movement) => (
             <article key={movement.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
               <div className="grid gap-2 text-sm text-neutral-700 md:grid-cols-2">
-                <p><span className="font-medium text-neutral-900">{labels.inventoryMovementType}:</span> {movement.type}</p>
                 <p>
                   <span className="font-medium text-neutral-900">{labels.inventoryMovementType}:</span>{" "}
                   <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${movementBadgeClass(movement.type)}`}>
@@ -445,10 +620,10 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
                   </span>
                 </p>
                 <p><span className="font-medium text-neutral-900">{labels.inventoryMovementQuantity}:</span> {movement.quantity}</p>
-                <p><span className="font-medium text-neutral-900">{labels.inventoryMovementWarehouse}:</span> {movement.warehouseCode ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.inventoryMovementWarehouse}:</span> {formatWarehouseCode(movement.warehouseCode, labels)}</p>
                 <p><span className="font-medium text-neutral-900">{labels.inventoryMovementReservation}:</span> {movement.reservationId ?? labels.notSpecified}</p>
                 <p><span className="font-medium text-neutral-900">{labels.historyAt}:</span> {formatDate(movement.createdAt, locale)}</p>
-                <p><span className="font-medium text-neutral-900">{labels.historyNote}:</span> {movement.note ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyNote}:</span> {formatSystemNote(movement.note, order.orderNumber, labels)}</p>
               </div>
             </article>
           ))}
@@ -457,17 +632,37 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
       </div>
 
       <div className="border-t border-neutral-200 p-5">
+        <h3 className="mb-3 text-lg font-semibold tracking-tight text-neutral-950">{labels.collectionSummaryTitle}</h3>
+        <div className="grid gap-3 md:grid-cols-2">
+          <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.collectionRecordedAmount}</p>
+            <p className="mt-2 text-sm font-semibold text-neutral-950">{formatMoney(recordedCollectionAmount, order.currency, locale)}</p>
+          </article>
+          <article className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.collectionRemainingAmount}</p>
+            <p className="mt-2 text-sm font-semibold text-neutral-950">{formatMoney(remainingCollectionAmount, order.currency, locale)}</p>
+          </article>
+        </div>
+        {isAutoPaidByCollections ? (
+          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-sm font-semibold text-emerald-900">{labels.collectionAutoPaidTitle}</p>
+            <p className="mt-1 text-sm text-emerald-800">{labels.collectionAutoPaidDescription}</p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="border-t border-neutral-200 p-5">
         <h3 className="mb-3 text-lg font-semibold tracking-tight text-neutral-950">{labels.statusHistoryTitle}</h3>
         <div className="space-y-3">
           {order.statusHistory.map((entry) => (
             <article key={entry.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
               <div className="grid gap-2 text-sm text-neutral-700 md:grid-cols-2">
-                <p><span className="font-medium text-neutral-900">{labels.historyFrom}:</span> {entry.fromStatus ?? labels.notSpecified}</p>
-                <p><span className="font-medium text-neutral-900">{labels.historyTo}:</span> {entry.toStatus}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyFrom}:</span> {entry.fromStatus ? formatOrderStatus(entry.fromStatus, labels) : labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyTo}:</span> {formatOrderStatus(entry.toStatus, labels)}</p>
                 <p><span className="font-medium text-neutral-900">{labels.historySource}:</span> {entry.source === "ADMIN" ? labels.historySourceAdmin : labels.historySourceSystem}</p>
                 <p><span className="font-medium text-neutral-900">{labels.historyBy}:</span> {entry.changedByUserId ?? labels.notSpecified}</p>
                 <p><span className="font-medium text-neutral-900">{labels.historyAt}:</span> {formatDate(entry.createdAt, locale)}</p>
-                <p><span className="font-medium text-neutral-900">{labels.historyNote}:</span> {entry.note ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyNote}:</span> {formatSystemNote(entry.note, order.orderNumber, labels)}</p>
               </div>
             </article>
           ))}
@@ -480,12 +675,12 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
           {order.paymentStatusHistory.map((entry) => (
             <article key={entry.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
               <div className="grid gap-2 text-sm text-neutral-700 md:grid-cols-2">
-                <p><span className="font-medium text-neutral-900">{labels.paymentHistoryFrom}:</span> {entry.fromStatus ?? labels.notSpecified}</p>
-                <p><span className="font-medium text-neutral-900">{labels.paymentHistoryTo}:</span> {entry.toStatus}</p>
+                <p><span className="font-medium text-neutral-900">{labels.paymentHistoryFrom}:</span> {entry.fromStatus ? formatPaymentStatus(entry.fromStatus) : labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.paymentHistoryTo}:</span> {formatPaymentStatus(entry.toStatus)}</p>
                 <p><span className="font-medium text-neutral-900">{labels.historySource}:</span> {entry.source === "ADMIN" ? labels.historySourceAdmin : labels.historySourceSystem}</p>
                 <p><span className="font-medium text-neutral-900">{labels.historyBy}:</span> {entry.changedByUserId ?? labels.notSpecified}</p>
                 <p><span className="font-medium text-neutral-900">{labels.historyAt}:</span> {formatDate(entry.createdAt, locale)}</p>
-                <p><span className="font-medium text-neutral-900">{labels.historyNote}:</span> {entry.note ?? labels.notSpecified}</p>
+                <p><span className="font-medium text-neutral-900">{labels.historyNote}:</span> {formatSystemNote(entry.note, order.orderNumber, labels)}</p>
               </div>
             </article>
           ))}
@@ -494,6 +689,24 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
 
       {canManage ? (
         <div className="flex flex-wrap items-center gap-3 border-t border-neutral-200 p-5">
+          {remainingCollectionAmount > 0 && paymentStatus !== "REFUNDED" ? (
+            <>
+              <select
+                value={collectionFinancialAccountId}
+                onChange={(event) => setCollectionFinancialAccountId(event.target.value)}
+                className="h-10 rounded-md border border-neutral-300 px-3 text-sm"
+                disabled={loading}
+              >
+                <option value="">{labels.collectionFinancialAccount}</option>
+                {accountOptions.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+              </select>
+              <Button type="button" variant="outline" onClick={createCollection} disabled={loading}>
+                {labels.createCollection}
+              </Button>
+            </>
+          ) : null}
           <select
             value={status}
             onChange={(event) => setStatus(event.target.value as OrderStatus)}
@@ -509,12 +722,25 @@ export function OrderDetailManager({ locale, order, labels, canManage }: { local
             className="h-10 rounded-md border border-neutral-300 px-3 text-sm"
             disabled={loading}
           >
-            <option value="PENDING">PENDING</option>
-            <option value="AUTHORIZED">AUTHORIZED</option>
-            <option value="PAID">PAID</option>
-            <option value="FAILED">FAILED</option>
-            <option value="REFUNDED">REFUNDED</option>
+            <option value="PENDING">{formatPaymentStatus("PENDING")}</option>
+            <option value="AUTHORIZED">{formatPaymentStatus("AUTHORIZED")}</option>
+            <option value="PAID">{formatPaymentStatus("PAID")}</option>
+            <option value="FAILED">{formatPaymentStatus("FAILED")}</option>
+            <option value="REFUNDED">{formatPaymentStatus("REFUNDED")}</option>
           </select>
+          {paymentStatus === "REFUNDED" && order.paymentStatus !== "REFUNDED" ? (
+            <select
+              value={refundFinancialAccountId}
+              onChange={(event) => setRefundFinancialAccountId(event.target.value)}
+              className="h-10 rounded-md border border-neutral-300 px-3 text-sm"
+              disabled={loading}
+            >
+              <option value="">{labels.refundFinancialAccount}</option>
+              {accountOptions.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+          ) : null}
           <Button type="button" variant="secondary" onClick={updateStatus} disabled={loading}>{loading ? labels.loading : labels.updateStatus}</Button>
           <Button type="button" variant="destructive" onClick={deleteOrder} disabled={loading}>{labels.deleteOrder}</Button>
         </div>

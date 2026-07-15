@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { collectionsService } from "@/modules/finance/services/collections.service";
+import { financialAccountsService } from "@/modules/finance/services/financial-accounts.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
 import { CollectionReadinessManager } from "@/ui/admin/collection-readiness-manager";
 
@@ -22,11 +23,15 @@ export default async function AdminFinanceCollectionsPage({
   }
 
   const dictionary = getDictionary(locale as Locale);
-  const result = await collectionsService.listCollectionReadiness(locale);
+  const [result, accountOptions] = await Promise.all([
+    collectionsService.listCollectionReadiness(locale),
+    financialAccountsService.listAccountOptions(),
+  ]);
 
   return (
     <CollectionReadinessManager
       result={result}
+      accountOptions={accountOptions}
       labels={{
         title: dictionary.admin.financeCollectionsTitle,
         description: dictionary.admin.financeCollectionsDescription,
@@ -38,6 +43,11 @@ export default async function AdminFinanceCollectionsPage({
         recordedCount: dictionary.admin.financeCollectionsRecordedCount,
         counterparty: dictionary.admin.documentsCounterparty,
         paymentStatus: dictionary.admin.paymentStatus,
+        financeStatus: dictionary.admin.financeOperationStatus,
+        financeStatusPending: dictionary.admin.financeOperationStatusPending,
+        financeStatusPartial: dictionary.admin.financeOperationStatusPartial,
+        financeStatusCompleted: dictionary.admin.financeOperationStatusCompleted,
+        financeStatusFailed: dictionary.admin.financeOperationStatusFailed,
         orderDate: dictionary.admin.orderDate,
         amount: dictionary.admin.orderTotal,
         remainingAmount: dictionary.admin.financeCollectionsRemainingAmount,
@@ -48,6 +58,8 @@ export default async function AdminFinanceCollectionsPage({
         creatingRecord: dictionary.admin.financeCollectionsCreatingRecord,
         createRecordSuccess: dictionary.admin.financeCollectionsCreateRecordSuccess,
         createRecordFailed: dictionary.admin.financeCollectionsCreateRecordFailed,
+        account: dictionary.admin.financeCollectionsFinancialAccount,
+        accountRequired: dictionary.admin.financeCollectionsFinancialAccountRequired,
         noResults: dictionary.admin.financeCollectionsEmpty,
       }}
     />

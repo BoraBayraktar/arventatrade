@@ -3,6 +3,7 @@ import { z } from "zod";
 import { redisCache } from "@/lib/redis";
 import type {
   AdminOrderDetail,
+  AdminOrderFinancialMovementEntry,
   AdminOrderDetailItem,
   AdminOrderDocumentSummaryItem,
   AdminOrderInventoryMovementEntry,
@@ -24,6 +25,8 @@ import { customerAccountService } from "@/modules/customers/services/customer-ac
 import { CommerceRepository } from "@/modules/commerce/repositories/commerce.repository";
 import { integrationService } from "@/modules/integration/services/integration.service";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
+import { cashTransactionsService } from "@/modules/finance/services/cash-transactions.service";
+import { financeRepository } from "@/modules/finance/repositories/finance.repository";
 import { pricingService } from "@/modules/pricing/services/pricing.service";
 
 const lineSchema = z.object({
@@ -53,6 +56,7 @@ const updateOrderStatusSchema = z.object({
   id: z.string().trim().min(1),
   status: z.enum(["CONFIRMED", "CANCELLED"]).optional(),
   paymentStatus: z.enum(["PENDING", "AUTHORIZED", "PAID", "FAILED", "REFUNDED"]).optional(),
+  refundFinancialAccountId: z.string().trim().optional(),
   changedByUserId: z.string().trim().min(1),
   note: z.string().trim().max(280).optional(),
 }).refine((value) => Boolean(value.status || value.paymentStatus), {
@@ -298,6 +302,21 @@ function mapOrderDetail(order: {
       transactionNumber: string;
     } | null;
   }>;
+  financialMovements: Array<{
+    id: string;
+    account: {
+      name: string;
+    };
+    direction: "IN" | "OUT" | "TRANSFER";
+    sourceType: "MANUAL" | "COLLECTION" | "PAYMENT" | "TRANSFER" | "ORDER" | "DOCUMENT" | "REFUND";
+    category: "GENERAL_INCOME" | "GENERAL_EXPENSE" | "MARKETPLACE_COMMISSION" | "SHIPPING_EXPENSE" | "SERVICE_FEE" | "REFUND" | "TRANSFER" | null;
+    amount: { toNumber: () => number };
+    currency: string;
+    title: string;
+    note: string | null;
+    counterpartyName: string | null;
+    transactionAt: Date;
+  }>;
 }): AdminOrderDetail {
   const statusHistory: AdminOrderStatusHistoryEntry[] = order.statusHistory.map((item) => ({
     id: item.id,
@@ -369,6 +388,20 @@ function mapOrderDetail(order: {
     inventoryTransactionNumber: item.inventoryTransaction?.transactionNumber ?? null,
   }));
 
+  const financialMovements: AdminOrderFinancialMovementEntry[] = order.financialMovements.map((item) => ({
+    id: item.id,
+    accountName: item.account.name,
+    direction: item.direction,
+    sourceType: item.sourceType,
+    category: item.category,
+    amount: item.amount.toNumber(),
+    currency: item.currency,
+    title: item.title,
+    note: item.note,
+    counterpartyName: item.counterpartyName,
+    transactionAt: item.transactionAt.toISOString(),
+  }));
+
   return {
     id: order.id,
     orderNumber: order.orderNumber,
@@ -388,6 +421,7 @@ function mapOrderDetail(order: {
     documents,
     inventorySummary,
     inventoryMovements,
+    financialMovements,
     statusHistory,
     paymentStatusHistory,
   };
@@ -623,13 +657,19 @@ export class CommerceService {
 
   async getOrderById(id: string): Promise<AdminOrderDetail> {
     const parsed = orderIdSchema.parse({ id });
-    const order = await this.repository.findOrderById(parsed.id);
+    const [order, financialMovements] = await Promise.all([
+      this.repository.findOrderById(parsed.id),
+      financeRepository.listCashTransactionsBySourceReferenceId(parsed.id),
+    ]);
 
     if (!order) {
       throw new CommerceOrderAdminError("Order not found", 404);
     }
 
-    return mapOrderDetail(order);
+    return mapOrderDetail({
+      ...order,
+      financialMovements,
+    });
   }
 
   async updateOrderStatus(input: AdminUpdateOrderStatusInput): Promise<AdminOrderDetail> {
@@ -655,6 +695,10 @@ export class CommerceService {
     }
 
     if (parsed.paymentStatus && current.paymentStatus !== parsed.paymentStatus) {
+      if (parsed.paymentStatus === "REFUNDED" && current.paymentStatus !== "REFUNDED" && !parsed.refundFinancialAccountId) {
+        throw new CommerceOrderAdminError("Refund finans hesabı seçilmelidir.", 400);
+      }
+
       current = await this.repository.updateOrderPaymentStatus({
         id: parsed.id,
         fromStatus: current.paymentStatus,
@@ -672,6 +716,18 @@ export class CommerceService {
       });
       current = await this.repository.findOrderById(parsed.id) ?? current;
     } else if (shouldRestockForRefund) {
+      await cashTransactionsService.createTransaction({
+        accountId: parsed.refundFinancialAccountId as string,
+        direction: "OUT",
+        sourceType: "REFUND",
+        category: "REFUND",
+        sourceReferenceId: parsed.id,
+        amount: current.total,
+        title: `İade • ${current.orderNumber}`,
+        note: parsed.note ?? `Sipariş iadesi • ${current.orderNumber}`,
+        counterpartyName: current.customerAccountName ?? current.orderNumber,
+        recordedByUserId: parsed.changedByUserId,
+      });
       await this.repository.restockOrderInventory({
         id: parsed.id,
         movementType: "RETURN_RESTOCK",

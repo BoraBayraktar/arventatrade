@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { CommerceOrderAdminError, commerceService } from "@/modules/commerce/services/commerce.service";
+import { financialAccountsService } from "@/modules/finance/services/financial-accounts.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
 import { OrderDetailManager } from "@/ui/admin/order-detail-manager";
 
@@ -24,6 +25,7 @@ export default async function AdminOrderDetailPage({
   }
 
   let order;
+  const accountOptions = await financialAccountsService.listAccountOptions();
 
   try {
     order = await commerceService.getOrderById(id);
@@ -40,6 +42,7 @@ export default async function AdminOrderDetailPage({
       locale={locale}
       order={order}
       canManage={user.role === "ADMIN"}
+      accountOptions={accountOptions}
       labels={{
         back: dictionary.admin.backToOrders,
         orderNumber: dictionary.admin.orderNumber,
@@ -70,12 +73,27 @@ export default async function AdminOrderDetailPage({
         paymentHistoryTitle: dictionary.admin.paymentStatusHistory,
         paymentHistoryFrom: dictionary.admin.paymentHistoryFrom,
         paymentHistoryTo: dictionary.admin.paymentHistoryTo,
+        collectionSummaryTitle: dictionary.admin.financeCollectionsTitle,
+        collectionRecordedAmount: dictionary.admin.financeCollectionsTotalRecordedAmount,
+        collectionRemainingAmount: dictionary.admin.financeCollectionsRemainingAmount,
+        createCollection: dictionary.admin.financeCollectionsCreateRecord,
+        createCollectionSuccess: dictionary.admin.financeCollectionsCreateRecordSuccess,
+        createCollectionFailed: dictionary.admin.financeCollectionsCreateRecordFailed,
+        collectionFinancialAccount: dictionary.admin.financeCollectionsFinancialAccount,
+        collectionFinancialAccountRequired: dictionary.admin.financeCollectionsFinancialAccountRequired,
+        collectionAutoPaidTitle: dictionary.admin.financeCollectionsAutoPaidTitle,
+        collectionAutoPaidDescription: dictionary.admin.financeCollectionsAutoPaidDescription,
         orderDocumentsTitle: dictionary.admin.documentManager,
         inventorySummaryTitle: dictionary.admin.inventorySummaryTitle,
         inventoryReservations: dictionary.admin.inventoryReservations,
         inventoryReservedQuantity: dictionary.admin.inventoryReservedQuantity,
         inventoryRestockStatus: dictionary.admin.inventoryRestockStatus,
         inventoryLastRestockedAt: dictionary.admin.inventoryLastRestockedAt,
+        financialMovementsTitle: dictionary.admin.financeAccountsTitle,
+        financialMovementAccount: dictionary.admin.financeCashTransactionsAccount,
+        financialMovementDirection: dictionary.admin.financeCashTransactionsAllDirections,
+        financialMovementSource: dictionary.admin.financeCashTransactionsSourceType,
+        financialMovementCategory: dictionary.admin.financeCashTransactionsCategory,
         inventoryMovementTitle: dictionary.admin.inventoryMovementTitle,
         inventoryMovementType: dictionary.admin.inventoryMovementType,
         inventoryMovementQuantity: dictionary.admin.inventoryMovementQuantity,
@@ -93,6 +111,8 @@ export default async function AdminOrderDetailPage({
         inventoryMovementRestockNone: dictionary.admin.inventoryMovementRestockNone,
         inventoryMovementRestockPartial: dictionary.admin.inventoryMovementRestockPartial,
         inventoryMovementRestockDone: dictionary.admin.inventoryMovementRestockDone,
+        refundFinancialAccount: dictionary.admin.financeRefundFinancialAccount,
+        refundFinancialAccountRequired: dictionary.admin.financeRefundFinancialAccountRequired,
         notSpecified: dictionary.common.notSpecified,
       }}
     />

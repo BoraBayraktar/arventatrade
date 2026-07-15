@@ -35,6 +35,27 @@ If `REDIS_URL` is omitted, the application can still serve requests, but cache-b
 
 These are required only if you want product/media uploads to work in production.
 
+### Cloudflare R2 mapping for media uploads
+
+This repository uses an S3-compatible storage client for product image uploads, so Cloudflare R2 works without code changes.
+
+Map your R2 settings into the existing variables like this:
+
+- `MINIO_ENDPOINT=<your-cloudflare-account-id>.r2.cloudflarestorage.com`
+- `MINIO_PORT=443`
+- `MINIO_USE_SSL=true`
+- `MINIO_ACCESS_KEY=<r2-access-key-id>`
+- `MINIO_SECRET_KEY=<r2-secret-access-key>`
+- `MINIO_BUCKET=<your-r2-bucket-name>`
+- `MEDIA_PUBLIC_BASE_URL=<your-public-r2-domain>`
+
+Notes:
+
+- The R2 S3 API endpoint format is `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`.
+- The S3 region value for R2 is `auto`, and `us-east-1` is also accepted by compatible tools. This repo does not need a separate region env var for the current MinIO client setup.
+- `MEDIA_PUBLIC_BASE_URL` should be the public bucket URL or your custom public domain, for example `https://pub-<hash>.r2.dev`.
+- If the bucket is not public, uploads may succeed but the returned product image URL will not be browser-accessible.
+
 - `RESEND_API_KEY`
 - `NOTIFICATION_EMAIL_FROM`
 - `NOTIFICATION_EMAIL_WEBHOOK_URL`

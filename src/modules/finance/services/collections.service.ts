@@ -1,15 +1,18 @@
 import { z } from "zod";
 
+import { CommerceRepository } from "@/modules/commerce/repositories/commerce.repository";
 import type {
   AdminCollectionRecordItem,
   AdminCollectionsResult,
   AdminCreateCollectionRecordInput,
 } from "@/modules/finance/contracts/collections.contract";
 import { financeRepository } from "@/modules/finance/repositories/finance.repository";
+import { cashTransactionsService } from "@/modules/finance/services/cash-transactions.service";
 import { receivablesService } from "@/modules/finance/services/receivables.service";
 
 const createCollectionRecordSchema = z.object({
   orderId: z.string().trim().min(1),
+  financialAccountId: z.string().trim().min(1),
   amount: z.coerce.number().positive(),
   collectedAt: z.string().datetime(),
   note: z.string().trim().max(500).optional().nullable(),
@@ -20,6 +23,7 @@ function mapCollectionRecord(item: Awaited<ReturnType<typeof financeRepository.l
   return {
     id: item.id,
     orderId: item.orderId,
+    financialAccountId: (item as { financialAccountId?: string | null }).financialAccountId ?? null,
     amount: item.amount.toNumber(),
     currency: item.currency,
     status: item.status,
@@ -31,6 +35,8 @@ function mapCollectionRecord(item: Awaited<ReturnType<typeof financeRepository.l
 }
 
 export class CollectionsService {
+  private readonly commerceRepository = new CommerceRepository();
+
   async listCollectionReadiness(locale: string): Promise<AdminCollectionsResult> {
     const result = await receivablesService.listOperationalReceivables({
       page: 1,
@@ -105,14 +111,46 @@ export class CollectionsService {
       throw new Error("Tahsilat tutarı kalan alacak tutarını aşamaz.");
     }
 
+    const financialAccount = await financeRepository.findFinancialAccountById(parsed.financialAccountId);
+
+    if (!financialAccount || !financialAccount.isActive) {
+      throw new Error("Tahsilat için geçerli bir finans hesabı seçin.");
+    }
+
     const created = await financeRepository.createCollectionRecord({
       orderId: parsed.orderId,
+      financialAccountId: parsed.financialAccountId,
       amount: parsed.amount,
       currency: receivable.currency,
       collectedAt: new Date(parsed.collectedAt),
       note: parsed.note ?? null,
       recordedByUserId: parsed.recordedByUserId,
     });
+
+    await cashTransactionsService.createTransaction({
+      accountId: parsed.financialAccountId,
+      direction: "IN",
+      sourceType: "COLLECTION",
+      sourceReferenceId: parsed.orderId,
+      amount: parsed.amount,
+      transactionAt: parsed.collectedAt,
+      title: `Tahsilat • ${receivable.orderNumber}`,
+      note: parsed.note ?? `Sipariş tahsilatı • ${receivable.orderNumber}`,
+      counterpartyName: receivable.counterpartyName,
+      recordedByUserId: parsed.recordedByUserId,
+    });
+
+    const newRemainingAmount = Number((remainingAmount - parsed.amount).toFixed(2));
+
+    if (newRemainingAmount <= 0) {
+      await this.commerceRepository.updateOrderPaymentStatus({
+        id: parsed.orderId,
+        fromStatus: receivable.paymentStatus,
+        toStatus: "PAID",
+        changedByUserId: parsed.recordedByUserId,
+        note: parsed.note ?? "Tahsilat tamamlandı ve ödeme durumu PAID olarak işaretlendi.",
+      });
+    }
 
     return mapCollectionRecord(created);
   }

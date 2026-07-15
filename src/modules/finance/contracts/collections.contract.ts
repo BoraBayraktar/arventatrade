@@ -30,6 +30,7 @@ export type AdminCollectionsResult = {
 export type AdminCollectionRecordItem = {
   id: string;
   orderId: string;
+  financialAccountId: string | null;
   amount: number;
   currency: string;
   status: "RECORDED" | "CANCELLED";
@@ -41,6 +42,7 @@ export type AdminCollectionRecordItem = {
 
 export type AdminCreateCollectionRecordInput = {
   orderId: string;
+  financialAccountId: string;
   amount: number;
   collectedAt: string;
   note?: string | null;

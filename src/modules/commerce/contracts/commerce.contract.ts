@@ -137,6 +137,7 @@ export type AdminOrderDetail = {
   documents: AdminOrderDocumentSummaryItem[];
   inventorySummary: AdminOrderInventorySummary;
   inventoryMovements: AdminOrderInventoryMovementEntry[];
+  financialMovements: AdminOrderFinancialMovementEntry[];
   statusHistory: AdminOrderStatusHistoryEntry[];
   paymentStatusHistory: AdminPaymentStatusHistoryEntry[];
 };
@@ -174,6 +175,20 @@ export type AdminOrderInventoryMovementEntry = {
   createdAt: string;
 };
 
+export type AdminOrderFinancialMovementEntry = {
+  id: string;
+  accountName: string;
+  direction: "IN" | "OUT" | "TRANSFER";
+  sourceType: "MANUAL" | "COLLECTION" | "PAYMENT" | "TRANSFER" | "ORDER" | "DOCUMENT" | "REFUND";
+  category: "GENERAL_INCOME" | "GENERAL_EXPENSE" | "MARKETPLACE_COMMISSION" | "SHIPPING_EXPENSE" | "SERVICE_FEE" | "REFUND" | "TRANSFER" | null;
+  amount: number;
+  currency: string;
+  title: string;
+  note: string | null;
+  counterpartyName: string | null;
+  transactionAt: string;
+};
+
 export type AdminOrderStatusHistoryEntry = {
   id: string;
   fromStatus: AdminOrderStatus | null;
@@ -198,6 +213,7 @@ export type AdminUpdateOrderStatusInput = {
   id: string;
   status?: AdminOrderStatus;
   paymentStatus?: AdminPaymentStatus;
+  refundFinancialAccountId?: string;
   changedByUserId: string;
   note?: string;
 };

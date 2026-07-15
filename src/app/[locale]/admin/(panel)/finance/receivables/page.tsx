@@ -66,7 +66,9 @@ export default async function AdminCustomerReceivablesPage({
         orderDate: dictionary.admin.orderDate,
         latestDocument: dictionary.admin.financeReceivablesLatestDocument,
         openOrder: dictionary.admin.financeReceivablesOpenOrder,
+        openDetail: dictionary.admin.financeCollectionsOpenDetail,
         notSpecified: dictionary.common.notSpecified,
+        cancel: dictionary.admin.cancel,
       }}
     />
   );

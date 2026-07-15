@@ -21,6 +21,18 @@ type Props = {
   labels: Labels;
 };
 
+function formatPaymentStatus(value: AdminReceivableDetail["paymentStatus"]) {
+  if (value === "AUTHORIZED") {
+    return "Provizyonlu";
+  }
+
+  if (value === "FAILED") {
+    return "Başarısız ödeme";
+  }
+
+  return "Bekleyen ödeme";
+}
+
 export function ReceivableDetailManager({ locale, item, labels }: Props) {
   return (
     <div className="space-y-6">
@@ -48,7 +60,7 @@ export function ReceivableDetailManager({ locale, item, labels }: Props) {
         </article>
         <article className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.paymentStatus}</p>
-          <p className="mt-3 text-2xl font-semibold text-neutral-950">{item.paymentStatus}</p>
+          <p className="mt-3 text-2xl font-semibold text-neutral-950">{formatPaymentStatus(item.paymentStatus)}</p>
         </article>
         <article className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.itemCount}</p>
@@ -63,7 +75,7 @@ export function ReceivableDetailManager({ locale, item, labels }: Props) {
       <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-neutral-950">{labels.title}</h2>
         <div className="mt-4 grid gap-2 text-sm text-neutral-700 md:grid-cols-2">
-          <p>{labels.paymentStatus}: {item.paymentStatus}</p>
+          <p>{labels.paymentStatus}: {formatPaymentStatus(item.paymentStatus)}</p>
           <p>{labels.totalAmount}: {item.totalAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.currency}</p>
           <p>{labels.itemCount}: {item.itemCount}</p>
           <p>{labels.latestDocument}: {item.latestDocument?.documentNumber ?? labels.notSpecified}</p>

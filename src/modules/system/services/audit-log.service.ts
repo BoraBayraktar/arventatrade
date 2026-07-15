@@ -9,7 +9,7 @@ import type {
 import { AuditLogRepository } from "@/modules/system/repositories/audit-log.repository";
 
 const createAuditLogSchema = z.object({
-  entityType: z.enum(["USER", "PRODUCT", "CATEGORY", "ORDER", "WAREHOUSE", "STOREFRONT_ITEM", "AUTH"]),
+  entityType: z.enum(["USER", "PRODUCT", "SUPPLIER", "CUSTOMER_ACCOUNT", "CATEGORY", "ORDER", "WAREHOUSE", "STOREFRONT_ITEM", "AUTH"]),
   entityId: z.string().trim().min(1).optional().nullable(),
   action: z.enum(["CREATE", "UPDATE", "DELETE", "STATUS_UPDATE", "LOGIN", "LOGOUT"]),
   actorUserId: z.string().trim().min(1).optional().nullable(),
@@ -19,7 +19,7 @@ const createAuditLogSchema = z.object({
 
 const listAuditLogSchema = z.object({
   search: z.string().trim().optional(),
-  entityType: z.enum(["USER", "PRODUCT", "CATEGORY", "ORDER", "WAREHOUSE", "STOREFRONT_ITEM", "AUTH"]).optional(),
+  entityType: z.enum(["USER", "PRODUCT", "SUPPLIER", "CUSTOMER_ACCOUNT", "CATEGORY", "ORDER", "WAREHOUSE", "STOREFRONT_ITEM", "AUTH"]).optional(),
   action: z.enum(["CREATE", "UPDATE", "DELETE", "STATUS_UPDATE", "LOGIN", "LOGOUT"]).optional(),
   actorUserId: z.string().trim().optional(),
   startDate: z.preprocess((value) => {
@@ -71,6 +71,8 @@ function formatFallbackEntityLabel(entityType: string, entityId: string | null) 
     USER: "Kullanıcı",
     PRODUCT: "Ürün",
     CATEGORY: "Kategori",
+    SUPPLIER: "Tedarikçi",
+    CUSTOMER_ACCOUNT: "Cari Müşteri Kartı",
     ORDER: "Sipariş",
     WAREHOUSE: "Depo",
     STOREFRONT_ITEM: "Mağaza İçeriği",
@@ -115,8 +117,9 @@ export class AuditLogService {
     const storefrontItemIds = Array.from(new Set(items.filter((item) => item.entityType === "STOREFRONT_ITEM" && item.entityId).map((item) => item.entityId as string)));
     const userEntityIds = Array.from(new Set(items.filter((item) => item.entityType === "USER" && item.entityId).map((item) => item.entityId as string)));
     const warehouseIds = Array.from(new Set(items.filter((item) => item.entityType === "WAREHOUSE" && item.entityId).map((item) => item.entityId as string)));
+    const customerAccountIds = Array.from(new Set(items.filter((item) => item.entityType === "CUSTOMER_ACCOUNT" && item.entityId).map((item) => item.entityId as string)));
 
-    const [actors, userEntities, products, categories, orders, warehouses, storefrontItems] = await Promise.all([
+    const [actors, userEntities, products, categories, orders, warehouses, storefrontItems, customerAccounts] = await Promise.all([
       this.repository.findUsersByIds(actorIds),
       this.repository.findUsersByIds(userEntityIds),
       this.repository.findProductsByIds(productIds),
@@ -124,6 +127,7 @@ export class AuditLogService {
       this.repository.findOrdersByIds(orderIds),
       this.repository.findWarehousesByIds(warehouseIds),
       this.repository.findStorefrontItemsByIds(storefrontItemIds),
+      this.repository.findCustomerAccountsByIds(customerAccountIds),
     ]);
 
     const actorMap = new Map(actors.map((item) => [item.id, `${item.name} • ${item.email}`]));
@@ -133,6 +137,9 @@ export class AuditLogService {
     const orderMap = new Map(orders.map((item) => [item.id, `Sipariş • ${item.orderNumber}`]));
     const warehouseMap = new Map(warehouses.map((item) => [item.id, `${item.name} • ${item.code}`]));
     const storefrontMap = new Map(storefrontItems.map((item) => [item.id, `${item.titleTr} • ${item.section}`]));
+    const customerAccountMap = new Map<string, string>(
+      customerAccounts.map((item: { id: string; name: string; email: string | null }) => [item.id, `${item.name}${item.email ? ` • ${item.email}` : ""}`]),
+    );
 
     return {
       items: items.map((item) => mapItem({
@@ -144,6 +151,7 @@ export class AuditLogService {
           ?? (item.entityType === "ORDER" ? orderMap.get(item.entityId ?? "") : undefined)
           ?? (item.entityType === "WAREHOUSE" ? warehouseMap.get(item.entityId ?? "") : undefined)
           ?? (item.entityType === "STOREFRONT_ITEM" ? storefrontMap.get(item.entityId ?? "") : undefined)
+          ?? (item.entityType === "CUSTOMER_ACCOUNT" ? customerAccountMap.get(item.entityId ?? "") : undefined)
           ?? formatFallbackEntityLabel(item.entityType, item.entityId),
         actorLabel: item.actorUserId ? (actorMap.get(item.actorUserId) ?? item.actorUserId.slice(0, 8)) : null,
       })),

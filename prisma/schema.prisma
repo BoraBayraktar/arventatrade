@@ -85,6 +85,55 @@ model CustomerAccount {
   @@index([taxNumber])
 }
 
+model FinancialAccount {
+  id             String               @id @default(cuid())
+  name           String
+  type           FinancialAccountType
+  currency       String               @default("TRY")
+  openingBalance Decimal              @default(0) @db.Decimal(10, 2)
+  isActive       Boolean              @default(true)
+  note           String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  deleted        Boolean              @default(false)
+  deletedDate    DateTime?
+  deletedUserId  String?
+  transactions   CashTransaction[]
+  collectionRecords CollectionRecord[]
+  paymentRecords  PaymentRecord[]
+
+  @@index([deleted, isActive])
+  @@index([type, isActive])
+}
+
+model CashTransaction {
+  id                String                    @id @default(cuid())
+  accountId         String
+  direction         CashTransactionDirection
+  sourceType        CashTransactionSourceType @default(MANUAL)
+  category          CashTransactionCategory?
+  status            CashTransactionStatus     @default(RECORDED)
+  amount            Decimal                   @db.Decimal(10, 2)
+  currency          String                    @default("TRY")
+  transactionAt     DateTime
+  title             String
+  note              String?
+  sourceReferenceId String?
+  counterpartyName  String?
+  createdByUserId   String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  deleted           Boolean                   @default(false)
+  deletedDate       DateTime?
+  deletedUserId     String?
+  account           FinancialAccount          @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, transactionAt])
+  @@index([status, transactionAt])
+  @@index([deleted, transactionAt])
+  @@index([sourceType, sourceReferenceId])
+}
+
 model ProductAttributeDefinition {
   id            String                  @id @default(cuid())
   slug          String                  @unique
@@ -409,6 +458,7 @@ model OrderPaymentStatusHistory {
 model CollectionRecord {
   id             String                 @id @default(cuid())
   orderId        String
+  financialAccountId String?
   amount         Decimal                @db.Decimal(10, 2)
   currency       String                 @default("TRY")
   status         CollectionRecordStatus @default(RECORDED)
@@ -421,8 +471,10 @@ model CollectionRecord {
   deletedDate    DateTime?
   deletedUserId  String?
   order          Order                  @relation(fields: [orderId], references: [id])
+  financialAccount FinancialAccount?    @relation(fields: [financialAccountId], references: [id])
 
   @@index([orderId, collectedAt])
+  @@index([financialAccountId, collectedAt])
   @@index([status, collectedAt])
   @@index([deleted, collectedAt])
 }
@@ -430,6 +482,7 @@ model CollectionRecord {
 model PaymentRecord {
   id               String              @id @default(cuid())
   supplierId       String
+  financialAccountId String?
   amount           Decimal             @db.Decimal(10, 2)
   currency         String              @default("TRY")
   status           PaymentRecordStatus @default(RECORDED)
@@ -442,8 +495,10 @@ model PaymentRecord {
   deletedDate      DateTime?
   deletedUserId    String?
   supplier         Supplier            @relation(fields: [supplierId], references: [id])
+  financialAccount FinancialAccount?   @relation(fields: [financialAccountId], references: [id])
 
   @@index([supplierId, paidAt])
+  @@index([financialAccountId, paidAt])
   @@index([status, paidAt])
   @@index([deleted, paidAt])
 }
@@ -1248,6 +1303,42 @@ enum CollectionRecordStatus {
 }
 
 enum PaymentRecordStatus {
+  RECORDED
+  CANCELLED
+}
+
+enum FinancialAccountType {
+  CASH
+  BANK
+}
+
+enum CashTransactionDirection {
+  IN
+  OUT
+  TRANSFER
+}
+
+enum CashTransactionSourceType {
+  MANUAL
+  COLLECTION
+  PAYMENT
+  TRANSFER
+  ORDER
+  DOCUMENT
+  REFUND
+}
+
+enum CashTransactionCategory {
+  GENERAL_INCOME
+  GENERAL_EXPENSE
+  MARKETPLACE_COMMISSION
+  SHIPPING_EXPENSE
+  SERVICE_FEE
+  REFUND
+  TRANSFER
+}
+
+enum CashTransactionStatus {
   RECORDED
   CANCELLED
 }

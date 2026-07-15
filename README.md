@@ -81,6 +81,20 @@ npm run db:seed
 
 Not: Migration tablosu olmayan eski lokal ortamlarda gecis asamasinda bir kez `npm run db:push` calistirilabilir.
 
+Shadow database zinciri bozuk eski ortamlarda yeni migration eklemek icin manual workflow kullanin:
+
+```bash
+npm run db:migrate:manual -- add_financial_accounts_cash_transactions
+```
+
+Bu komut:
+
+- mevcut veritabani ile `prisma/schema.prisma` arasindaki SQL diff'i uretir
+- migration SQL'ini `prisma/migrations/` altina yazar
+- SQL'i veritabanina uygular
+- migration kaydini `_prisma_migrations` tablosunda applied olarak isaretler
+- Prisma client'i yeniden uretir
+
 4. Uygulamayi baslatin.
 
 ```bash

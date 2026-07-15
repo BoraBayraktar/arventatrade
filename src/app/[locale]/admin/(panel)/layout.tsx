@@ -93,6 +93,8 @@ export default async function AdminPanelLayout({
         { href: `/${locale}/admin/customer-accounts`, label: dictionary.admin.customerAccountsTitle },
         { href: `/${locale}/admin/finance/collections`, label: dictionary.admin.financeMenuCollections },
         { href: `/${locale}/admin/finance/payments`, label: dictionary.admin.financeMenuPayments },
+        { href: `/${locale}/admin/finance/bank-cash`, label: dictionary.admin.financeMenuBankCash },
+        { href: `/${locale}/admin/finance/transactions`, label: dictionary.admin.financeMenuTransactions },
         { href: `/${locale}/admin/finance/reports`, label: dictionary.admin.financeMenuReports },
       ],
     },
