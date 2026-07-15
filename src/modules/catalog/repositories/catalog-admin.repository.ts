@@ -7,8 +7,10 @@ import type {
   AdminCategoryListQuery,
   AdminProductQuestionListQuery,
   AdminProductListQuery,
+  AdminUpdateBrandInput,
   AdminUpdateCategoryInput,
   AdminUpdateProductAttributeDefinitionInput,
+  AdminUpdateSupplierInput,
 } from "@/modules/catalog/contracts/catalog-admin.contract";
 
 type AdminCreateProductRecordInput = {
@@ -699,6 +701,30 @@ export class CatalogAdminRepository {
     });
   }
 
+  async updateBrand(input: AdminUpdateBrandInput) {
+    return prisma.brand.update({
+      where: {
+        id: input.id,
+      },
+      data: {
+        ...(input.slug !== undefined ? { slug: input.slug } : {}),
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+      },
+      include: {
+        _count: {
+          select: {
+            products: {
+              where: {
+                deleted: false,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   async createSupplier(input: AdminCreateSupplierInput) {
     return prisma.supplier.create({
       data: {
@@ -708,6 +734,33 @@ export class CatalogAdminRepository {
         email: input.email ?? null,
         phone: input.phone ?? null,
         isActive: input.isActive ?? true,
+      },
+      include: {
+        _count: {
+          select: {
+            primaryProducts: {
+              where: {
+                deleted: false,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async updateSupplier(input: AdminUpdateSupplierInput) {
+    return prisma.supplier.update({
+      where: {
+        id: input.id,
+      },
+      data: {
+        ...(input.slug !== undefined ? { slug: input.slug } : {}),
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.taxNumber !== undefined ? { taxNumber: input.taxNumber ?? null } : {}),
+        ...(input.email !== undefined ? { email: input.email ?? null } : {}),
+        ...(input.phone !== undefined ? { phone: input.phone ?? null } : {}),
+        ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       },
       include: {
         _count: {
@@ -842,10 +895,18 @@ export class CatalogAdminRepository {
       where: {
         id,
         deleted: false,
-        isActive: true,
       },
       select: {
         id: true,
+        _count: {
+          select: {
+            products: {
+              where: {
+                deleted: false,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -878,6 +939,19 @@ export class CatalogAdminRepository {
     });
   }
 
+  async softDeleteSupplier(id: string, deletedUserId: string) {
+    return prisma.supplier.update({
+      where: {
+        id,
+      },
+      data: {
+        deleted: true,
+        deletedDate: new Date(),
+        deletedUserId,
+      },
+    });
+  }
+
   async findActiveCategoryBySlug(slug: string) {
     return prisma.category.findFirst({
       where: {
@@ -899,6 +973,19 @@ export class CatalogAdminRepository {
       },
       select: {
         id: true,
+      },
+    });
+  }
+
+  async softDeleteBrand(id: string, deletedUserId: string) {
+    return prisma.brand.update({
+      where: {
+        id,
+      },
+      data: {
+        deleted: true,
+        deletedDate: new Date(),
+        deletedUserId,
       },
     });
   }

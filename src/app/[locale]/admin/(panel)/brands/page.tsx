@@ -27,16 +27,40 @@ export default async function AdminBrandsPage({
   return (
     <BrandDirectoryManager
       items={items}
+      canDelete={user.role === "ADMIN"}
       labels={{
         title: dictionary.admin.brandsTitle,
         description: dictionary.admin.brandsDescription,
         createTitle: dictionary.admin.brandsCreateTitle,
+        listTitle: dictionary.admin.brandsTitle,
+        search: dictionary.admin.searchBrand,
+        filterStatus: dictionary.admin.role,
+        filterAllStatuses: dictionary.admin.allStatuses,
+        filterActive: dictionary.admin.active,
+        filterPassive: dictionary.admin.passive,
+        filterProducts: dictionary.admin.filterProducts,
+        filterAllProducts: dictionary.admin.filterAllProducts,
+        filterWithProducts: dictionary.admin.filterWithProducts,
+        filterWithoutProducts: dictionary.admin.filterWithoutProducts,
+        sort: dictionary.admin.sortCategories,
+        sortNameAsc: dictionary.admin.sortNameAsc,
+        sortNameDesc: dictionary.admin.sortNameDesc,
+        sortProductCountDesc: dictionary.admin.sortProductCountDesc,
         slug: dictionary.admin.slug,
         name: dictionary.admin.brandName,
         productCount: dictionary.admin.productCount,
         create: dictionary.admin.create,
-        saving: dictionary.common.loading,
+        edit: dictionary.admin.edit,
+        delete: dictionary.admin.delete,
+        save: dictionary.admin.save,
+        cancel: dictionary.admin.cancel,
+        loading: dictionary.common.loading,
         empty: dictionary.admin.brandsEmpty,
+        opFailed: dictionary.admin.operationFailed,
+        validationRequired: dictionary.admin.validationRequired,
+        validationDeleteBlocked: "Bu marka aktif ürünlerde kullanıldığı için silinemez.",
+        importCsv: dictionary.admin.importCsv,
+        exportCsv: dictionary.admin.exportCsv,
       }}
     />
   );

@@ -1,23 +1,41 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Download, Pencil, Plus, Upload, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   AdminBusinessDocumentDetail,
+  AdminBusinessDocumentListItem,
   AdminBusinessDocumentListResult,
+  AdminBusinessDocumentStatus,
+  AdminBusinessDocumentSyncStatus,
+  AdminBusinessDocumentType,
 } from "@/modules/documents/contracts/document.contract";
 
 type Labels = {
   title: string;
   description: string;
   createTitle: string;
+  listTitle: string;
+  search: string;
+  filterDocumentType: string;
+  filterStatus: string;
+  filterSyncStatus: string;
+  filterAllDocumentTypes: string;
+  filterAllStatuses: string;
+  filterAllSyncStatuses: string;
+  sort: string;
+  sortNewest: string;
+  sortOldest: string;
+  sortNumberAsc: string;
+  sortNumberDesc: string;
   documentNumber: string;
   documentType: string;
   documentStatus: string;
@@ -27,10 +45,21 @@ type Labels = {
   externalSystemStatus: string;
   orderNumber: string;
   inventoryTransactionNumber: string;
+  sourcePrimary: string;
+  sourceSecondary: string;
+  sourceHelper: string;
+  selectOrderSource: string;
+  selectInventoryTransactionSource: string;
+  searchOrderSource: string;
+  searchInventoryTransactionSource: string;
+  noOrderSourceResults: string;
+  noInventoryTransactionSourceResults: string;
   note: string;
   create: string;
+  save: string;
+  cancel: string;
+  edit: string;
   saving: string;
-  search: string;
   noResults: string;
   viewLines: string;
   notSpecified: string;
@@ -56,6 +85,12 @@ type Labels = {
   slaAttention: string;
   slaCritical: string;
   slaQueuedStale: string;
+  empty: string;
+  opFailed: string;
+  validationRequired: string;
+  importCsv: string;
+  exportCsv: string;
+  close: string;
 };
 
 type Props = {
@@ -64,8 +99,27 @@ type Props = {
   providerOptions: Array<{ id: string; displayName: string; isDefault: boolean }>;
   supplierOptions: Array<{ id: string; name: string; description: string | null }>;
   customerAccountOptions: Array<{ id: string; name: string; description: string | null }>;
-  initialSearch: string;
+  orderOptions: Array<{ id: string; orderNumber: string; description: string | null }>;
+  transactionOptions: Array<{ id: string; transactionNumber: string; description: string | null }>;
   labels: Labels;
+};
+
+type DrawerMode = "create" | "edit";
+type SortValue = "newest" | "oldest" | "number_asc" | "number_desc";
+
+type DocumentForm = {
+  documentNumber: string;
+  documentType: AdminBusinessDocumentType;
+  status: AdminBusinessDocumentStatus;
+  issueDate: string;
+  supplierId: string;
+  customerAccountId: string;
+  externalReference: string;
+  externalSystemStatus: AdminBusinessDocumentSyncStatus;
+  providerConfigId: string;
+  orderNumber: string;
+  inventoryTransactionNumber: string;
+  note: string;
 };
 
 function subscribeNoop() {
@@ -76,21 +130,38 @@ function getCurrentDateTimeLocalValue() {
   return new Date().toISOString().slice(0, 16);
 }
 
-function getExternalStatusBadgeClass(status: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED") {
-  switch (status) {
-    case "SENT":
-      return "rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700";
-    case "QUEUED":
-      return "rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700";
-    case "FAILED":
-      return "rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700";
+function getDocumentTypeLabel(value: AdminBusinessDocumentType) {
+  switch (value) {
+    case "PURCHASE_DOCUMENT":
+      return "Satın alma belgesi";
+    case "DELIVERY_NOTE":
+      return "İrsaliye";
+    case "E_INVOICE":
+      return "E-fatura";
+    case "E_DISPATCH":
+      return "E-irsaliye";
     default:
-      return "rounded-full bg-neutral-200 px-3 py-1 text-xs font-semibold text-neutral-700";
+      return value;
+  }
+}
+
+function getDocumentStatusLabel(value: AdminBusinessDocumentStatus) {
+  switch (value) {
+    case "DRAFT":
+      return "Taslak";
+    case "LINKED":
+      return "Bağlı";
+    case "ISSUED":
+      return "Kesildi";
+    case "CANCELLED":
+      return "İptal";
+    default:
+      return value;
   }
 }
 
 function getExternalStatusLabel(
-  status: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED",
+  status: AdminBusinessDocumentSyncStatus,
   labels: Pick<Labels, "badgeNotSent" | "badgeQueued" | "badgeSent" | "badgeFailed">,
 ) {
   switch (status) {
@@ -105,62 +176,313 @@ function getExternalStatusLabel(
   }
 }
 
-function getSlaBadge(item: AdminBusinessDocumentListResult["items"][number], labels: Pick<Labels, "slaAttention" | "slaCritical" | "slaQueuedStale">) {
+function getExternalStatusBadgeClass(status: AdminBusinessDocumentSyncStatus) {
+  switch (status) {
+    case "SENT":
+      return "border-sky-200 bg-sky-100 text-sky-700";
+    case "QUEUED":
+      return "border-violet-200 bg-violet-100 text-violet-700";
+    case "FAILED":
+      return "border-rose-200 bg-rose-100 text-rose-700";
+    default:
+      return "border-slate-200 bg-slate-100 text-slate-700";
+  }
+}
+
+function getSlaBadge(item: AdminBusinessDocumentListItem, labels: Pick<Labels, "slaAttention" | "slaCritical" | "slaQueuedStale">) {
   const ageHours = (Date.now() - new Date(item.issueDate).getTime()) / (1000 * 60 * 60);
 
   if (item.externalSystemStatus === "NOT_SENT") {
     if (ageHours >= 72) {
-      return {
-        className: "rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700",
-        label: labels.slaCritical,
-      };
+      return { className: "border-rose-200 bg-rose-100 text-rose-700", label: labels.slaCritical };
     }
 
     if (ageHours >= 24) {
-      return {
-        className: "rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700",
-        label: labels.slaAttention,
-      };
+      return { className: "border-amber-200 bg-amber-100 text-amber-700", label: labels.slaAttention };
     }
   }
 
   if (item.externalSystemStatus === "QUEUED" && ageHours >= 24) {
-    return {
-      className: "rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700",
-      label: labels.slaQueuedStale,
-    };
+    return { className: "border-orange-200 bg-orange-100 text-orange-700", label: labels.slaQueuedStale };
   }
 
   return null;
 }
 
-export function DocumentManager({ locale, result, providerOptions, supplierOptions, customerAccountOptions, initialSearch, labels }: Props) {
-  const router = useRouter();
-  const defaultDateTimeLocal = useSyncExternalStore(
-    subscribeNoop,
-    getCurrentDateTimeLocalValue,
-    () => "",
-  );
+function buildEmptyForm(defaultDateTimeLocal: string, defaultProviderConfigId: string): DocumentForm {
+  return {
+    documentNumber: "",
+    documentType: "PURCHASE_DOCUMENT",
+    status: "DRAFT",
+    issueDate: defaultDateTimeLocal,
+    supplierId: "",
+    customerAccountId: "",
+    externalReference: "",
+    externalSystemStatus: "NOT_SENT",
+    providerConfigId: defaultProviderConfigId,
+    orderNumber: "",
+    inventoryTransactionNumber: "",
+    note: "",
+  };
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function exportItemsAsCsv(items: AdminBusinessDocumentListItem[]) {
+  const rows = [
+    ["documentNumber", "documentType", "status", "issueDate", "counterpartyName", "externalReference", "externalSystemStatus", "orderNumber", "inventoryTransactionNumber", "providerDisplayName"],
+    ...items.map((item) => [
+      item.documentNumber,
+      item.documentType,
+      item.status,
+      item.issueDate,
+      item.counterpartyName,
+      item.externalReference ?? "",
+      item.externalSystemStatus,
+      item.orderNumber ?? "",
+      item.inventoryTransactionNumber ?? "",
+      item.providerDisplayName ?? "",
+    ]),
+  ];
+
+  const csv = rows
+    .map((row) => row.map((value) => `"${String(value).replaceAll("\"", "\"\"")}"`).join(","))
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "documents.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export function DocumentManager({
+  locale: _locale,
+  result,
+  providerOptions,
+  supplierOptions,
+  customerAccountOptions,
+  orderOptions,
+  transactionOptions,
+  labels,
+}: Props) {
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
+  const defaultDateTimeLocal = useSyncExternalStore(subscribeNoop, getCurrentDateTimeLocalValue, () => "");
+  const defaultProviderConfigId = providerOptions.find((item) => item.isDefault)?.id ?? "";
+
+  const [documentItems, setDocumentItems] = useState(result.items);
+  const [query, setQuery] = useState("");
+  const [documentTypeFilter, setDocumentTypeFilter] = useState<"all" | AdminBusinessDocumentType>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | AdminBusinessDocumentStatus>("all");
+  const [syncStatusFilter, setSyncStatusFilter] = useState<"all" | AdminBusinessDocumentSyncStatus>("all");
+  const [sort, setSort] = useState<SortValue>("newest");
   const [pending, setPending] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [detail, setDetail] = useState<AdminBusinessDocumentDetail | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [dispatchingId, setDispatchingId] = useState<string | null>(null);
   const [statusSyncingId, setStatusSyncingId] = useState<string | null>(null);
-  const [documentNumber, setDocumentNumber] = useState("");
-  const [documentType, setDocumentType] = useState<"PURCHASE_DOCUMENT" | "DELIVERY_NOTE" | "E_INVOICE" | "E_DISPATCH">("PURCHASE_DOCUMENT");
-  const [issueDate, setIssueDate] = useState("");
-  const [supplierId, setSupplierId] = useState("");
-  const [customerAccountId, setCustomerAccountId] = useState("");
-  const [externalReference, setExternalReference] = useState("");
-  const [externalSystemStatus, setExternalSystemStatus] = useState<"NOT_SENT" | "QUEUED" | "SENT" | "FAILED">("NOT_SENT");
-  const [providerConfigId, setProviderConfigId] = useState<string>(providerOptions.find((item) => item.isDefault)?.id ?? "");
-  const [orderNumber, setOrderNumber] = useState("");
-  const [inventoryTransactionNumber, setInventoryTransactionNumber] = useState("");
-  const [note, setNote] = useState("");
+  const [createForm, setCreateForm] = useState<DocumentForm>(() => buildEmptyForm(defaultDateTimeLocal, defaultProviderConfigId));
+  const [editForm, setEditForm] = useState<DocumentForm>(() => buildEmptyForm(defaultDateTimeLocal, defaultProviderConfigId));
 
-  async function createDocument() {
+  const filteredItems = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase("tr-TR");
+
+    return [...documentItems]
+      .filter((item) => {
+        if (documentTypeFilter !== "all" && item.documentType !== documentTypeFilter) {
+          return false;
+        }
+
+        if (statusFilter !== "all" && item.status !== statusFilter) {
+          return false;
+        }
+
+        if (syncStatusFilter !== "all" && item.externalSystemStatus !== syncStatusFilter) {
+          return false;
+        }
+
+        if (!normalizedQuery) {
+          return true;
+        }
+
+        return [
+          item.documentNumber,
+          item.counterpartyName,
+          item.orderNumber ?? "",
+          item.inventoryTransactionNumber ?? "",
+          item.externalReference ?? "",
+          item.providerDisplayName ?? "",
+        ].some((value) => value.toLocaleLowerCase("tr-TR").includes(normalizedQuery));
+      })
+      .sort((left, right) => {
+        if (sort === "oldest") {
+          return new Date(left.issueDate).getTime() - new Date(right.issueDate).getTime();
+        }
+
+        if (sort === "number_asc") {
+          return left.documentNumber.localeCompare(right.documentNumber, "tr");
+        }
+
+        if (sort === "number_desc") {
+          return right.documentNumber.localeCompare(left.documentNumber, "tr");
+        }
+
+        return new Date(right.issueDate).getTime() - new Date(left.issueDate).getTime();
+      });
+  }, [documentItems, documentTypeFilter, query, sort, statusFilter, syncStatusFilter]);
+
+  const activeForm = drawerMode === "edit" ? editForm : createForm;
+  const usesSupplierCounterparty = activeForm.documentType === "PURCHASE_DOCUMENT" || activeForm.documentType === "DELIVERY_NOTE";
+  const primarySourceIsTransaction = usesSupplierCounterparty;
+  const orderSourceOptions = orderOptions.map((item) => ({
+    value: item.orderNumber,
+    label: item.orderNumber,
+    description: item.description,
+  }));
+  const transactionSourceOptions = transactionOptions.map((item) => ({
+    value: item.transactionNumber,
+    label: item.transactionNumber,
+    description: item.description,
+  }));
+
+  function patchActiveForm(field: keyof DocumentForm, value: string) {
+    const setter = drawerMode === "edit" ? setEditForm : setCreateForm;
+    setter((current) => ({ ...current, [field]: value }));
+  }
+
+  function resetCreateForm() {
+    setCreateForm(buildEmptyForm(defaultDateTimeLocal, defaultProviderConfigId));
+  }
+
+  function closeDrawer() {
+    if (pending) {
+      return;
+    }
+
+    setDrawerMode(null);
+    setEditingId(null);
+    setError(null);
+  }
+
+  function openCreateDrawer() {
+    resetCreateForm();
+    setEditingId(null);
+    setError(null);
+    setDrawerMode("create");
+  }
+
+  function openEditDrawer(item: AdminBusinessDocumentListItem) {
+    setEditForm({
+      documentNumber: item.documentNumber,
+      documentType: item.documentType,
+      status: item.status,
+      issueDate: item.issueDate.slice(0, 16),
+      supplierId: item.supplierId ?? "",
+      customerAccountId: item.customerAccountId ?? "",
+      externalReference: item.externalReference ?? "",
+      externalSystemStatus: item.externalSystemStatus,
+      providerConfigId: item.providerConfigId ?? "",
+      orderNumber: item.orderNumber ?? "",
+      inventoryTransactionNumber: item.inventoryTransactionNumber ?? "",
+      note: "",
+    });
+    setEditingId(item.id);
+    setError(null);
+    setDrawerMode("edit");
+  }
+
+  async function refreshItems() {
+    const response = await fetch("/api/admin/documents?search=&page=1&pageSize=50", { method: "GET" });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+      throw new Error(payload?.message ?? labels.opFailed);
+    }
+
+    const payload = (await response.json()) as AdminBusinessDocumentListResult;
+    setDocumentItems(payload.items);
+  }
+
+  async function openDetail(id: string) {
+    const response = await fetch(`/api/admin/documents/${id}`, { cache: "no-store" });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+      setError(payload?.message ?? labels.opFailed);
+      return;
+    }
+
+    const payload = (await response.json()) as { item: AdminBusinessDocumentDetail };
+    setDetail(payload.item);
+  }
+
+  async function submitDocument(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (drawerMode === "edit") {
+      if (!editingId) {
+        setError(labels.opFailed);
+        return;
+      }
+
+      setPending(true);
+      setError(null);
+
+      try {
+        const response = await fetch(`/api/admin/documents/${editingId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status: editForm.status,
+            externalSystemStatus: editForm.externalSystemStatus,
+            externalReference: editForm.externalReference.trim() || null,
+            note: editForm.note.trim() || null,
+          }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+          setError(payload?.message ?? labels.opFailed);
+          return;
+        }
+
+        await refreshItems();
+        setDrawerMode(null);
+        setEditingId(null);
+      } catch (caughtError) {
+        setError(caughtError instanceof Error ? caughtError.message : labels.opFailed);
+      } finally {
+        setPending(false);
+      }
+
+      return;
+    }
+
+    if (!createForm.documentNumber.trim() || !createForm.issueDate) {
+      setError(labels.validationRequired);
+      return;
+    }
+
+    if (usesSupplierCounterparty && !createForm.supplierId) {
+      setError(labels.validationRequired);
+      return;
+    }
+
+    if (!usesSupplierCounterparty && !createForm.customerAccountId) {
+      setError(labels.validationRequired);
+      return;
+    }
+
     setPending(true);
     setError(null);
+
     try {
       const response = await fetch("/api/admin/documents", {
         method: "POST",
@@ -168,68 +490,34 @@ export function DocumentManager({ locale, result, providerOptions, supplierOptio
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          documentNumber,
-          documentType,
-          issueDate: new Date(issueDate || defaultDateTimeLocal).toISOString(),
-          supplierId: supplierId || undefined,
-          customerAccountId: customerAccountId || undefined,
-          externalReference: externalReference.trim() || undefined,
-          externalSystemStatus,
-          providerConfigId: providerConfigId || undefined,
-          orderNumber: orderNumber.trim() || undefined,
-          inventoryTransactionNumber: inventoryTransactionNumber.trim() || undefined,
-          note: note.trim() || undefined,
+          documentNumber: createForm.documentNumber.trim(),
+          documentType: createForm.documentType,
+          status: createForm.status,
+          issueDate: new Date(createForm.issueDate || defaultDateTimeLocal).toISOString(),
+          supplierId: usesSupplierCounterparty ? createForm.supplierId || undefined : undefined,
+          customerAccountId: usesSupplierCounterparty ? undefined : createForm.customerAccountId || undefined,
+          externalReference: createForm.externalReference.trim() || undefined,
+          externalSystemStatus: createForm.externalSystemStatus,
+          providerConfigId: createForm.providerConfigId || undefined,
+          orderNumber: createForm.orderNumber.trim() || undefined,
+          inventoryTransactionNumber: createForm.inventoryTransactionNumber.trim() || undefined,
+          note: createForm.note.trim() || undefined,
         }),
       });
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(payload?.message ?? "Belge kaydedilemedi.");
+        setError(payload?.message ?? labels.opFailed);
         return;
       }
 
-      router.refresh();
-      setDocumentNumber("");
-      setSupplierId("");
-      setCustomerAccountId("");
-      setExternalReference("");
-      setProviderConfigId(providerOptions.find((item) => item.isDefault)?.id ?? "");
-      setOrderNumber("");
-      setInventoryTransactionNumber("");
-      setNote("");
-    } catch {
-      setError("Belge kaydedilemedi.");
+      await refreshItems();
+      resetCreateForm();
+      setDrawerMode(null);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : labels.opFailed);
     } finally {
       setPending(false);
-    }
-  }
-
-  const usesSupplierCounterparty = documentType === "PURCHASE_DOCUMENT" || documentType === "DELIVERY_NOTE";
-
-  async function openDetail(id: string) {
-    const response = await fetch(`/api/admin/documents/${id}`, { cache: "no-store" });
-    if (!response.ok) {
-      return;
-    }
-    const payload = (await response.json()) as { item: AdminBusinessDocumentDetail };
-    setDetail(payload.item);
-  }
-
-  async function updateStatus(id: string, status: "DRAFT" | "LINKED" | "ISSUED" | "CANCELLED") {
-    const response = await fetch(`/api/admin/documents/${id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ status }),
-    });
-
-    if (response.ok) {
-      if (detail?.id === id) {
-        const payload = (await response.json()) as { item: AdminBusinessDocumentDetail };
-        setDetail(payload.item);
-      }
-      router.refresh();
     }
   }
 
@@ -248,18 +536,18 @@ export function DocumentManager({ locale, result, providerOptions, supplierOptio
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(payload?.message ?? "Belge gönderim kuyruğuna alınamadı.");
+        setError(payload?.message ?? labels.opFailed);
         return;
       }
 
-      const payload = (await response.json()) as { item: AdminBusinessDocumentDetail };
       if (detail?.id === id) {
+        const payload = (await response.json()) as { item: AdminBusinessDocumentDetail };
         setDetail(payload.item);
       }
 
-      router.refresh();
-    } catch {
-      setError("Belge gönderim kuyruğuna alınamadı.");
+      await refreshItems();
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : labels.opFailed);
     } finally {
       setDispatchingId(null);
     }
@@ -280,217 +568,629 @@ export function DocumentManager({ locale, result, providerOptions, supplierOptio
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(payload?.message ?? "Belge durum senkronu kuyruğuna alınamadı.");
+        setError(payload?.message ?? labels.opFailed);
         return;
       }
 
-      const payload = (await response.json()) as { item: AdminBusinessDocumentDetail };
       if (detail?.id === id) {
+        const payload = (await response.json()) as { item: AdminBusinessDocumentDetail };
         setDetail(payload.item);
       }
 
-      router.refresh();
-    } catch {
-      setError("Belge durum senkronu kuyruğuna alınamadı.");
+      await refreshItems();
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : labels.opFailed);
     } finally {
       setStatusSyncingId(null);
     }
   }
 
+  function parseCsvLine(line: string) {
+    const values: string[] = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index];
+
+      if (character === "\"") {
+        if (inQuotes && line[index + 1] === "\"") {
+          current += "\"";
+          index += 1;
+          continue;
+        }
+
+        inQuotes = !inQuotes;
+        continue;
+      }
+
+      if (character === "," && !inQuotes) {
+        values.push(current);
+        current = "";
+        continue;
+      }
+
+      current += character;
+    }
+
+    values.push(current);
+    return values.map((value) => value.trim());
+  }
+
+  async function importDocumentsFromCsv(file: File) {
+    setImporting(true);
+    setError(null);
+
+    try {
+      const text = await file.text();
+      const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      if (lines.length <= 1) {
+        return;
+      }
+
+      const headers = parseCsvLine(lines[0]).map((header) => header.toLocaleLowerCase("tr-TR"));
+      const rows = lines.slice(1).map((line) => {
+        const values = parseCsvLine(line);
+        return headers.reduce<Record<string, string>>((accumulator, header, index) => {
+          accumulator[header] = values[index] ?? "";
+          return accumulator;
+        }, {});
+      });
+
+      for (const row of rows) {
+        const documentType = (row.documenttype || row.document_type || "PURCHASE_DOCUMENT") as AdminBusinessDocumentType;
+        const usesSupplier = documentType === "PURCHASE_DOCUMENT" || documentType === "DELIVERY_NOTE";
+        const supplierMatch = usesSupplier
+          ? supplierOptions.find((item) => item.name.toLocaleLowerCase("tr-TR") === (row.counterpartyname || row.suppliername || "").toLocaleLowerCase("tr-TR"))
+          : null;
+        const customerMatch = !usesSupplier
+          ? customerAccountOptions.find((item) => item.name.toLocaleLowerCase("tr-TR") === (row.counterpartyname || row.customeraccountname || "").toLocaleLowerCase("tr-TR"))
+          : null;
+        const providerMatch = providerOptions.find((item) => item.displayName.toLocaleLowerCase("tr-TR") === (row.providerdisplayname || "").toLocaleLowerCase("tr-TR"));
+
+        const response = await fetch("/api/admin/documents", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            documentNumber: row.documentnumber,
+            documentType,
+            status: (row.status || "DRAFT") as AdminBusinessDocumentStatus,
+            issueDate: row.issuedate ? new Date(row.issuedate).toISOString() : new Date(defaultDateTimeLocal).toISOString(),
+            supplierId: supplierMatch?.id,
+            customerAccountId: customerMatch?.id,
+            externalReference: row.externalreference || undefined,
+            externalSystemStatus: (row.externalsystemstatus || "NOT_SENT") as AdminBusinessDocumentSyncStatus,
+            providerConfigId: providerMatch?.id,
+            orderNumber: row.ordernumber || undefined,
+            inventoryTransactionNumber: row.inventorytransactionnumber || undefined,
+            note: row.note || undefined,
+          }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+          throw new Error(payload?.message ?? labels.opFailed);
+        }
+      }
+
+      await refreshItems();
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : labels.opFailed);
+    } finally {
+      setImporting(false);
+      if (importFileInputRef.current) {
+        importFileInputRef.current.value = "";
+      }
+    }
+  }
+
+  const renderForm = (
+    <form onSubmit={(event) => void submitDocument(event)} className="flex h-full flex-col">
+      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-950">{drawerMode === "edit" ? labels.edit : labels.createTitle}</h2>
+          <p className="mt-1 text-sm text-slate-500">{drawerMode === "edit" ? labels.title : labels.description}</p>
+        </div>
+        <Button type="button" size="icon" variant="ghost" onClick={closeDrawer} disabled={pending}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        {drawerMode === "create" ? (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="document-number">{labels.documentNumber}</Label>
+                <Input id="document-number" value={activeForm.documentNumber} onChange={(event) => patchActiveForm("documentNumber", event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="document-type">{labels.documentType}</Label>
+                <Select value={activeForm.documentType} onValueChange={(value) => patchActiveForm("documentType", value)}>
+                  <SelectTrigger id="document-type">
+                    <SelectValue placeholder={labels.documentType} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PURCHASE_DOCUMENT">{getDocumentTypeLabel("PURCHASE_DOCUMENT")}</SelectItem>
+                    <SelectItem value="DELIVERY_NOTE">{getDocumentTypeLabel("DELIVERY_NOTE")}</SelectItem>
+                    <SelectItem value="E_INVOICE">{getDocumentTypeLabel("E_INVOICE")}</SelectItem>
+                    <SelectItem value="E_DISPATCH">{getDocumentTypeLabel("E_DISPATCH")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="issue-date">{labels.issueDate}</Label>
+                <Input id="issue-date" type="datetime-local" value={activeForm.issueDate} onChange={(event) => patchActiveForm("issueDate", event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="document-status">{labels.documentStatus}</Label>
+                <Select value={activeForm.status} onValueChange={(value) => patchActiveForm("status", value)}>
+                  <SelectTrigger id="document-status">
+                    <SelectValue placeholder={labels.documentStatus} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DRAFT">{getDocumentStatusLabel("DRAFT")}</SelectItem>
+                    <SelectItem value="LINKED">{getDocumentStatusLabel("LINKED")}</SelectItem>
+                    <SelectItem value="ISSUED">{getDocumentStatusLabel("ISSUED")}</SelectItem>
+                    <SelectItem value="CANCELLED">{getDocumentStatusLabel("CANCELLED")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>{usesSupplierCounterparty ? labels.selectSupplier : labels.selectCustomerAccount}</Label>
+                <SearchableSelect
+                  value={usesSupplierCounterparty ? activeForm.supplierId : activeForm.customerAccountId}
+                  onValueChange={(value) => {
+                    if (usesSupplierCounterparty) {
+                      patchActiveForm("supplierId", value);
+                      patchActiveForm("customerAccountId", "");
+                      return;
+                    }
+
+                    patchActiveForm("customerAccountId", value);
+                    patchActiveForm("supplierId", "");
+                  }}
+                  options={(usesSupplierCounterparty ? supplierOptions : customerAccountOptions).map((item) => ({
+                    value: item.id,
+                    label: item.name,
+                    description: item.description,
+                  }))}
+                  placeholder={usesSupplierCounterparty ? labels.selectSupplier : labels.selectCustomerAccount}
+                  searchPlaceholder={labels.searchCounterparty}
+                  emptyLabel={labels.noCounterpartyResults}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="external-reference">{labels.externalReference}</Label>
+                <Input id="external-reference" value={activeForm.externalReference} onChange={(event) => patchActiveForm("externalReference", event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="external-status">{labels.externalSystemStatus}</Label>
+                <Select value={activeForm.externalSystemStatus} onValueChange={(value) => patchActiveForm("externalSystemStatus", value)}>
+                  <SelectTrigger id="external-status">
+                    <SelectValue placeholder={labels.externalSystemStatus} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NOT_SENT">{labels.badgeNotSent}</SelectItem>
+                    <SelectItem value="QUEUED">{labels.badgeQueued}</SelectItem>
+                    <SelectItem value="SENT">{labels.badgeSent}</SelectItem>
+                    <SelectItem value="FAILED">{labels.badgeFailed}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="provider-config">{labels.providerSelection}</Label>
+                <Select value={activeForm.providerConfigId || "__none__"} onValueChange={(value) => patchActiveForm("providerConfigId", value === "__none__" ? "" : value)}>
+                  <SelectTrigger id="provider-config">
+                    <SelectValue placeholder={labels.providerSelection} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{labels.providerNone}</SelectItem>
+                    {providerOptions.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>{item.displayName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-950">{labels.sourcePrimary}</p>
+                <p className="mt-1 text-xs text-slate-500">{labels.sourceHelper}</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>{primarySourceIsTransaction ? labels.inventoryTransactionNumber : labels.orderNumber}</Label>
+                  <SearchableSelect
+                    value={primarySourceIsTransaction ? activeForm.inventoryTransactionNumber : activeForm.orderNumber}
+                    onValueChange={(value) => {
+                      if (primarySourceIsTransaction) {
+                        patchActiveForm("inventoryTransactionNumber", value);
+                        return;
+                      }
+
+                      patchActiveForm("orderNumber", value);
+                    }}
+                    options={primarySourceIsTransaction ? transactionSourceOptions : orderSourceOptions}
+                    placeholder={primarySourceIsTransaction ? labels.selectInventoryTransactionSource : labels.selectOrderSource}
+                    searchPlaceholder={primarySourceIsTransaction ? labels.searchInventoryTransactionSource : labels.searchOrderSource}
+                    emptyLabel={primarySourceIsTransaction ? labels.noInventoryTransactionSourceResults : labels.noOrderSourceResults}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{primarySourceIsTransaction ? labels.orderNumber : labels.inventoryTransactionNumber}</Label>
+                  <SearchableSelect
+                    value={primarySourceIsTransaction ? activeForm.orderNumber : activeForm.inventoryTransactionNumber}
+                    onValueChange={(value) => {
+                      if (primarySourceIsTransaction) {
+                        patchActiveForm("orderNumber", value);
+                        return;
+                      }
+
+                      patchActiveForm("inventoryTransactionNumber", value);
+                    }}
+                    options={primarySourceIsTransaction ? orderSourceOptions : transactionSourceOptions}
+                    placeholder={primarySourceIsTransaction ? labels.selectOrderSource : labels.selectInventoryTransactionSource}
+                    searchPlaceholder={primarySourceIsTransaction ? labels.searchOrderSource : labels.searchInventoryTransactionSource}
+                    emptyLabel={primarySourceIsTransaction ? labels.noOrderSourceResults : labels.noInventoryTransactionSourceResults}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="document-note">{labels.note}</Label>
+              <Textarea id="document-note" rows={5} value={activeForm.note} onChange={(event) => patchActiveForm("note", event.target.value)} />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>{labels.documentNumber}</Label>
+                <Input value={activeForm.documentNumber} disabled />
+              </div>
+              <div className="space-y-2">
+                <Label>{labels.documentType}</Label>
+                <Input value={getDocumentTypeLabel(activeForm.documentType)} disabled />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-document-status">{labels.documentStatus}</Label>
+                <Select value={activeForm.status} onValueChange={(value) => patchActiveForm("status", value)}>
+                  <SelectTrigger id="edit-document-status">
+                    <SelectValue placeholder={labels.documentStatus} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DRAFT">{getDocumentStatusLabel("DRAFT")}</SelectItem>
+                    <SelectItem value="LINKED">{getDocumentStatusLabel("LINKED")}</SelectItem>
+                    <SelectItem value="ISSUED">{getDocumentStatusLabel("ISSUED")}</SelectItem>
+                    <SelectItem value="CANCELLED">{getDocumentStatusLabel("CANCELLED")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-external-status">{labels.externalSystemStatus}</Label>
+                <Select value={activeForm.externalSystemStatus} onValueChange={(value) => patchActiveForm("externalSystemStatus", value)}>
+                  <SelectTrigger id="edit-external-status">
+                    <SelectValue placeholder={labels.externalSystemStatus} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NOT_SENT">{labels.badgeNotSent}</SelectItem>
+                    <SelectItem value="QUEUED">{labels.badgeQueued}</SelectItem>
+                    <SelectItem value="SENT">{labels.badgeSent}</SelectItem>
+                    <SelectItem value="FAILED">{labels.badgeFailed}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="edit-external-reference">{labels.externalReference}</Label>
+                <Input id="edit-external-reference" value={activeForm.externalReference} onChange={(event) => patchActiveForm("externalReference", event.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-note">{labels.note}</Label>
+              <Textarea id="edit-note" rows={6} value={activeForm.note} onChange={(event) => patchActiveForm("note", event.target.value)} />
+            </div>
+          </>
+        )}
+        {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      </div>
+      <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
+        <Button type="button" variant="outline" onClick={closeDrawer} disabled={pending}>{labels.cancel}</Button>
+        <Button type="submit" disabled={pending}>{pending ? labels.saving : drawerMode === "edit" ? labels.save : labels.create}</Button>
+      </div>
+    </form>
+  );
+
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold text-neutral-950">{labels.title}</h1>
-          <p className="text-sm text-neutral-600">{labels.description}</p>
-        </div>
-        <form action={`/${locale}/admin/documents`} className="mt-4">
-          <Input
-            type="search"
-            name="search"
-            defaultValue={initialSearch}
-            placeholder={labels.search}
-          />
-        </form>
-      </section>
-
-      <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-neutral-950">{labels.createTitle}</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <Input value={documentNumber} onChange={(event) => setDocumentNumber(event.target.value)} placeholder={labels.documentNumber} />
-          <Select value={documentType} onValueChange={(value) => setDocumentType(value as typeof documentType)}>
-            <SelectTrigger>
-              <SelectValue placeholder={labels.documentType} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="PURCHASE_DOCUMENT">Satın alma belgesi</SelectItem>
-              <SelectItem value="DELIVERY_NOTE">İrsaliye</SelectItem>
-              <SelectItem value="E_INVOICE">E-fatura</SelectItem>
-              <SelectItem value="E_DISPATCH">E-irsaliye</SelectItem>
-            </SelectContent>
-          </Select>
-          <Input type="datetime-local" value={issueDate || defaultDateTimeLocal} onChange={(event) => setIssueDate(event.target.value)} />
-          <SearchableSelect
-            value={usesSupplierCounterparty ? supplierId : customerAccountId}
-            onValueChange={(value) => {
-              if (usesSupplierCounterparty) {
-                setSupplierId(value);
-                return;
-              }
-              setCustomerAccountId(value);
-            }}
-            options={(usesSupplierCounterparty ? supplierOptions : customerAccountOptions).map((item) => ({
-              value: item.id,
-              label: item.name,
-              description: item.description,
-            }))}
-            placeholder={usesSupplierCounterparty ? labels.selectSupplier : labels.selectCustomerAccount}
-            searchPlaceholder={labels.searchCounterparty}
-            emptyLabel={labels.noCounterpartyResults}
-          />
-          <Input value={externalReference} onChange={(event) => setExternalReference(event.target.value)} placeholder={labels.externalReference} />
-          <Select value={externalSystemStatus} onValueChange={(value) => setExternalSystemStatus(value as typeof externalSystemStatus)}>
-            <SelectTrigger>
-              <SelectValue placeholder={labels.externalSystemStatus} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="NOT_SENT">Gönderilmedi</SelectItem>
-              <SelectItem value="QUEUED">Kuyrukta</SelectItem>
-              <SelectItem value="SENT">Gönderildi</SelectItem>
-              <SelectItem value="FAILED">Hata aldı</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={providerConfigId || "__none__"} onValueChange={(value) => setProviderConfigId(value === "__none__" ? "" : value)}>
-            <SelectTrigger>
-              <SelectValue placeholder={`${labels.providerSelection}: ${labels.providerNone}`} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">{labels.providerSelection}: {labels.providerNone}</SelectItem>
-              {providerOptions.map((item) => (
-                <SelectItem key={item.id} value={item.id}>{item.displayName}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} placeholder={labels.orderNumber} />
-          <Input value={inventoryTransactionNumber} onChange={(event) => setInventoryTransactionNumber(event.target.value)} placeholder={labels.inventoryTransactionNumber} />
-          <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={labels.note} rows={4} className="md:col-span-2" />
-        </div>
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
-        <div className="mt-4 flex justify-end">
-          <Button type="button" onClick={() => void createDocument()} disabled={pending}>
-            {pending ? labels.saving : labels.create}
-          </Button>
-        </div>
-      </section>
-
-      <section className="grid gap-3">
-        {result.items.length === 0 ? (
-          <article className="rounded-3xl border border-neutral-200 bg-white p-5 text-sm text-neutral-500 shadow-sm">{labels.noResults}</article>
-        ) : result.items.map((item) => {
-          const slaBadge = getSlaBadge(item, labels);
-
-          return (
-          <article key={item.id} className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary">{item.documentType}</Badge>
-                  <Badge className="border-emerald-200 bg-emerald-100 text-emerald-700">{item.status}</Badge>
-                  <Badge className={getExternalStatusBadgeClass(item.externalSystemStatus)}>
-                    {getExternalStatusLabel(item.externalSystemStatus, labels)}
-                  </Badge>
-                  {slaBadge ? (
-                    <Badge className={slaBadge.className}>
-                      {slaBadge.label}
-                    </Badge>
-                  ) : null}
-                </div>
-                <h3 className="mt-3 text-lg font-semibold text-neutral-950">{item.documentNumber}</h3>
-                <p className="mt-1 text-sm text-neutral-600">{item.counterpartyName}</p>
-                <div className="mt-3 grid gap-2 text-sm text-neutral-700 md:grid-cols-2 xl:grid-cols-4">
-                  <p>{labels.issueDate}: {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.issueDate))}</p>
-                  <p>{labels.providerSelection}: {item.providerDisplayName ?? labels.notSpecified}</p>
-                  <p>{labels.orderNumber}: {item.orderNumber ?? labels.notSpecified}</p>
-                  <p>{labels.inventoryTransactionNumber}: {item.inventoryTransactionNumber ?? labels.notSpecified}</p>
-                  <p>{labels.externalReference}: {item.externalReference ?? labels.notSpecified}</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" onClick={() => void openDetail(item.id)} variant="secondary">
-                  {labels.viewLines}
-                </Button>
-                {(item.documentType === "E_INVOICE" || item.documentType === "E_DISPATCH") ? (
-                  <Button type="button" onClick={() => void queueDispatch(item.id, item.providerConfigId)} disabled={dispatchingId === item.id} variant="secondary">
-                    {dispatchingId === item.id ? labels.queueing : labels.queueDispatch}
-                  </Button>
-                ) : null}
-                {(item.documentType === "E_INVOICE" || item.documentType === "E_DISPATCH") ? (
-                  <Button type="button" onClick={() => void queueStatusSync(item.id, item.providerConfigId)} disabled={statusSyncingId === item.id} variant="secondary">
-                    {statusSyncingId === item.id ? labels.statusSyncing : labels.queueStatusSync}
-                  </Button>
-                ) : null}
-                <Button type="button" onClick={() => void updateStatus(item.id, "ISSUED")} variant="secondary">
-                  Issued
-                </Button>
-                <Button type="button" onClick={() => void updateStatus(item.id, "CANCELLED")} variant="secondary">
-                  Cancel
-                </Button>
-              </div>
+      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-5 p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-slate-950">{labels.title}</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-600">{labels.description}</p>
             </div>
-          </article>
-        )})}
-      </section>
-
-      {detail ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-neutral-950/35">
-          <div className="flex h-full w-full max-w-2xl flex-col overflow-y-auto bg-white p-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{detail.documentType}</p>
-                <h3 className="mt-1 text-xl font-semibold text-neutral-950">{detail.documentNumber}</h3>
-              </div>
-              <Button type="button" onClick={() => setDetail(null)} variant="secondary" size="sm">
-                Kapat
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    void importDocumentsFromCsv(file);
+                  }
+                }}
+              />
+              <Button type="button" variant="outline" onClick={() => importFileInputRef.current?.click()} disabled={importing}>
+                <Upload className="mr-2 h-4 w-4" />
+                {importing ? labels.saving : labels.importCsv}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => exportItemsAsCsv(filteredItems)} disabled={filteredItems.length === 0}>
+                <Download className="mr-2 h-4 w-4" />
+                {labels.exportCsv}
+              </Button>
+              <Button type="button" onClick={openCreateDrawer}>
+                <Plus className="mr-2 h-4 w-4" />
+                {labels.create}
               </Button>
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-neutral-200 p-4 text-sm text-neutral-700">
-                <p>{labels.counterparty}: {detail.counterpartyName}</p>
-                <p className="mt-2">{labels.providerSelection}: {detail.providerDisplayName ?? labels.notSpecified}</p>
-                <p className="mt-2">{labels.orderNumber}: {detail.orderNumber ?? labels.notSpecified}</p>
-                <p className="mt-2">{labels.inventoryTransactionNumber}: {detail.inventoryTransactionNumber ?? labels.notSpecified}</p>
-              </div>
-              <div className="rounded-2xl border border-neutral-200 p-4 text-sm text-neutral-700">
-                <p>{labels.documentStatus}: {detail.status}</p>
-                <p className="mt-2">{labels.externalSystemStatus}: {getExternalStatusLabel(detail.externalSystemStatus, labels)}</p>
-                <p className="mt-2">{labels.externalReference}: {detail.externalReference ?? labels.notSpecified}</p>
-              </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={labels.search} className="xl:col-span-2" />
+            <Select value={documentTypeFilter} onValueChange={(value) => setDocumentTypeFilter(value as typeof documentTypeFilter)}>
+              <SelectTrigger>
+                <SelectValue placeholder={labels.filterDocumentType} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{labels.filterAllDocumentTypes}</SelectItem>
+                <SelectItem value="PURCHASE_DOCUMENT">{getDocumentTypeLabel("PURCHASE_DOCUMENT")}</SelectItem>
+                <SelectItem value="DELIVERY_NOTE">{getDocumentTypeLabel("DELIVERY_NOTE")}</SelectItem>
+                <SelectItem value="E_INVOICE">{getDocumentTypeLabel("E_INVOICE")}</SelectItem>
+                <SelectItem value="E_DISPATCH">{getDocumentTypeLabel("E_DISPATCH")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
+              <SelectTrigger>
+                <SelectValue placeholder={labels.filterStatus} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{labels.filterAllStatuses}</SelectItem>
+                <SelectItem value="DRAFT">{getDocumentStatusLabel("DRAFT")}</SelectItem>
+                <SelectItem value="LINKED">{getDocumentStatusLabel("LINKED")}</SelectItem>
+                <SelectItem value="ISSUED">{getDocumentStatusLabel("ISSUED")}</SelectItem>
+                <SelectItem value="CANCELLED">{getDocumentStatusLabel("CANCELLED")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={syncStatusFilter} onValueChange={(value) => setSyncStatusFilter(value as typeof syncStatusFilter)}>
+              <SelectTrigger>
+                <SelectValue placeholder={labels.filterSyncStatus} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{labels.filterAllSyncStatuses}</SelectItem>
+                <SelectItem value="NOT_SENT">{labels.badgeNotSent}</SelectItem>
+                <SelectItem value="QUEUED">{labels.badgeQueued}</SelectItem>
+                <SelectItem value="SENT">{labels.badgeSent}</SelectItem>
+                <SelectItem value="FAILED">{labels.badgeFailed}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sort} onValueChange={(value) => setSort(value as SortValue)}>
+              <SelectTrigger>
+                <SelectValue placeholder={labels.sort} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">{labels.sortNewest}</SelectItem>
+                <SelectItem value="oldest">{labels.sortOldest}</SelectItem>
+                <SelectItem value="number_asc">{labels.sortNumberAsc}</SelectItem>
+                <SelectItem value="number_desc">{labels.sortNumberDesc}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-semibold text-slate-950">{labels.listTitle}</h2>
+        </div>
+
+        {filteredItems.length === 0 ? (
+          <div className="px-5 py-12 text-sm text-slate-500">{labels.empty}</div>
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 text-left text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">{labels.documentNumber}</th>
+                    <th className="px-5 py-3 font-medium">{labels.documentType}</th>
+                    <th className="px-5 py-3 font-medium">{labels.counterparty}</th>
+                    <th className="px-5 py-3 font-medium">{labels.issueDate}</th>
+                    <th className="px-5 py-3 font-medium">{labels.documentStatus}</th>
+                    <th className="px-5 py-3 font-medium">{labels.externalSystemStatus}</th>
+                    <th className="px-5 py-3 font-medium">{labels.providerSelection}</th>
+                    <th className="px-5 py-3 font-medium text-right">{labels.edit}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {filteredItems.map((item) => {
+                    const slaBadge = getSlaBadge(item, labels);
+
+                    return (
+                      <tr key={item.id} className="align-top">
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-slate-950">{item.documentNumber}</div>
+                          <div className="mt-1 text-xs text-slate-500">{item.orderNumber ?? item.inventoryTransactionNumber ?? labels.notSpecified}</div>
+                        </td>
+                        <td className="px-5 py-4 text-slate-700">{getDocumentTypeLabel(item.documentType)}</td>
+                        <td className="px-5 py-4 text-slate-700">{item.counterpartyName}</td>
+                        <td className="px-5 py-4 text-slate-700">{formatDate(item.issueDate)}</td>
+                        <td className="px-5 py-4">
+                          <Badge variant="outline">{getDocumentStatusLabel(item.status)}</Badge>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex flex-wrap gap-2">
+                            <Badge className={getExternalStatusBadgeClass(item.externalSystemStatus)}>
+                              {getExternalStatusLabel(item.externalSystemStatus, labels)}
+                            </Badge>
+                            {slaBadge ? <Badge className={slaBadge.className}>{slaBadge.label}</Badge> : null}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-slate-700">{item.providerDisplayName ?? labels.providerNone}</td>
+                        <td className="px-5 py-4">
+                          <div className="flex justify-end gap-2">
+                            <Button type="button" size="sm" variant="outline" onClick={() => void openDetail(item.id)}>{labels.viewLines}</Button>
+                            <Button type="button" size="sm" variant="outline" onClick={() => openEditDrawer(item)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              {labels.edit}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <div className="mt-4 space-y-3">
-              {detail.lines.map((line) => (
-                <article key={line.id} className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
-                  <p className="font-semibold text-neutral-950">{line.productName}</p>
-                  <p className="mt-1">{line.productSku} • {line.quantity}</p>
-                </article>
-              ))}
+
+            <div className="grid gap-4 p-4 lg:hidden">
+              {filteredItems.map((item) => {
+                const slaBadge = getSlaBadge(item, labels);
+
+                return (
+                  <article key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-base font-semibold text-slate-950">{item.documentNumber}</h3>
+                        <p className="mt-1 text-sm text-slate-600">{item.counterpartyName}</p>
+                      </div>
+                      <Badge variant="outline">{getDocumentStatusLabel(item.status)}</Badge>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge variant="outline">{getDocumentTypeLabel(item.documentType)}</Badge>
+                      <Badge className={getExternalStatusBadgeClass(item.externalSystemStatus)}>
+                        {getExternalStatusLabel(item.externalSystemStatus, labels)}
+                      </Badge>
+                      {slaBadge ? <Badge className={slaBadge.className}>{slaBadge.label}</Badge> : null}
+                    </div>
+                    <div className="mt-4 space-y-2 text-sm text-slate-600">
+                      <p>{labels.issueDate}: {formatDate(item.issueDate)}</p>
+                      <p>{labels.providerSelection}: {item.providerDisplayName ?? labels.providerNone}</p>
+                      <p>{labels.orderNumber}: {item.orderNumber ?? labels.notSpecified}</p>
+                      <p>{labels.inventoryTransactionNumber}: {item.inventoryTransactionNumber ?? labels.notSpecified}</p>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={() => void openDetail(item.id)}>{labels.viewLines}</Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => openEditDrawer(item)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        {labels.edit}
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-            <div className="mt-6">
-              <h4 className="text-sm font-semibold text-neutral-950">{labels.dispatchHistory}</h4>
-              {detail.dispatches.length === 0 ? (
-                <p className="mt-2 text-sm text-neutral-500">{labels.noDispatchHistory}</p>
-              ) : (
-                <div className="mt-3 space-y-3">
-                  {detail.dispatches.map((dispatch) => (
-                    <article key={dispatch.id} className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
-                      <p className="font-semibold text-neutral-950">{dispatch.channel} • {dispatch.status}</p>
-                      <p className="mt-1">{labels.dispatchProvider}: {dispatch.providerKey}</p>
-                      <p className="mt-1">{labels.externalReference}: {dispatch.externalReference ?? labels.notSpecified}</p>
-                      <p className="mt-1">{labels.dispatchQueuedAt}: {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(dispatch.queuedAt))}</p>
-                      <p className="mt-1">{labels.dispatchError}: {dispatch.errorMessage ?? labels.notSpecified}</p>
-                    </article>
-                  ))}
+          </>
+        )}
+      </section>
+
+      {drawerMode ? (
+        <div className="fixed inset-0 z-50 bg-slate-950/40">
+          <div className="absolute inset-y-0 right-0 h-full w-full max-w-2xl overflow-hidden bg-white shadow-2xl">
+            {renderForm}
+          </div>
+        </div>
+      ) : null}
+
+      {detail ? (
+        <div className="fixed inset-0 z-50 bg-slate-950/40">
+          <div className="absolute inset-y-0 right-0 h-full w-full max-w-3xl overflow-hidden bg-white shadow-2xl">
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{getDocumentTypeLabel(detail.documentType)}</p>
+                  <h2 className="mt-1 text-xl font-semibold text-slate-950">{detail.documentNumber}</h2>
                 </div>
-              )}
+                <Button type="button" size="icon" variant="ghost" onClick={() => setDetail(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-700">
+                    <p><span className="font-medium text-slate-950">{labels.counterparty}:</span> {detail.counterpartyName}</p>
+                    <p className="mt-2"><span className="font-medium text-slate-950">{labels.providerSelection}:</span> {detail.providerDisplayName ?? labels.providerNone}</p>
+                    <p className="mt-2"><span className="font-medium text-slate-950">{labels.orderNumber}:</span> {detail.orderNumber ?? labels.notSpecified}</p>
+                    <p className="mt-2"><span className="font-medium text-slate-950">{labels.inventoryTransactionNumber}:</span> {detail.inventoryTransactionNumber ?? labels.notSpecified}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-700">
+                    <p><span className="font-medium text-slate-950">{labels.documentStatus}:</span> {getDocumentStatusLabel(detail.status)}</p>
+                    <p className="mt-2"><span className="font-medium text-slate-950">{labels.externalSystemStatus}:</span> {getExternalStatusLabel(detail.externalSystemStatus, labels)}</p>
+                    <p className="mt-2"><span className="font-medium text-slate-950">{labels.externalReference}:</span> {detail.externalReference ?? labels.notSpecified}</p>
+                    <p className="mt-2"><span className="font-medium text-slate-950">{labels.note}:</span> {detail.note ?? labels.notSpecified}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <div className="flex flex-wrap gap-2">
+                    {(detail.documentType === "E_INVOICE" || detail.documentType === "E_DISPATCH") ? (
+                      <Button type="button" variant="outline" onClick={() => void queueDispatch(detail.id, detail.providerConfigId)} disabled={dispatchingId === detail.id}>
+                        {dispatchingId === detail.id ? labels.queueing : labels.queueDispatch}
+                      </Button>
+                    ) : null}
+                    {(detail.documentType === "E_INVOICE" || detail.documentType === "E_DISPATCH") ? (
+                      <Button type="button" variant="outline" onClick={() => void queueStatusSync(detail.id, detail.providerConfigId)} disabled={statusSyncingId === detail.id}>
+                        {statusSyncingId === detail.id ? labels.statusSyncing : labels.queueStatusSync}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-950">{labels.viewLines}</h3>
+                  <div className="mt-3 space-y-3">
+                    {detail.lines.map((line) => (
+                      <article key={line.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                        <p className="font-semibold text-slate-950">{line.productName}</p>
+                        <p className="mt-1">{line.productSku} • {line.quantity}</p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-950">{labels.dispatchHistory}</h3>
+                  {detail.dispatches.length === 0 ? (
+                    <p className="mt-3 text-sm text-slate-500">{labels.noDispatchHistory}</p>
+                  ) : (
+                    <div className="mt-3 space-y-3">
+                      {detail.dispatches.map((dispatch) => (
+                        <article key={dispatch.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                          <p className="font-semibold text-slate-950">{dispatch.channel} • {getExternalStatusLabel(dispatch.status, labels)}</p>
+                          <p className="mt-1">{labels.dispatchProvider}: {dispatch.providerKey}</p>
+                          <p className="mt-1">{labels.externalReference}: {dispatch.externalReference ?? labels.notSpecified}</p>
+                          <p className="mt-1">{labels.dispatchQueuedAt}: {formatDate(dispatch.queuedAt)}</p>
+                          <p className="mt-1">{labels.dispatchError}: {dispatch.errorMessage ?? labels.notSpecified}</p>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 px-5 py-4">
+                <Button type="button" variant="outline" onClick={() => setDetail(null)}>{labels.close}</Button>
+              </div>
             </div>
           </div>
         </div>

@@ -27,8 +27,10 @@ import type {
   AdminProductVariantInput,
   AdminSupplierItem,
   AdminTopInteractionItem,
+  AdminUpdateBrandInput,
   AdminUpdateCategoryInput,
   AdminUpdateProductInput,
+  AdminUpdateSupplierInput,
 } from "@/modules/catalog/contracts/catalog-admin.contract";
 import { CatalogAdminRepository } from "@/modules/catalog/repositories/catalog-admin.repository";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
@@ -156,6 +158,13 @@ const createBrandSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
+const updateBrandSchema = z.object({
+  id: z.string().trim().min(1),
+  slug: z.string().trim().min(2).max(120).optional(),
+  name: z.string().trim().min(2).max(120).optional(),
+  isActive: z.boolean().optional(),
+});
+
 const createSupplierSchema = z.object({
   slug: z.string().trim().min(2).max(120),
   name: z.string().trim().min(2).max(120),
@@ -163,6 +172,16 @@ const createSupplierSchema = z.object({
   email: z.string().trim().email().max(160).optional().nullable(),
   phone: z.string().trim().max(40).optional().nullable(),
   isActive: z.boolean().default(true),
+});
+
+const updateSupplierSchema = z.object({
+  id: z.string().trim().min(1),
+  slug: z.string().trim().min(2).max(120).optional(),
+  name: z.string().trim().min(2).max(120).optional(),
+  taxNumber: z.string().trim().max(64).optional().nullable(),
+  email: z.string().trim().email().max(160).optional().nullable(),
+  phone: z.string().trim().max(40).optional().nullable(),
+  isActive: z.boolean().optional(),
 });
 
 const createAttributeDefinitionSchema = z.object({
@@ -995,13 +1014,71 @@ export class CatalogAdminService {
   async createBrand(input: AdminCreateBrandInput): Promise<AdminBrandItem> {
     const parsed = createBrandSchema.parse(input);
     const created = await this.repository.createBrand(parsed);
+    await invalidateCatalogCache();
     return mapBrand(created);
+  }
+
+  async updateBrand(input: AdminUpdateBrandInput): Promise<AdminBrandItem> {
+    const parsed = updateBrandSchema.parse(input);
+    const existing = await this.repository.findActiveBrandById(parsed.id);
+
+    if (!existing) {
+      throw new Error("Brand not found");
+    }
+
+    const updated = await this.repository.updateBrand(parsed);
+    await invalidateCatalogCache();
+    return mapBrand(updated);
+  }
+
+  async softDeleteBrand(brandId: string, deletedUserId: string) {
+    const existing = await this.repository.findActiveBrandById(brandId);
+
+    if (!existing) {
+      throw new Error("Brand not found");
+    }
+
+    if (existing._count.products > 0) {
+      throw new Error("Bu marka aktif ürünlerde kullanıldığı için silinemez.");
+    }
+
+    await this.repository.softDeleteBrand(brandId, deletedUserId);
+    await invalidateCatalogCache();
   }
 
   async createSupplier(input: AdminCreateSupplierInput): Promise<AdminSupplierItem> {
     const parsed = createSupplierSchema.parse(input);
     const created = await this.repository.createSupplier(parsed);
+    await invalidateCatalogCache();
     return mapSupplier(created);
+  }
+
+  async updateSupplier(input: AdminUpdateSupplierInput): Promise<AdminSupplierItem> {
+    const parsed = updateSupplierSchema.parse(input);
+    const existing = await this.repository.findActiveSupplierById(parsed.id);
+
+    if (!existing) {
+      throw new Error("Supplier not found");
+    }
+
+    const updated = await this.repository.updateSupplier(parsed);
+    await invalidateCatalogCache();
+    return mapSupplier(updated);
+  }
+
+  async softDeleteSupplier(supplierId: string, deletedUserId: string) {
+    const existing = await this.repository.findActiveSupplierById(supplierId);
+
+    if (!existing) {
+      throw new Error("Supplier not found");
+    }
+
+    if (existing._count.primaryProducts > 0) {
+      throw new Error("Bu tedarikçi aktif ürünlerde kullanıldığı için silinemez.");
+    }
+
+    await this.repository.softDeleteSupplier(supplierId, deletedUserId);
+    await invalidateCatalogCache();
   }
 
   async listAttributeDefinitions(): Promise<AdminProductAttributeDefinitionItem[]> {

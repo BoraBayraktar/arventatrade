@@ -2,9 +2,11 @@ import { notFound } from "next/navigation";
 
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
+import { commerceService } from "@/modules/commerce/services/commerce.service";
 import { customerAccountService } from "@/modules/customers/services/customer-account.service";
 import { documentService } from "@/modules/documents/services/document.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { inventoryService } from "@/modules/inventory/services/inventory.service";
 import { DocumentManager } from "@/ui/admin/document-manager";
 
 export default async function AdminDocumentsPage({
@@ -27,15 +29,23 @@ export default async function AdminDocumentsPage({
   }
 
   const dictionary = getDictionary(locale as Locale);
-  const [result, providerConfigs, suppliers, customerAccounts] = await Promise.all([
+  const [result, providerConfigs, suppliers, customerAccounts, orders, transactions] = await Promise.all([
     documentService.listBusinessDocuments({
       search: resolvedSearchParams.search,
       page: 1,
-      pageSize: 20,
+      pageSize: 50,
     }),
     documentService.listProviderConfigs(),
     catalogAdminService.listSuppliers(),
     customerAccountService.listCustomerAccounts(),
+    commerceService.listOrders({
+      page: 1,
+      pageSize: 50,
+    }),
+    inventoryService.listInventoryTransactions({
+      page: 1,
+      pageSize: 20,
+    }),
   ]);
 
   return (
@@ -57,11 +67,32 @@ export default async function AdminDocumentsPage({
         name: item.name,
         description: item.email ?? item.phone ?? item.taxNumber ?? null,
       }))}
-      initialSearch={resolvedSearchParams.search ?? ""}
+      orderOptions={orders.items.map((item) => ({
+        id: item.id,
+        orderNumber: item.orderNumber,
+        description: item.customerAccountName ?? null,
+      }))}
+      transactionOptions={transactions.items.map((item) => ({
+        id: item.id,
+        transactionNumber: item.transactionNumber,
+        description: item.sourceDocument.counterpartyName ?? item.note ?? item.reference ?? null,
+      }))}
       labels={{
         title: dictionary.admin.documentManager,
         description: dictionary.admin.documentsDescription,
         createTitle: dictionary.admin.documentsCreateTitle,
+        listTitle: dictionary.admin.documentsMenuOverview,
+        filterDocumentType: dictionary.admin.documentsDocumentType,
+        filterStatus: dictionary.admin.documentsDocumentStatus,
+        filterSyncStatus: dictionary.admin.documentsExternalSystemStatus,
+        filterAllDocumentTypes: "Tüm belge tipleri",
+        filterAllStatuses: dictionary.admin.allStatuses,
+        filterAllSyncStatuses: "Tüm dış sistem durumları",
+        sort: "Sıralama",
+        sortNewest: "Tarih: En yeni",
+        sortOldest: "Tarih: En eski",
+        sortNumberAsc: "Belge no A-Z",
+        sortNumberDesc: "Belge no Z-A",
         documentNumber: dictionary.admin.documentsDocumentNumber,
         documentType: dictionary.admin.documentsDocumentType,
         documentStatus: dictionary.admin.documentsDocumentStatus,
@@ -71,8 +102,20 @@ export default async function AdminDocumentsPage({
         externalSystemStatus: dictionary.admin.documentsExternalSystemStatus,
         orderNumber: dictionary.admin.documentsOrderNumber,
         inventoryTransactionNumber: dictionary.admin.documentsInventoryTransactionNumber,
+        sourcePrimary: "Birincil kaynak",
+        sourceSecondary: "İkincil kaynak",
+        sourceHelper: "Varsayılan akışta tek bir kaynak seçmeniz yeterlidir. İhtiyaç halinde ikinci bir kaynak da bağlayabilirsiniz.",
+        selectOrderSource: "Sipariş seç",
+        selectInventoryTransactionSource: "Stok işlemi seç",
+        searchOrderSource: "Sipariş ara",
+        searchInventoryTransactionSource: "Stok işlemi ara",
+        noOrderSourceResults: "Eşleşen sipariş bulunamadı.",
+        noInventoryTransactionSourceResults: "Eşleşen stok işlemi bulunamadı.",
         note: dictionary.admin.documentsNote,
         create: dictionary.admin.documentsCreateAction,
+        save: dictionary.admin.save,
+        cancel: dictionary.admin.cancel,
+        edit: dictionary.admin.edit,
         saving: dictionary.common.loading,
         search: dictionary.admin.documentsSearch,
         noResults: dictionary.admin.documentsNoResults,
@@ -100,6 +143,12 @@ export default async function AdminDocumentsPage({
         selectCustomerAccount: dictionary.admin.documentsSelectCustomerAccount,
         searchCounterparty: dictionary.admin.documentsSearchCounterparty,
         noCounterpartyResults: dictionary.admin.documentsNoCounterpartyResults,
+        empty: dictionary.admin.documentsNoResults,
+        opFailed: dictionary.admin.operationFailed,
+        validationRequired: dictionary.admin.validationRequired,
+        importCsv: dictionary.admin.importCsv,
+        exportCsv: dictionary.admin.exportCsv,
+        close: dictionary.admin.documentsDrawerClose,
       }}
     />
   );

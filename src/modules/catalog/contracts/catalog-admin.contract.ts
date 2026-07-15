@@ -220,9 +220,26 @@ export type AdminCreateBrandInput = {
   isActive?: boolean;
 };
 
+export type AdminUpdateBrandInput = {
+  id: string;
+  slug?: string;
+  name?: string;
+  isActive?: boolean;
+};
+
 export type AdminCreateSupplierInput = {
   slug: string;
   name: string;
+  taxNumber?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  isActive?: boolean;
+};
+
+export type AdminUpdateSupplierInput = {
+  id: string;
+  slug?: string;
+  name?: string;
   taxNumber?: string | null;
   email?: string | null;
   phone?: string | null;

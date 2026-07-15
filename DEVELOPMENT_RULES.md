@@ -13,10 +13,10 @@ Tum yeni gelistirmeler ve refactor islemleri bu kurallara uygun yapilmalidir.
 ## 2) i18n Kurallari
 
 - Lokalizasyon altyapisi i18n uzerinden yonetilir.
-- Key kaynaklari sadece iki dosyadir:
+- Key kaynaklari sadece tek dosyadir:
   - src/i18n/tr.json
-  - src/i18n/en.json
-- i18n alt yapısını koru kaldırma ama bundan sonra aksi belirtilene kadar sadece Türkçe dil kullanılacak. 
+- i18n alt yapısını koru.
+- Sadece Türkçe dil kullan. 
 
 ## 3) Responsive UI Kurallari
 
@@ -38,6 +38,8 @@ Tum yeni gelistirmeler ve refactor islemleri bu kurallara uygun yapilmalidir.
 
 ## 6) Genel UI / UX Prensipleri
 
+- shadgn/ui kütüphanesini kullan.
+- Radius Tailwind CSS kullan.
 - Bu kurallar yalnizca tek bir modul icin degil, tum yonetim paneli ve tum uygun uygulama yuzeyleri icin gecerlidir.
 - Varsayilan ekran her zaman sade, hizli anlasilir ve aksiyon odakli olmalidir.
 - Kullanici ilk bakista sadece temel isi yapabilmelidir; ileri detaylar varsayilan acik gelmemelidir.
