@@ -172,6 +172,9 @@ export class IdentityService {
 
   async getAuthenticatedUser(token?: string): Promise<AuthUser | null> {
     if (!token) {
+      logInfo("Authentication skipped because no auth token cookie was present", {
+        scope: "identity.auth",
+      });
       return null;
     }
 
@@ -211,7 +214,11 @@ export class IdentityService {
       );
 
       return user;
-    } catch {
+    } catch (error) {
+      logError("Authentication token verification failed", {
+        scope: "identity.auth",
+        error: String(error),
+      });
       return null;
     }
   }
