@@ -23,7 +23,7 @@ import { IntegrationRepository } from "@/modules/integration/repositories/integr
 
 const listQuerySchema = z.object({
   channel: z.enum(["TRENDYOL", "N11", "EDOCS_MOCK"]).optional(),
-  jobType: z.enum(["PRODUCT_SYNC", "PRICE_SYNC", "STOCK_SYNC", "DOCUMENT_OUTBOUND", "DOCUMENT_STATUS_SYNC"]).optional(),
+  jobType: z.enum(["PRODUCT_SYNC", "PRICE_SYNC", "STOCK_SYNC", "ORDER_IMPORT", "ORDER_STATUS_SYNC", "DOCUMENT_OUTBOUND", "DOCUMENT_STATUS_SYNC"]).optional(),
   status: z.enum(["PENDING", "PROCESSING", "SUCCESS", "FAILED", "DEAD_LETTER"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
@@ -31,8 +31,8 @@ const listQuerySchema = z.object({
 
 const dispatchSchema = z.object({
   channel: z.enum(["TRENDYOL", "N11", "EDOCS_MOCK"]),
-  jobType: z.enum(["PRODUCT_SYNC", "PRICE_SYNC", "STOCK_SYNC", "DOCUMENT_OUTBOUND", "DOCUMENT_STATUS_SYNC"]),
-  entityType: z.enum(["PRODUCT", "BUSINESS_DOCUMENT"]),
+  jobType: z.enum(["PRODUCT_SYNC", "PRICE_SYNC", "STOCK_SYNC", "ORDER_IMPORT", "ORDER_STATUS_SYNC", "DOCUMENT_OUTBOUND", "DOCUMENT_STATUS_SYNC"]),
+  entityType: z.enum(["PRODUCT", "MARKETPLACE_ACCOUNT", "MARKETPLACE_PACKAGE", "ORDER", "BUSINESS_DOCUMENT"]),
   entityIds: z.array(z.string().trim().min(1)).min(1).max(100),
   maxAttempts: z.coerce.number().int().min(1).max(10).optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
@@ -62,8 +62,8 @@ function mapJob(item: {
   id: string;
   idempotencyKey: string;
   channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
-  jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
-  entityType: "PRODUCT" | "BUSINESS_DOCUMENT";
+  jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_IMPORT" | "ORDER_STATUS_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
+  entityType: "PRODUCT" | "MARKETPLACE_ACCOUNT" | "MARKETPLACE_PACKAGE" | "ORDER" | "BUSINESS_DOCUMENT";
   entityId: string;
   status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
   attemptCount: number;
@@ -71,6 +71,9 @@ function mapJob(item: {
   nextAttemptAt: Date;
   lastAttemptAt: Date | null;
   processedAt: Date | null;
+  externalReference: string | null;
+  payload: unknown;
+  responsePayload: unknown;
   lastError: string | null;
   createdAt: Date;
 }): AdminIntegrationJobItem {
@@ -87,6 +90,13 @@ function mapJob(item: {
     nextAttemptAt: item.nextAttemptAt.toISOString(),
     lastAttemptAt: item.lastAttemptAt ? item.lastAttemptAt.toISOString() : null,
     processedAt: item.processedAt ? item.processedAt.toISOString() : null,
+    externalReference: item.externalReference,
+    payload: item.payload && typeof item.payload === "object"
+      ? item.payload as Record<string, unknown>
+      : null,
+    responsePayload: item.responsePayload && typeof item.responsePayload === "object"
+      ? item.responsePayload as Record<string, unknown>
+      : null,
     lastError: item.lastError,
     createdAt: item.createdAt.toISOString(),
   };
@@ -96,8 +106,8 @@ function mapDeadLetter(item: {
   id: string;
   jobId: string;
   channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
-  jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
-  entityType: "PRODUCT" | "BUSINESS_DOCUMENT";
+  jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_IMPORT" | "ORDER_STATUS_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
+  entityType: "PRODUCT" | "MARKETPLACE_ACCOUNT" | "MARKETPLACE_PACKAGE" | "ORDER" | "BUSINESS_DOCUMENT";
   entityId: string;
   lastError: string;
   attemptCount: number;
@@ -175,7 +185,11 @@ export class IntegrationService {
           payload: (job.payload as Record<string, unknown> | null) ?? null,
         });
 
-        await this.repository.markJobSuccess(job.id);
+        await this.repository.markJobSuccess({
+          id: job.id,
+          externalReference: dispatchResult?.externalReference ?? null,
+          responsePayload: dispatchResult?.responsePayload ?? null,
+        });
 
         if (job.entityType === "BUSINESS_DOCUMENT" && job.jobType === "DOCUMENT_OUTBOUND") {
           await documentDispatchLifecycleService.markSuccess({

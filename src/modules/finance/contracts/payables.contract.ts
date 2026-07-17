@@ -1,4 +1,4 @@
-import type { AdminOperationalPayableDocument } from "@/modules/documents/contracts/document.contract";
+import type { AdminBusinessDocumentDetail, AdminOperationalPayableDocument } from "@/modules/documents/contracts/document.contract";
 
 export type AdminSupplierPayablesQuery = {
   search?: string;
@@ -13,7 +13,12 @@ export type AdminSupplierPayableSummary = {
   documentCount: number;
   draftCount: number;
   lastIssueDate: string | null;
+  topVariantSummary: string | null;
   documents: AdminOperationalPayableDocument[];
 };
 
-export type AdminSupplierPayableDetail = AdminSupplierPayableSummary;
+export type AdminSupplierPayableDetailDocument = AdminBusinessDocumentDetail;
+
+export type AdminSupplierPayableDetail = Omit<AdminSupplierPayableSummary, "documents"> & {
+  documents: AdminSupplierPayableDetailDocument[];
+};

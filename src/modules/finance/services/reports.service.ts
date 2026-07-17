@@ -49,6 +49,26 @@ function resolveTone(value: number): "neutral" | "success" | "warning" {
   return "neutral";
 }
 
+function formatMoney(value: number | null, currency = "TRY") {
+  if (value === null) {
+    return "Belirtilmedi";
+  }
+
+  return new Intl.NumberFormat("tr-TR", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "Belirtilmedi";
+  }
+
+  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(value));
+}
+
 export class ReportsService {
   async getOverview(locale: string): Promise<AdminFinanceReportsOverview> {
     const [accounts, payables, receivables, financialAccounts, transactions] = await Promise.all([
@@ -122,10 +142,13 @@ export class ReportsService {
   }
 
   async getAgingReport(locale: string): Promise<AdminFinanceReportDetail> {
-    const [payables, receivables] = await Promise.all([
+    const [payableSummaries, receivables] = await Promise.all([
       payablesService.listSupplierPayables(),
       receivablesService.listOperationalReceivables({ page: 1, pageSize: 100 }),
     ]);
+    const payables = (await Promise.all(
+      payableSummaries.map((item) => payablesService.getSupplierPayableByKey(item.supplierKey)),
+    )).filter((item): item is NonNullable<typeof item> => Boolean(item));
 
     const rows: AdminFinanceReportDetailRow[] = agingBuckets.map((bucket) => {
       const receivableAmount = receivables.items
@@ -146,7 +169,23 @@ export class ReportsService {
       return {
         id: bucket.id,
         label: bucket.label,
-        supportingText: "Açık operasyon bakiyesi yaş aralığı",
+        supportingText: (() => {
+          const bucketPayables = payables
+            .flatMap((item) => item.documents.map((document) => ({ document, supplier: item })))
+            .filter((entry) => {
+              const days = diffInDays(entry.document.issueDate);
+              return days >= bucket.minDays && (bucket.maxDays == null || days <= bucket.maxDays);
+            });
+          const variantSummary = bucketPayables
+            .map((entry) => entry.supplier.topVariantSummary)
+            .filter((value): value is string => Boolean(value))
+            .slice(0, 2)
+            .join(" + ");
+
+          return variantSummary
+            ? `Açık operasyon bakiyesi yaş aralığı • ${variantSummary}`
+            : "Açık operasyon bakiyesi yaş aralığı";
+        })(),
         primaryValue: receivableAmount,
         primaryCurrency: "TRY",
         secondaryValue: payableAmount,
@@ -157,6 +196,25 @@ export class ReportsService {
 
     const totalReceivable = rows.reduce((sum, item) => sum + item.primaryValue, 0);
     const totalPayable = rows.reduce((sum, item) => sum + (item.secondaryValue ?? 0), 0);
+    const payableTableRows = payables
+      .flatMap((supplier) => supplier.documents.map((document) => ({ supplier, document })))
+      .flatMap(({ supplier, document }) => document.lines.map((line) => ({
+        id: line.id,
+        href: `/${locale}/admin/finance/payables/${encodeURIComponent(supplier.supplierKey)}`,
+        cells: {
+          agingBucket: resolveBucketLabel(diffInDays(document.issueDate)),
+          supplier: supplier.supplierName,
+          document: document.documentNumber,
+          issueDate: formatDate(document.issueDate),
+          product: line.productName,
+          variant: line.productVariantTitle ?? "-",
+          sku: line.productVariantSku ?? line.productSku,
+          quantity: line.quantity.toLocaleString("tr-TR"),
+          unitPrice: formatMoney(line.unitPrice, line.currency),
+          lineTotal: formatMoney(line.lineTotal, line.currency),
+        },
+      })))
+      .sort((left, right) => right.cells.lineTotal.localeCompare(left.cells.lineTotal));
 
     return {
       title: "Yaşlandırma raporu",
@@ -185,16 +243,37 @@ export class ReportsService {
         },
       ],
       rows,
+      table: {
+        title: "Borç Yaşlandırma Detay Listesi",
+        description: "Açık borç belgelerinin ürün ve varyant satırlarını yaş aralığıyla birlikte tablo halinde inceleyin.",
+        columns: [
+          { key: "agingBucket", label: "Yaş Aralığı" },
+          { key: "supplier", label: "Tedarikçi" },
+          { key: "document", label: "Belge" },
+          { key: "issueDate", label: "Belge Tarihi" },
+          { key: "product", label: "Ürün" },
+          { key: "variant", label: "Varyant" },
+          { key: "sku", label: "SKU" },
+          { key: "quantity", label: "Miktar", align: "right" },
+          { key: "unitPrice", label: "Birim Maliyet", align: "right" },
+          { key: "lineTotal", label: "Satır Toplamı", align: "right" },
+        ],
+        rows: payableTableRows,
+      },
     };
   }
 
   async getCashflowReport(locale: string): Promise<AdminFinanceReportDetail> {
-    const [collections, payments, financialAccounts, transactions] = await Promise.all([
+    const [collections, payments, financialAccounts, transactions, payableSummaries] = await Promise.all([
       collectionsService.listCollectionReadiness(locale),
       paymentsService.listPaymentReadiness(locale),
       financialAccountsService.listAccounts(),
       cashTransactionsService.listTransactions(),
+      payablesService.listSupplierPayables(),
     ]);
+    const payableDetails = (await Promise.all(
+      payableSummaries.map((item) => payablesService.getSupplierPayableByKey(item.supplierKey)),
+    )).filter((item): item is NonNullable<typeof item> => Boolean(item));
 
     const netExpected = collections.summary.totalPendingAmount - payments.summary.totalPendingAmount;
     const netRecorded = collections.summary.totalRecordedAmount - payments.summary.totalRecordedAmount;
@@ -269,7 +348,14 @@ export class ReportsService {
         {
           id: "payments-expected",
           label: "Beklenen ödeme",
-          supportingText: "Açık borç toplamı",
+          supportingText: (() => {
+            const topSummaries = payments.items
+              .map((item) => item.topVariantSummary)
+              .filter((value): value is string => Boolean(value))
+              .slice(0, 2)
+              .join(" + ");
+            return topSummaries ? `Açık borç toplamı • ${topSummaries}` : "Açık borç toplamı";
+          })(),
           primaryValue: payments.summary.totalPendingAmount,
           primaryCurrency: payments.summary.currency,
           href: `/${locale}/admin/finance/payments`,
@@ -295,13 +381,46 @@ export class ReportsService {
         },
         ...accountRows,
       ],
+      table: {
+        title: "Beklenen Ödeme Ürün Detay Listesi",
+        description: "Açık tedarikçi borçlarının ürün ve varyant satırlarını ödeme planı gözüyle tablo halinde izleyin.",
+        columns: [
+          { key: "supplier", label: "Tedarikçi" },
+          { key: "document", label: "Belge" },
+          { key: "issueDate", label: "Belge Tarihi" },
+          { key: "product", label: "Ürün" },
+          { key: "variant", label: "Varyant" },
+          { key: "sku", label: "SKU" },
+          { key: "quantity", label: "Miktar", align: "right" },
+          { key: "unitPrice", label: "Birim Maliyet", align: "right" },
+          { key: "lineTotal", label: "Ödeme Tutarı", align: "right" },
+        ],
+        rows: payableDetails
+          .flatMap((supplier) => supplier.documents.map((document) => ({ supplier, document })))
+          .flatMap(({ supplier, document }) => document.lines.map((line) => ({
+            id: line.id,
+            href: `/${locale}/admin/finance/payments/${encodeURIComponent(supplier.supplierKey)}`,
+            cells: {
+              supplier: supplier.supplierName,
+              document: document.documentNumber,
+              issueDate: formatDate(document.issueDate),
+              product: line.productName,
+              variant: line.productVariantTitle ?? "-",
+              sku: line.productVariantSku ?? line.productSku,
+              quantity: line.quantity.toLocaleString("tr-TR"),
+              unitPrice: formatMoney(line.unitPrice, line.currency),
+              lineTotal: formatMoney(line.lineTotal, line.currency),
+            },
+          })))
+          .sort((left, right) => right.cells.lineTotal.localeCompare(left.cells.lineTotal)),
+      },
     };
   }
 
   async getStockValueReport(locale: string): Promise<AdminFinanceReportDetail> {
     const products = await catalogAdminService.listProducts({
       page: 1,
-      pageSize: 24,
+      pageSize: 50,
     });
 
     const totalStockValue = products.items.reduce((sum, item) => sum + item.stockValue, 0);
@@ -345,6 +464,42 @@ export class ReportsService {
           tone: item.stockValue > 0 ? "neutral" : "warning",
           href: `/${locale}/admin/products`,
         })),
+      table: {
+        title: "Ürün Bazlı Detay Liste",
+        description: "Stok değerini ürün bilgileriyle tablo halinde inceleyin. Bu alan özet kartlardan farklı olarak operasyonel rapor okuması içindir.",
+        columns: [
+          { key: "name", label: "Ürün" },
+          { key: "sku", label: "SKU" },
+          { key: "supplier", label: "Tedarikçi" },
+          { key: "stock", label: "Stok", align: "right" },
+          { key: "purchasePrice", label: "Alış Fiyatı", align: "right" },
+          { key: "averageUnitCost", label: "Ort. Maliyet", align: "right" },
+          { key: "stockValue", label: "Stok Değeri", align: "right" },
+          { key: "lastOrderedAt", label: "Son Sipariş" },
+        ],
+        rows: products.items
+          .sort((left, right) => right.stockValue - left.stockValue)
+          .map((item) => ({
+            id: item.id,
+            href: `/${locale}/admin/products`,
+            cells: {
+              name: item.name,
+              sku: item.sku,
+              supplier: item.primarySupplierName ?? "Belirtilmedi",
+              stock: item.stock.toLocaleString("tr-TR"),
+              purchasePrice: item.purchasePrice === null
+                ? "Belirtilmedi"
+                : new Intl.NumberFormat("tr-TR", { style: "currency", currency: item.currency, maximumFractionDigits: 2 }).format(item.purchasePrice),
+              averageUnitCost: item.averageUnitCost === null
+                ? "Belirtilmedi"
+                : new Intl.NumberFormat("tr-TR", { style: "currency", currency: item.currency, maximumFractionDigits: 2 }).format(item.averageUnitCost),
+              stockValue: new Intl.NumberFormat("tr-TR", { style: "currency", currency: item.currency, maximumFractionDigits: 2 }).format(item.stockValue),
+              lastOrderedAt: item.lastOrderedAt
+                ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(item.lastOrderedAt))
+                : "Belirtilmedi",
+            },
+          })),
+      },
     };
   }
 }

@@ -1162,7 +1162,18 @@ export function DocumentManager({
                     {detail.lines.map((line) => (
                       <article key={line.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                         <p className="font-semibold text-slate-950">{line.productName}</p>
+                        {line.productVariantTitle ? (
+                          <p className="mt-1 text-xs text-slate-600">
+                            Varyant: {line.productVariantTitle}
+                            {line.productVariantSku ? ` • ${line.productVariantSku}` : ""}
+                          </p>
+                        ) : null}
                         <p className="mt-1">{line.productSku} • {line.quantity}</p>
+                        <p className="mt-1 text-xs text-slate-600">
+                          Birim fiyat: {line.unitPrice === null ? labels.notSpecified : `${line.unitPrice.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${line.currency}`}
+                          {" • "}
+                          Satır toplamı: {line.lineTotal === null ? labels.notSpecified : `${line.lineTotal.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${line.currency}`}
+                        </p>
                       </article>
                     ))}
                   </div>

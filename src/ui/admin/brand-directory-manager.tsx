@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AdminBrandItem } from "@/modules/catalog/contracts/catalog-admin.contract";
+import { useTrendyolCatalogSearch } from "@/ui/admin/use-trendyol-catalog-search";
 
 type Labels = {
   title: string;
@@ -30,6 +31,10 @@ type Labels = {
   slug: string;
   name: string;
   productCount: string;
+  trendyolId: string;
+  trendyolSearch: string;
+  trendyolSearchHint: string;
+  trendyolSelected: string;
   create: string;
   edit: string;
   delete: string;
@@ -55,11 +60,18 @@ type DrawerMode = "create" | "edit";
 type BrandForm = {
   slug: string;
   name: string;
+  trendyolBrandId: string;
+};
+
+type TrendyolBrandOption = {
+  id: number;
+  name: string;
 };
 
 const emptyForm: BrandForm = {
   slug: "",
   name: "",
+  trendyolBrandId: "",
 };
 
 export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
@@ -76,6 +88,10 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<BrandForm>(emptyForm);
   const [editForm, setEditForm] = useState<BrandForm>(emptyForm);
+  const trendyolBrandSearch = useTrendyolCatalogSearch<TrendyolBrandOption>({
+    endpoint: "/api/admin/integrations/marketplaces/trendyol/catalog/brands",
+    enabled: Boolean(drawerMode),
+  });
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("tr-TR");
@@ -164,6 +180,7 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
     setError(null);
     setEditingId(null);
     setCreateForm(emptyForm);
+    trendyolBrandSearch.clear();
     setDrawerMode("create");
   }
 
@@ -173,7 +190,10 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
     setEditForm({
       slug: item.slug,
       name: item.name,
+      trendyolBrandId: item.trendyolBrandId ? String(item.trendyolBrandId) : "",
     });
+    trendyolBrandSearch.setQuery(item.name);
+    trendyolBrandSearch.setItems([]);
     setDrawerMode("edit");
   }
 
@@ -216,7 +236,10 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          trendyolBrandId: form.trendyolBrandId.trim() ? Number(form.trendyolBrandId) : null,
+        }),
       });
 
       if (!response.ok) {
@@ -448,9 +471,10 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
         </div>
 
         <div className="overflow-hidden rounded-xl border border-neutral-200">
-          <div className="hidden grid-cols-[1fr_1fr_120px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+          <div className="hidden grid-cols-[1fr_1fr_120px_120px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
             <span>{labels.name}</span>
             <span>{labels.slug}</span>
+            <span>{labels.trendyolId}</span>
             <span>{labels.productCount}</span>
             <span className="text-right">İşlem</span>
           </div>
@@ -460,11 +484,12 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
           ) : (
             <div className="divide-y divide-neutral-200">
               {filteredItems.map((item) => (
-                <article key={item.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_120px_190px] lg:items-center">
+                <article key={item.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_120px_120px_190px] lg:items-center">
                   <div>
                     <h3 className="font-medium text-neutral-950">{item.name}</h3>
                   </div>
                   <p className="text-sm text-neutral-500">{item.slug}</p>
+                  <p className="text-sm text-neutral-500">{item.trendyolBrandId ?? "-"}</p>
                   <p className="text-sm font-semibold text-neutral-950">{item.productCount}</p>
                   <div className="flex flex-wrap gap-2 lg:justify-end">
                     <Button type="button" size="sm" variant="secondary" disabled={loading} onClick={() => openEditDrawer(item)}>{labels.edit}</Button>
@@ -501,6 +526,47 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
               <div className="grid gap-2">
                 <Label>{labels.name}</Label>
                 <Input value={activeForm.name} onChange={(event) => patchActiveField("name", event.target.value)} required />
+              </div>
+              <div className="grid gap-2">
+                <Label>{labels.trendyolId}</Label>
+                <Input
+                  value={trendyolBrandSearch.query}
+                  onChange={(event) => trendyolBrandSearch.setQuery(event.target.value)}
+                  placeholder={labels.trendyolSearch}
+                  disabled={loading}
+                />
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                  {activeForm.trendyolBrandId ? (
+                    <div className="mb-2 flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                      <span className="text-neutral-700">{labels.trendyolSelected}: {activeForm.trendyolBrandId}</span>
+                      <button type="button" className="text-xs font-medium text-rose-600" onClick={() => patchActiveField("trendyolBrandId", "")}>
+                        {labels.delete}
+                      </button>
+                    </div>
+                  ) : null}
+                  {trendyolBrandSearch.busy ? (
+                    <p className="text-sm text-neutral-500">{labels.loading}</p>
+                  ) : trendyolBrandSearch.items.length === 0 ? (
+                    <p className="text-sm text-neutral-500">{labels.trendyolSearchHint}</p>
+                  ) : (
+                    <div className="grid gap-1">
+                      {trendyolBrandSearch.items.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => {
+                            patchActiveField("trendyolBrandId", String(option.id));
+                            trendyolBrandSearch.setQuery(option.name);
+                            trendyolBrandSearch.setItems([]);
+                          }}
+                          className="rounded-lg bg-white px-3 py-2 text-left text-sm transition hover:bg-cyan-50"
+                        >
+                          <span className="font-medium text-neutral-950">{option.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="mt-2 flex items-center justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={closeDrawer} disabled={loading}>

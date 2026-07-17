@@ -70,6 +70,7 @@ export default async function AdminProductsPage({
       attributeDefinitions={attributeDefinitions}
       warehouses={warehouses}
       canDelete={user.role === "ADMIN"}
+      canManageIntegrations={user.role === "ADMIN"}
       labels={{
         title: dictionary.admin.productManager,
         createTitle: dictionary.admin.createProduct,
@@ -173,6 +174,17 @@ export default async function AdminProductsPage({
         alertHealthy: dictionary.admin.alertHealthy,
         reviewInventory: dictionary.admin.reviewInventory,
         reviewTransactions: dictionary.admin.reviewTransactions,
+        trendyolPreflight: dictionary.admin.trendyolPreflight,
+        trendyolPreflightReady: dictionary.admin.trendyolPreflightReady,
+        trendyolPreflightBlocked: dictionary.admin.trendyolPreflightBlocked,
+        trendyolPreflightWarnings: dictionary.admin.trendyolPreflightWarnings,
+        trendyolPreflightIssues: dictionary.admin.trendyolPreflightIssues,
+        trendyolDraftPayload: dictionary.admin.trendyolDraftPayload,
+        trendyolQueueProductSync: dictionary.admin.trendyolQueueProductSync,
+        trendyolProductSyncQueued: dictionary.admin.trendyolProductSyncQueued,
+        trendyolProductSyncTracking: dictionary.admin.trendyolProductSyncTracking,
+        trendyolProductSyncJobStatus: dictionary.admin.trendyolProductSyncJobStatus,
+        trendyolProductSyncCheckAgain: dictionary.admin.trendyolProductSyncCheckAgain,
         brandName: dictionary.admin.brandName,
         supplierName: dictionary.admin.supplierName,
         supplierTaxNumber: dictionary.admin.supplierTaxNumber,

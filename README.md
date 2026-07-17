@@ -113,7 +113,7 @@ Varsayilan kimlik bilgileri:
 - Username: `minioadmin`
 - Password: `minioadmin`
 
-Admin urun yonetimi ekranindaki gorsel yukleme akisi MinIO bucket'ina (`arventa-media`) dosya yukler ve urune otomatik URL atar.
+Admin urun yonetimi ekranindaki gorsel yukleme akisi MinIO bucket'ina (`2bem-media`) dosya yukler ve urune otomatik URL atar.
 
 ## Notification ve SLA Ortam Degiskenleri
 

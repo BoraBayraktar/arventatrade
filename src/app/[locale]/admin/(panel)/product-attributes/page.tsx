@@ -22,11 +22,15 @@ export default async function AdminProductAttributesPage({
   }
 
   const dictionary = getDictionary(locale as Locale);
-  const items = await catalogAdminService.listAttributeDefinitions();
+  const [items, valueMappings] = await Promise.all([
+    catalogAdminService.listAttributeDefinitions(),
+    catalogAdminService.listAttributeValueMarketplaceMappings("TRENDYOL"),
+  ]);
 
   return (
     <AttributeDefinitionManager
       items={items}
+      valueMappings={valueMappings}
       labels={{
         title: dictionary.admin.productAttributesTitle,
         description: dictionary.admin.productAttributesDescription,
@@ -38,6 +42,12 @@ export default async function AdminProductAttributesPage({
         attributeDisplayText: dictionary.admin.attributeDisplayText,
         attributeDisplayColor: dictionary.admin.attributeDisplayColor,
         attributeDisplayNumber: dictionary.admin.attributeDisplayNumber,
+        trendyolId: dictionary.admin.trendyolId,
+        trendyolCategorySearch: dictionary.admin.trendyolCategorySearch,
+        trendyolCategorySearchHint: dictionary.admin.trendyolCategorySearchHint,
+        trendyolAttributeSearchHint: dictionary.admin.trendyolAttributeSearchHint,
+        trendyolValueSearchHint: dictionary.admin.trendyolValueSearchHint,
+        trendyolSelected: dictionary.admin.trendyolSelected,
         variantAxisUsageCount: dictionary.admin.variantAxisUsageCount,
         page: dictionary.admin.page,
         create: dictionary.admin.create,
@@ -53,6 +63,12 @@ export default async function AdminProductAttributesPage({
         statusActive: dictionary.admin.productStatusActive,
         statusArchived: dictionary.admin.productStatusArchived,
         selectedCount: dictionary.admin.selectedCount,
+        valueMappingsTitle: dictionary.admin.attributeValueMappingsTitle,
+        valueMappingsDescription: dictionary.admin.attributeValueMappingsDescription,
+        localValue: dictionary.admin.localValue,
+        externalValueId: dictionary.admin.externalValueId,
+        externalValueName: dictionary.admin.externalValueName,
+        customValue: dictionary.admin.customValue,
       }}
     />
   );

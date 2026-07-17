@@ -7,6 +7,7 @@ import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 const stockInSchema = z.object({
   productId: z.string().trim().min(1),
+  variantId: z.string().trim().min(1).optional(),
   sku: z.string().trim().min(1).max(64),
   warehouseCode: z.string().trim().min(1).max(32),
   quantity: z.coerce.number().int().min(1),
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
 
     await inventoryService.recordProductInventoryMovement({
       productId: payload.productId,
+      variantId: payload.variantId,
       sku: payload.sku,
       warehouseCode: payload.warehouseCode,
       quantity: payload.quantity,
@@ -51,6 +53,7 @@ export async function POST(request: Request) {
       summary: `Stok girişi uygulandı: ${payload.sku}`,
       metadata: {
         warehouseCode: payload.warehouseCode,
+        variantId: payload.variantId ?? null,
         quantity: payload.quantity,
         documentType: payload.documentType ?? null,
         sourceDocumentNumber: payload.sourceDocumentNumber ?? null,

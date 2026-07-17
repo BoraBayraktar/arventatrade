@@ -12,8 +12,8 @@ export type ConnectorDispatchResult = {
 export type ConnectorSyncJob = {
   id: string;
   channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
-  jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
-  entityType: "PRODUCT" | "BUSINESS_DOCUMENT";
+  jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_IMPORT" | "ORDER_STATUS_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
+  entityType: "PRODUCT" | "MARKETPLACE_ACCOUNT" | "MARKETPLACE_PACKAGE" | "ORDER" | "BUSINESS_DOCUMENT";
   entityId: string;
   payload: ConnectorJobPayload | null;
 };

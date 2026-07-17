@@ -103,6 +103,7 @@ export default async function AdminPanelLayout({
       label: dictionary.admin.integrationManager,
       children: [
         { href: `/${locale}/admin/integrations`, label: dictionary.admin.integrationManager },
+        { href: `/${locale}/admin/integrations/trendyol`, label: dictionary.admin.integrationMarketplaceTrendyol },
         { href: `/${locale}/admin/inventory/external-events`, label: "Harici Stok Eventleri" },
       ],
     },

@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 
 type JobStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
 type Channel = "TRENDYOL" | "N11" | "EDOCS_MOCK";
-type JobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
+type JobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_IMPORT" | "ORDER_STATUS_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
+type EntityType = "PRODUCT" | "MARKETPLACE_ACCOUNT" | "MARKETPLACE_PACKAGE" | "ORDER" | "BUSINESS_DOCUMENT";
 type DrawerMode = "create" | "process";
 
 type Job = {
@@ -19,7 +20,7 @@ type Job = {
   idempotencyKey: string;
   channel: Channel;
   jobType: JobType;
-  entityType: "PRODUCT" | "BUSINESS_DOCUMENT";
+  entityType: EntityType;
   entityId: string;
   status: JobStatus;
   attemptCount: number;
@@ -27,8 +28,17 @@ type Job = {
   nextAttemptAt: string;
   lastAttemptAt: string | null;
   processedAt: string | null;
+  externalReference: string | null;
+  payload: Record<string, unknown> | null;
+  responsePayload: Record<string, unknown> | null;
   lastError: string | null;
   createdAt: string;
+};
+
+type TrendyolBatchResult = {
+  jobId: string;
+  batchRequestId: string;
+  result: Record<string, unknown>;
 };
 
 type DeadLetter = {
@@ -36,7 +46,7 @@ type DeadLetter = {
   jobId: string;
   channel: Channel;
   jobType: JobType;
-  entityType: "PRODUCT" | "BUSINESS_DOCUMENT";
+  entityType: EntityType;
   entityId: string;
   lastError: string;
   attemptCount: number;
@@ -51,11 +61,57 @@ type Labels = {
   createJob: string;
   processQueue: string;
   deadLetters: string;
+  deadLettersEmpty: string;
   jobs: string;
   channel: string;
   jobType: string;
   status: string;
   entityId: string;
+  marketplaceOverview: string;
+  marketplaceOverviewHint: string;
+  filterByChannel: string;
+  activeFilters: string;
+  recentActivity: string;
+  noExternalReference: string;
+  noActionAvailable: string;
+  actionWaitingQueue: string;
+  actionProcessingQueue: string;
+  actionReviewError: string;
+  actionTrackDeadLetter: string;
+  openJobDetail: string;
+  jobDetailTitle: string;
+  jobDetailDescription: string;
+  requestPayload: string;
+  responsePayload: string;
+  payloadEmpty: string;
+  payloadReference: string;
+  payloadTrigger: string;
+  payloadBatch: string;
+  payloadSku: string;
+  attemptProgress: string;
+  lastAttemptAt: string;
+  processedAt: string;
+  channelTrendyol: string;
+  channelN11: string;
+  channelEDocsMock: string;
+  jobTypeProductSync: string;
+  jobTypePriceSync: string;
+  jobTypeStockSync: string;
+  jobTypeOrderImport: string;
+  jobTypeOrderStatusSync: string;
+  jobTypeDocumentOutbound: string;
+  jobTypeDocumentStatusSync: string;
+  statusPending: string;
+  statusProcessing: string;
+  statusSuccess: string;
+  statusFailed: string;
+  statusDeadLetter: string;
+  entityProduct: string;
+  entityMarketplaceAccount: string;
+  entityMarketplacePackage: string;
+  entityOrder: string;
+  entityBusinessDocument: string;
+  targetEntityType: string;
   actions: string;
   retry: string;
   operationFailed: string;
@@ -68,6 +124,10 @@ type Labels = {
   drawerDescription: string;
   entityIds: string;
   entityIdsHint: string;
+  entityIdsProductHint: string;
+  entityIdsMarketplaceAccountHint: string;
+  entityIdsMarketplacePackageHint: string;
+  entityIdsBusinessDocumentHint: string;
   stockSyncHint: string;
   genericSyncHint: string;
   maxAttempts: string;
@@ -102,6 +162,12 @@ type Labels = {
   nextAttemptAt: string;
   lastError: string;
   createdAt: string;
+  externalReference: string;
+  batchResult: string;
+  batchResultHint: string;
+  checkBatchResult: string;
+  batchResultEmpty: string;
+  batchCheckedAt: string;
   all: string;
   validationEntityIds: string;
   validationQueueLimit: string;
@@ -122,6 +188,14 @@ const JOB_TYPE_TRIGGER_PRESETS: Record<JobType, string[]> = {
   ],
   PRICE_SYNC: [
     "PRICE_UPDATE",
+    "MANUAL_DISPATCH",
+  ],
+  ORDER_IMPORT: [
+    "MARKETPLACE_ORDER_IMPORT",
+    "MANUAL_DISPATCH",
+  ],
+  ORDER_STATUS_SYNC: [
+    "MARKETPLACE_STATUS_REFRESH",
     "MANUAL_DISPATCH",
   ],
   DOCUMENT_OUTBOUND: [
@@ -166,8 +240,140 @@ function triggerLabel(trigger: string, labels: Labels) {
   return labels.triggerManualDispatch;
 }
 
+function channelLabel(channel: Channel, labels: Labels) {
+  if (channel === "TRENDYOL") {
+    return labels.channelTrendyol;
+  }
+
+  if (channel === "N11") {
+    return labels.channelN11;
+  }
+
+  return labels.channelEDocsMock;
+}
+
+function jobTypeLabel(jobType: JobType, labels: Labels) {
+  const map: Record<JobType, string> = {
+    PRODUCT_SYNC: labels.jobTypeProductSync,
+    PRICE_SYNC: labels.jobTypePriceSync,
+    STOCK_SYNC: labels.jobTypeStockSync,
+    ORDER_IMPORT: labels.jobTypeOrderImport,
+    ORDER_STATUS_SYNC: labels.jobTypeOrderStatusSync,
+    DOCUMENT_OUTBOUND: labels.jobTypeDocumentOutbound,
+    DOCUMENT_STATUS_SYNC: labels.jobTypeDocumentStatusSync,
+  };
+
+  return map[jobType];
+}
+
+function statusLabel(status: JobStatus, labels: Labels) {
+  const map: Record<JobStatus, string> = {
+    PENDING: labels.statusPending,
+    PROCESSING: labels.statusProcessing,
+    SUCCESS: labels.statusSuccess,
+    FAILED: labels.statusFailed,
+    DEAD_LETTER: labels.statusDeadLetter,
+  };
+
+  return map[status];
+}
+
+function entityTypeLabel(entityType: EntityType, labels: Labels) {
+  const map: Record<EntityType, string> = {
+    PRODUCT: labels.entityProduct,
+    MARKETPLACE_ACCOUNT: labels.entityMarketplaceAccount,
+    MARKETPLACE_PACKAGE: labels.entityMarketplacePackage,
+    ORDER: labels.entityOrder,
+    BUSINESS_DOCUMENT: labels.entityBusinessDocument,
+  };
+
+  return map[entityType];
+}
+
+function actionHint(job: Job, labels: Labels) {
+  if (job.status === "PENDING") {
+    return labels.actionWaitingQueue;
+  }
+
+  if (job.status === "PROCESSING") {
+    return labels.actionProcessingQueue;
+  }
+
+  if (job.status === "FAILED") {
+    return labels.actionReviewError;
+  }
+
+  if (job.status === "DEAD_LETTER") {
+    return labels.actionTrackDeadLetter;
+  }
+
+  return labels.noActionAvailable;
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function jobHighlights(job: Job, labels: Labels) {
+  const items: Array<{ label: string; value: string; tone: "neutral" | "cyan" | "amber" }> = [];
+  const reference = readString(job.payload?.reference);
+  const trigger = readString(job.payload?.trigger);
+  const batchRequestId = readString(job.responsePayload?.batchRequestId);
+  const sku = readString(job.responsePayload?.sku);
+
+  if (reference) {
+    items.push({ label: labels.payloadReference, value: reference, tone: "neutral" });
+  }
+
+  if (trigger) {
+    items.push({ label: labels.payloadTrigger, value: triggerLabel(trigger, labels), tone: "neutral" });
+  }
+
+  if (batchRequestId) {
+    items.push({ label: labels.payloadBatch, value: batchRequestId, tone: "cyan" });
+  }
+
+  if (sku) {
+    items.push({ label: labels.payloadSku, value: sku, tone: "amber" });
+  }
+
+  return items;
+}
+
 function defaultTriggerForJobType(jobType: JobType) {
   return JOB_TYPE_TRIGGER_PRESETS[jobType][0] ?? "MANUAL_DISPATCH";
+}
+
+function entityTypeForJobType(jobType: JobType): EntityType {
+  if (jobType === "DOCUMENT_OUTBOUND" || jobType === "DOCUMENT_STATUS_SYNC") {
+    return "BUSINESS_DOCUMENT";
+  }
+
+  if (jobType === "ORDER_IMPORT") {
+    return "MARKETPLACE_ACCOUNT";
+  }
+
+  if (jobType === "ORDER_STATUS_SYNC") {
+    return "MARKETPLACE_PACKAGE";
+  }
+
+  return "PRODUCT";
+}
+
+function entityIdsHintForEntityType(entityType: EntityType, labels: Labels) {
+  if (entityType === "MARKETPLACE_ACCOUNT") {
+    return labels.entityIdsMarketplaceAccountHint;
+  }
+
+  if (entityType === "MARKETPLACE_PACKAGE") {
+    return labels.entityIdsMarketplacePackageHint;
+  }
+
+  if (entityType === "BUSINESS_DOCUMENT") {
+    return labels.entityIdsBusinessDocumentHint;
+  }
+
+  return labels.entityIdsProductHint;
 }
 
 function formatDate(value: string, locale: string) {
@@ -226,6 +432,9 @@ export function IntegrationManager({
   const [forceFail, setForceFail] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [batchBusyJobId, setBatchBusyJobId] = useState<string | null>(null);
+  const [batchResult, setBatchResult] = useState<TrendyolBatchResult | null>(null);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | JobStatus>("all");
   const [channelFilter, setChannelFilter] = useState<"all" | Channel>("all");
@@ -238,10 +447,26 @@ export function IntegrationManager({
     failed: jobs.filter((item) => item.status === "FAILED").length,
     deadLetter: jobs.filter((item) => item.status === "DEAD_LETTER").length,
   }), [jobs]);
+  const channelSummaries = useMemo(() => (["TRENDYOL", "N11", "EDOCS_MOCK"] as Channel[]).map((item) => {
+    const channelJobs = jobs.filter((job) => job.channel === item);
+    const activeCount = channelJobs.filter((job) => job.status === "PENDING" || job.status === "PROCESSING").length;
+    const failedCount = channelJobs.filter((job) => job.status === "FAILED" || job.status === "DEAD_LETTER").length;
+    const lastJob = [...channelJobs].sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null;
+
+    return {
+      channel: item,
+      total: channelJobs.length,
+      activeCount,
+      failedCount,
+      lastJob,
+    };
+  }), [jobs]);
 
   const isStockSync = jobType === "STOCK_SYNC";
-  const isDocumentJob = jobType === "DOCUMENT_OUTBOUND" || jobType === "DOCUMENT_STATUS_SYNC";
+  const targetEntityType = entityTypeForJobType(jobType);
+  const targetEntityIdsHint = entityIdsHintForEntityType(targetEntityType, labels);
   const triggerOptions = JOB_TYPE_TRIGGER_PRESETS[jobType];
+  const hasActiveFilters = search.trim().length > 0 || statusFilter !== "all" || channelFilter !== "all" || jobTypeFilter !== "all";
 
   const filteredJobs = useMemo(() => [...jobs]
     .filter((item) => (
@@ -316,7 +541,7 @@ export function IntegrationManager({
       const payload = {
         channel,
         jobType,
-        entityType: (isDocumentJob ? "BUSINESS_DOCUMENT" : "PRODUCT") as "PRODUCT" | "BUSINESS_DOCUMENT",
+        entityType: targetEntityType,
         entityIds: normalizedEntityIds,
         maxAttempts: Number(maxAttempts || "3"),
         idempotencySuffix: idempotencySuffix.trim() || undefined,
@@ -407,6 +632,28 @@ export function IntegrationManager({
     }
   }
 
+  async function checkBatchResult(jobId: string) {
+    setBatchBusyJobId(jobId);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/integrations/jobs/${jobId}/trendyol-batch`);
+
+      if (!response.ok) {
+        const responsePayload = await response.json().catch(() => null) as { message?: string } | null;
+        setError(responsePayload?.message ?? labels.operationFailed);
+        return;
+      }
+
+      const payload = await response.json() as TrendyolBatchResult;
+      setBatchResult(payload);
+    } catch {
+      setError(labels.operationFailed);
+    } finally {
+      setBatchBusyJobId(null);
+    }
+  }
+
   return (
     <section className="rounded-3xl border border-neutral-200 bg-gradient-to-b from-neutral-50 to-white shadow-sm">
       <div className="border-b border-neutral-200 bg-[radial-gradient(circle_at_top_right,_rgba(14,116,144,0.15),_transparent_55%),radial-gradient(circle_at_left,_rgba(245,158,11,0.10),_transparent_45%)] p-6">
@@ -443,6 +690,58 @@ export function IntegrationManager({
       </div>
 
       <div className="border-b border-neutral-200 bg-white/90 p-5">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-lg font-semibold tracking-tight text-neutral-950">{labels.marketplaceOverview}</h3>
+          <p className="text-sm text-neutral-600">{labels.marketplaceOverviewHint}</p>
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          {channelSummaries.map((item) => (
+            <button
+              key={item.channel}
+              type="button"
+              onClick={() => setChannelFilter(item.channel)}
+              className={`rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${
+                channelFilter === item.channel
+                  ? "border-cyan-300 bg-cyan-50/80"
+                  : "border-neutral-200 bg-neutral-50/80"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-950">{channelLabel(item.channel, labels)}</p>
+                  <p className="mt-1 text-xs text-neutral-500">{labels.filterByChannel}</p>
+                </div>
+                <Badge className={item.failedCount > 0 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}>
+                  {item.failedCount > 0 ? labels.statusFailed : labels.statusSuccess}
+                </Badge>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+                <div className="rounded-xl bg-white px-3 py-2">
+                  <p className="text-xs text-neutral-500">{labels.jobs}</p>
+                  <p className="mt-1 font-semibold text-neutral-950">{item.total}</p>
+                </div>
+                <div className="rounded-xl bg-white px-3 py-2">
+                  <p className="text-xs text-neutral-500">{labels.summaryPending}</p>
+                  <p className="mt-1 font-semibold text-sky-700">{item.activeCount}</p>
+                </div>
+                <div className="rounded-xl bg-white px-3 py-2">
+                  <p className="text-xs text-neutral-500">{labels.summaryFailed}</p>
+                  <p className="mt-1 font-semibold text-amber-700">{item.failedCount}</p>
+                </div>
+              </div>
+              {item.lastJob ? (
+                <p className="mt-3 text-xs text-neutral-500">
+                  {jobTypeLabel(item.lastJob.jobType, labels)} - {statusLabel(item.lastJob.status, labels)} - {formatDate(item.lastJob.createdAt, locale)}
+                </p>
+              ) : (
+                <p className="mt-3 text-xs text-neutral-500">{labels.emptyJobs}</p>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="border-b border-neutral-200 bg-white/90 p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Input
@@ -456,9 +755,9 @@ export function IntegrationManager({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{labels.filterChannel}: {labels.all}</SelectItem>
-                <SelectItem value="TRENDYOL">TRENDYOL</SelectItem>
-                <SelectItem value="N11">N11</SelectItem>
-                <SelectItem value="EDOCS_MOCK">EDOCS_MOCK</SelectItem>
+                <SelectItem value="TRENDYOL">{labels.channelTrendyol}</SelectItem>
+                <SelectItem value="N11">{labels.channelN11}</SelectItem>
+                <SelectItem value="EDOCS_MOCK">{labels.channelEDocsMock}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={jobTypeFilter} onValueChange={(value) => setJobTypeFilter(value as "all" | JobType)}>
@@ -467,11 +766,13 @@ export function IntegrationManager({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{labels.filterJobType}: {labels.all}</SelectItem>
-                <SelectItem value="PRODUCT_SYNC">PRODUCT_SYNC</SelectItem>
-                <SelectItem value="PRICE_SYNC">PRICE_SYNC</SelectItem>
-                <SelectItem value="STOCK_SYNC">STOCK_SYNC</SelectItem>
-                <SelectItem value="DOCUMENT_OUTBOUND">DOCUMENT_OUTBOUND</SelectItem>
-                <SelectItem value="DOCUMENT_STATUS_SYNC">DOCUMENT_STATUS_SYNC</SelectItem>
+                <SelectItem value="PRODUCT_SYNC">{labels.jobTypeProductSync}</SelectItem>
+                <SelectItem value="PRICE_SYNC">{labels.jobTypePriceSync}</SelectItem>
+                <SelectItem value="STOCK_SYNC">{labels.jobTypeStockSync}</SelectItem>
+                <SelectItem value="ORDER_IMPORT">{labels.jobTypeOrderImport}</SelectItem>
+                <SelectItem value="ORDER_STATUS_SYNC">{labels.jobTypeOrderStatusSync}</SelectItem>
+                <SelectItem value="DOCUMENT_OUTBOUND">{labels.jobTypeDocumentOutbound}</SelectItem>
+                <SelectItem value="DOCUMENT_STATUS_SYNC">{labels.jobTypeDocumentStatusSync}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as "all" | JobStatus)}>
@@ -480,11 +781,11 @@ export function IntegrationManager({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{labels.filterStatus}: {labels.all}</SelectItem>
-                <SelectItem value="PENDING">PENDING</SelectItem>
-                <SelectItem value="PROCESSING">PROCESSING</SelectItem>
-                <SelectItem value="SUCCESS">SUCCESS</SelectItem>
-                <SelectItem value="FAILED">FAILED</SelectItem>
-                <SelectItem value="DEAD_LETTER">DEAD_LETTER</SelectItem>
+                <SelectItem value="PENDING">{labels.statusPending}</SelectItem>
+                <SelectItem value="PROCESSING">{labels.statusProcessing}</SelectItem>
+                <SelectItem value="SUCCESS">{labels.statusSuccess}</SelectItem>
+                <SelectItem value="FAILED">{labels.statusFailed}</SelectItem>
+                <SelectItem value="DEAD_LETTER">{labels.statusDeadLetter}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -497,77 +798,208 @@ export function IntegrationManager({
             }}>
               {labels.clearFilters}
             </Button>
-            <Button type="button" onClick={() => openDrawer("create")}>
-              {labels.openCreateDrawer}
-            </Button>
             {canManage ? (
-              <Button type="button" variant="secondary" onClick={() => openDrawer("process")}>
-                {labels.openProcessDrawer}
-              </Button>
+              <>
+                <Button type="button" onClick={() => openDrawer("create")}>
+                  {labels.openCreateDrawer}
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => openDrawer("process")}>
+                  {labels.openProcessDrawer}
+                </Button>
+              </>
             ) : null}
           </div>
         </div>
+        {hasActiveFilters ? (
+          <p className="mt-3 rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs text-cyan-800">
+            {labels.activeFilters}: {filteredJobs.length} / {jobs.length}
+          </p>
+        ) : null}
       </div>
 
       <div className="border-b border-neutral-200 bg-white/90 p-5">
         <h3 className="text-lg font-semibold tracking-tight text-neutral-950">{labels.jobs}</h3>
         <div className="mt-3 overflow-hidden rounded-xl border border-neutral-200">
-          <div className="hidden grid-cols-[110px_140px_120px_1fr_140px_160px] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+          <div className="hidden grid-cols-[150px_180px_130px_1fr_190px_130px] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 xl:grid">
             <span>{labels.channel}</span>
             <span>{labels.jobType}</span>
             <span>{labels.status}</span>
             <span>{labels.entityId}</span>
-            <span>{labels.nextAttemptAt}</span>
             <span>{labels.createdAt}</span>
+            <span>{labels.actions}</span>
           </div>
 
           {filteredJobs.length === 0 ? (
             <p className="p-4 text-sm text-neutral-500">{labels.emptyJobs}</p>
           ) : (
             <div className="divide-y divide-neutral-200">
-              {filteredJobs.map((item) => (
-                <article key={item.id} className="grid gap-3 p-4 lg:grid-cols-[110px_140px_120px_1fr_140px_160px] lg:items-center">
-                  <p className="font-medium text-neutral-900">{item.channel}</p>
-                  <p className="text-neutral-700">{item.jobType}</p>
-                  <p>
-                    <Badge className={statusClass(item.status)}>
-                      {item.status}
-                    </Badge>
-                  </p>
-                  <div className="min-w-0">
-                    <p className="break-all text-neutral-700">{item.entityId}</p>
-                    <p className="mt-1 truncate text-xs text-neutral-500">{item.idempotencyKey}</p>
-                    {item.lastError ? (
-                      <p className="mt-1 text-xs text-red-600">{labels.lastError}: {item.lastError}</p>
-                    ) : null}
-                  </div>
-                  <p className="text-sm text-neutral-500">{formatDate(item.nextAttemptAt, locale)}</p>
-                  <p className="text-sm text-neutral-500">{formatDate(item.createdAt, locale)}</p>
-                </article>
-              ))}
+              {filteredJobs.map((item) => {
+                const canCheckBatch = item.channel === "TRENDYOL"
+                  && item.status === "SUCCESS"
+                  && (item.jobType === "PRODUCT_SYNC" || item.jobType === "STOCK_SYNC" || item.jobType === "PRICE_SYNC")
+                  && Boolean(item.externalReference || item.responsePayload?.batchRequestId);
+                const highlights = jobHighlights(item, labels);
+
+                return (
+                  <article key={item.id} className="grid gap-3 p-4 xl:grid-cols-[150px_180px_130px_1fr_190px_130px] xl:items-center">
+                    <div>
+                      <p className="font-semibold text-neutral-900">{channelLabel(item.channel, labels)}</p>
+                      <p className="mt-1 text-xs text-neutral-500">{entityTypeLabel(item.entityType, labels)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-neutral-800">{jobTypeLabel(item.jobType, labels)}</p>
+                      <p className="mt-1 text-xs text-neutral-500">{labels.attemptProgress}: {item.attemptCount}/{item.maxAttempts}</p>
+                    </div>
+                    <p>
+                      <Badge className={statusClass(item.status)}>
+                        {statusLabel(item.status, labels)}
+                      </Badge>
+                    </p>
+                    <div className="min-w-0">
+                      <p className="break-all text-neutral-700">{item.entityId}</p>
+                      <p className="mt-1 truncate text-xs text-neutral-500">{item.idempotencyKey}</p>
+                      {item.externalReference ? (
+                        <p className="mt-1 truncate text-xs text-cyan-700">{labels.externalReference}: {item.externalReference}</p>
+                      ) : (
+                        <p className="mt-1 text-xs text-neutral-400">{labels.noExternalReference}</p>
+                      )}
+                      {highlights.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {highlights.map((highlight) => (
+                            <span
+                              key={`${highlight.label}:${highlight.value}`}
+                              className={`rounded-full px-2 py-1 text-xs ${
+                                highlight.tone === "cyan"
+                                  ? "bg-cyan-50 text-cyan-700"
+                                  : highlight.tone === "amber"
+                                    ? "bg-amber-50 text-amber-700"
+                                    : "bg-neutral-100 text-neutral-600"
+                              }`}
+                            >
+                              {highlight.label}: {highlight.value}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      {typeof item.responsePayload?.batchCheckedAt === "string" ? (
+                        <p className="mt-1 text-xs text-neutral-500">
+                          {labels.batchCheckedAt}: {formatDate(item.responsePayload.batchCheckedAt, locale)}
+                        </p>
+                      ) : null}
+                      {item.lastError ? (
+                        <p className="mt-1 text-xs text-red-600">{labels.lastError}: {item.lastError}</p>
+                      ) : null}
+                    </div>
+                    <div className="text-sm text-neutral-500">
+                      <p>{labels.createdAt}: {formatDate(item.createdAt, locale)}</p>
+                      <p className="mt-1">{labels.nextAttemptAt}: {formatDate(item.nextAttemptAt, locale)}</p>
+                      {item.lastAttemptAt ? <p className="mt-1">{labels.lastAttemptAt}: {formatDate(item.lastAttemptAt, locale)}</p> : null}
+                      {item.processedAt ? <p className="mt-1">{labels.processedAt}: {formatDate(item.processedAt, locale)}</p> : null}
+                    </div>
+                    <div className="flex flex-col items-start gap-2">
+                      {canCheckBatch ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => checkBatchResult(item.id)}
+                          disabled={batchBusyJobId === item.id}
+                        >
+                          {batchBusyJobId === item.id ? labels.loading : labels.checkBatchResult}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-neutral-500">{actionHint(item, labels)}</span>
+                      )}
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedJob(item)}>
+                        {labels.openJobDetail}
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
+      {batchResult ? (
+        <div className="border-b border-neutral-200 bg-cyan-50/60 p-5">
+          <div className="rounded-2xl border border-cyan-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold tracking-tight text-neutral-950">{labels.batchResult}</h3>
+                <p className="mt-1 text-sm text-neutral-600">{labels.batchResultHint}</p>
+                <p className="mt-2 text-xs font-medium text-cyan-800">Batch: {batchResult.batchRequestId}</p>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setBatchResult(null)}>
+                {labels.close}
+              </Button>
+            </div>
+            <pre className="mt-4 max-h-80 overflow-auto rounded-xl bg-neutral-950 p-4 text-xs text-neutral-50">
+              {JSON.stringify(batchResult.result ?? labels.batchResultEmpty, null, 2)}
+            </pre>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedJob ? (
+        <div className="fixed inset-0 z-50 flex justify-end bg-neutral-950/30">
+          <button type="button" className="absolute inset-0" onClick={() => setSelectedJob(null)} aria-label={labels.close} />
+          <aside className="relative h-full w-full max-w-4xl overflow-y-auto bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex flex-col gap-3 border-b border-neutral-200 bg-white p-5 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.jobDetailTitle}</p>
+                <h3 className="mt-1 text-lg font-semibold tracking-tight text-neutral-950">
+                  {channelLabel(selectedJob.channel, labels)} - {jobTypeLabel(selectedJob.jobType, labels)}
+                </h3>
+                <p className="mt-1 text-sm text-neutral-600">{labels.jobDetailDescription}</p>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedJob(null)}>
+                {labels.close}
+              </Button>
+            </div>
+            <div className="grid gap-4 p-5 lg:grid-cols-2">
+              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                <p className="text-sm font-semibold text-neutral-900">{labels.requestPayload}</p>
+                <pre className="mt-3 max-h-72 overflow-auto rounded-xl bg-neutral-950 p-4 text-xs text-neutral-50">
+                  {JSON.stringify(selectedJob.payload ?? labels.payloadEmpty, null, 2)}
+                </pre>
+              </div>
+              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                <p className="text-sm font-semibold text-neutral-900">{labels.responsePayload}</p>
+                <pre className="mt-3 max-h-72 overflow-auto rounded-xl bg-neutral-950 p-4 text-xs text-neutral-50">
+                  {JSON.stringify(selectedJob.responsePayload ?? labels.payloadEmpty, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </aside>
+        </div>
+      ) : null}
+
       <div className="bg-white/90 p-5">
         <h3 className="text-lg font-semibold tracking-tight text-neutral-950">{labels.deadLetters}</h3>
-        <div className="mt-3 divide-y divide-neutral-200 overflow-hidden rounded-xl border border-neutral-200">
+        <div className="mt-3 grid gap-3">
           {deadLetters.length === 0 ? (
-            <p className="p-4 text-sm text-neutral-500">{labels.emptyJobs}</p>
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{labels.deadLettersEmpty}</p>
           ) : deadLetters.map((item) => (
-            <article key={item.id} className="grid gap-3 p-4 lg:grid-cols-[110px_140px_1fr_auto] lg:items-center">
-              <p className="text-sm font-medium text-neutral-900">{item.channel}</p>
-              <p className="text-sm text-neutral-700">{item.jobType}</p>
-              <div>
-                <p className="text-sm text-neutral-700">{item.entityId}</p>
-                <p className="mt-1 text-xs text-red-600">{item.lastError}</p>
+            <article key={item.id} className="rounded-2xl border border-rose-100 bg-rose-50/60 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="bg-rose-100 text-rose-700">{labels.statusDeadLetter}</Badge>
+                    <p className="text-sm font-semibold text-neutral-950">{channelLabel(item.channel, labels)}</p>
+                    <p className="text-sm text-neutral-600">{jobTypeLabel(item.jobType, labels)}</p>
+                  </div>
+                  <p className="mt-2 break-all text-sm text-neutral-700">{labels.entityId}: {item.entityId}</p>
+                  <p className="mt-1 text-xs text-neutral-500">{labels.attemptProgress}: {item.attemptCount}/{item.maxAttempts} - {labels.createdAt}: {formatDate(item.createdAt, locale)}</p>
+                  <p className="mt-2 text-sm text-rose-700">{labels.lastError}: {item.lastError}</p>
+                </div>
+                {canManage ? (
+                  <Button type="button" variant="secondary" onClick={() => retryDeadLetter(item.jobId)} disabled={busy}>
+                    {labels.retry}
+                  </Button>
+                ) : null}
               </div>
-              {canManage ? (
-                <Button type="button" variant="secondary" onClick={() => retryDeadLetter(item.jobId)} disabled={busy}>
-                  {labels.retry}
-                </Button>
-              ) : null}
             </article>
           ))}
         </div>
@@ -618,9 +1050,9 @@ export function IntegrationManager({
                           <SelectValue placeholder={labels.channel} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="TRENDYOL">TRENDYOL</SelectItem>
-                          <SelectItem value="N11">N11</SelectItem>
-                          <SelectItem value="EDOCS_MOCK">EDOCS_MOCK</SelectItem>
+                          <SelectItem value="TRENDYOL">{labels.channelTrendyol}</SelectItem>
+                          <SelectItem value="N11">{labels.channelN11}</SelectItem>
+                          <SelectItem value="EDOCS_MOCK">{labels.channelEDocsMock}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -638,11 +1070,13 @@ export function IntegrationManager({
                           <SelectValue placeholder={labels.jobType} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="PRODUCT_SYNC">PRODUCT_SYNC</SelectItem>
-                          <SelectItem value="PRICE_SYNC">PRICE_SYNC</SelectItem>
-                          <SelectItem value="STOCK_SYNC">STOCK_SYNC</SelectItem>
-                          <SelectItem value="DOCUMENT_OUTBOUND">DOCUMENT_OUTBOUND</SelectItem>
-                          <SelectItem value="DOCUMENT_STATUS_SYNC">DOCUMENT_STATUS_SYNC</SelectItem>
+                          <SelectItem value="PRODUCT_SYNC">{labels.jobTypeProductSync}</SelectItem>
+                          <SelectItem value="PRICE_SYNC">{labels.jobTypePriceSync}</SelectItem>
+                          <SelectItem value="STOCK_SYNC">{labels.jobTypeStockSync}</SelectItem>
+                          <SelectItem value="ORDER_IMPORT">{labels.jobTypeOrderImport}</SelectItem>
+                          <SelectItem value="ORDER_STATUS_SYNC">{labels.jobTypeOrderStatusSync}</SelectItem>
+                          <SelectItem value="DOCUMENT_OUTBOUND">{labels.jobTypeDocumentOutbound}</SelectItem>
+                          <SelectItem value="DOCUMENT_STATUS_SYNC">{labels.jobTypeDocumentStatusSync}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -654,6 +1088,10 @@ export function IntegrationManager({
                       : "border-neutral-200 bg-neutral-50 text-neutral-700"
                   }`}>
                     {isStockSync ? labels.stockSyncHint : labels.genericSyncHint}
+                    <p className="mt-2 text-xs font-medium">
+                      {labels.targetEntityType}: {entityTypeLabel(targetEntityType, labels)}
+                    </p>
+                    <p className="mt-1 text-xs">{targetEntityIdsHint}</p>
                   </div>
 
                   <div className="grid gap-1">
@@ -662,9 +1100,9 @@ export function IntegrationManager({
                       value={entityIds}
                       onChange={(event) => setEntityIds(event.target.value)}
                       rows={6}
-                      placeholder={labels.entityIdsHint}
+                      placeholder={targetEntityIdsHint}
                     />
-                    <p className="text-xs text-neutral-500">{labels.entityIdsHint}</p>
+                    <p className="text-xs text-neutral-500">{targetEntityIdsHint}</p>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">

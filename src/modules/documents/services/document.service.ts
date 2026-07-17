@@ -157,8 +157,11 @@ function mapDocument(item: Awaited<ReturnType<DocumentRepository["findBusinessDo
     lines: item.lines.map((line: {
       id: string;
       productId: string | null;
+      productVariantId: string | null;
       productSku: string;
+      productVariantSku: string | null;
       productName: string;
+      productVariantTitle: string | null;
       quantity: number;
       unitPrice: { toNumber: () => number } | null;
       lineTotal: { toNumber: () => number } | null;
@@ -167,8 +170,11 @@ function mapDocument(item: Awaited<ReturnType<DocumentRepository["findBusinessDo
     }) => ({
       id: line.id,
       productId: line.productId,
+      productVariantId: line.productVariantId,
       productSku: line.productSku,
+      productVariantSku: line.productVariantSku,
       productName: line.productName,
+      productVariantTitle: line.productVariantTitle,
       quantity: line.quantity,
       unitPrice: toNumber(line.unitPrice),
       lineTotal: toNumber(line.lineTotal),
@@ -467,18 +473,40 @@ export class DocumentService {
           lineTotal: item.lineTotal.toNumber(),
           currency: item.currency,
         }))
-      : (transactionSource?.lines ?? []).map((line) => ({
-          productId: line.inventoryItem.product.id,
-          productSku: line.inventoryItem.product.sku,
-          productName: line.inventoryItem.product.name,
-          quantity: line.quantity,
-          unitPrice: line.inventoryItem.product.purchasePrice?.toNumber() ?? null,
-          lineTotal: line.inventoryItem.product.purchasePrice?.toNumber() !== undefined && line.inventoryItem.product.purchasePrice !== null
-            ? Number((line.inventoryItem.product.purchasePrice.toNumber() * line.quantity).toFixed(2))
-            : null,
-          currency: line.inventoryItem.product.currency,
-          note: line.note,
-        }));
+      : (transactionSource?.lines ?? []).flatMap((line) => {
+          const product = line.inventoryItem.product;
+          if (!product) {
+            return [];
+          }
+
+          const variant = line.inventoryItem.productVariant ?? null;
+          const matchingReceiptLine = variant?.id
+            ? transactionSource?.purchaseReceipt?.lines.find((receiptLine) => receiptLine.productVariantId === variant.id) ?? null
+            : transactionSource?.purchaseReceipt?.lines.find((receiptLine) => (
+              receiptLine.productVariantId === null
+              && receiptLine.productId === product.id
+            )) ?? null;
+          const resolvedUnitPrice = matchingReceiptLine?.unitCost?.toNumber()
+            ?? variant?.purchasePriceOverride?.toNumber()
+            ?? product.purchasePrice?.toNumber()
+            ?? null;
+          const resolvedLineTotal = matchingReceiptLine?.lineTotal?.toNumber()
+            ?? (resolvedUnitPrice !== null ? Number((resolvedUnitPrice * line.quantity).toFixed(2)) : null);
+
+          return [{
+            productId: product.id,
+            productVariantId: variant?.id ?? null,
+            productSku: variant?.sku ?? product.sku,
+            productVariantSku: variant?.sku ?? null,
+            productName: product.name,
+            productVariantTitle: variant?.title ?? null,
+            quantity: line.quantity,
+            unitPrice: resolvedUnitPrice,
+            lineTotal: resolvedLineTotal,
+            currency: product.currency,
+            note: line.note,
+          }];
+        });
 
     const created = await this.repository.createBusinessDocument({
       input: parsed,

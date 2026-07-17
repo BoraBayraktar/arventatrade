@@ -7,6 +7,7 @@ import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 const transferInventorySchema = z.object({
   productId: z.string().trim().min(1),
+  variantId: z.string().trim().min(1).optional(),
   sku: z.string().trim().min(1).max(64),
   fromWarehouseCode: z.string().trim().min(1).max(32),
   toWarehouseCode: z.string().trim().min(1).max(32),
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
 
     await inventoryService.transferProductInventory({
       productId: payload.productId,
+      variantId: payload.variantId,
       sku: payload.sku,
       fromWarehouseCode: payload.fromWarehouseCode,
       toWarehouseCode: payload.toWarehouseCode,
@@ -37,6 +39,7 @@ export async function POST(request: Request) {
       metadata: {
         fromWarehouseCode: payload.fromWarehouseCode,
         toWarehouseCode: payload.toWarehouseCode,
+        variantId: payload.variantId ?? null,
         quantity: payload.quantity,
       },
     });

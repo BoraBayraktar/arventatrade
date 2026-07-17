@@ -1,6 +1,6 @@
 export type IntegrationChannel = "TRENDYOL" | "N11" | "EDOCS_MOCK";
-export type IntegrationJobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
-export type IntegrationEntityType = "PRODUCT" | "BUSINESS_DOCUMENT";
+export type IntegrationJobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_IMPORT" | "ORDER_STATUS_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
+export type IntegrationEntityType = "PRODUCT" | "MARKETPLACE_ACCOUNT" | "MARKETPLACE_PACKAGE" | "ORDER" | "BUSINESS_DOCUMENT";
 export type IntegrationJobStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
 
 export type AdminIntegrationListQuery = {
@@ -24,6 +24,9 @@ export type AdminIntegrationJobItem = {
   nextAttemptAt: string;
   lastAttemptAt: string | null;
   processedAt: string | null;
+  externalReference: string | null;
+  payload: Record<string, unknown> | null;
+  responsePayload: Record<string, unknown> | null;
   lastError: string | null;
   createdAt: string;
 };

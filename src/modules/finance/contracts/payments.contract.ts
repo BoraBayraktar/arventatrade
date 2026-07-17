@@ -9,6 +9,7 @@ export type AdminPaymentReadinessItem = {
   lastIssueDate: string | null;
   recordedPaymentCount: number;
   remainingAmount: number;
+  topVariantSummary: string | null;
   detailHref: string;
   sourceHref: string;
 };

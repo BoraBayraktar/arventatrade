@@ -20,8 +20,20 @@ The root layout also avoids remote Google Font fetching so production builds are
 
 - `REDIS_URL`: enables distributed cache and allows `/api/system/ready` to report healthy Redis status.
 - `REDIS_CONNECT_TIMEOUT_MS`: optional, defaults to `1000` so unreachable Redis does not stall request/build flow for too long.
+- `CRON_SECRET`: secures Vercel Cron invocations. Vercel sends this as `Authorization: Bearer <value>`.
+- `MARKETPLACE_SYNC_SECRET`: optional marketplace-specific cron secret. If set, marketplace system endpoints also accept it.
 
 If `REDIS_URL` is omitted, the application can still serve requests, but cache-backed features fall back to degraded behavior and readiness checks may not report fully healthy infrastructure.
+
+## Scheduled jobs
+
+[`vercel.json`](/Users/borabayraktar/Documents/GitHub/arventatrade/vercel.json:1) registers a daily production cron:
+
+- Path: `/api/system/integrations/trendyol-sync`
+- Schedule: `0 3 * * *` (03:00 UTC)
+- Scope: queues active Trendyol order imports, processes the integration queue, and follows up Trendyol stock/price batch results.
+
+Vercel Cron only runs on production deployments. For more frequent Trendyol syncing, update the cron expression in `vercel.json` after confirming the Vercel plan supports the desired interval.
 
 ## Optional integrations
 

@@ -137,6 +137,7 @@ export type AdminProductAttributeDefinitionItem = {
   slug: string;
   name: string;
   displayType: "TEXT" | "COLOR" | "NUMBER";
+  trendyolAttributeId: number | null;
   sortOrder: number;
   isActive: boolean;
   productCount: number;
@@ -146,6 +147,7 @@ export type AdminCreateProductAttributeDefinitionInput = {
   slug: string;
   name: string;
   displayType?: "TEXT" | "COLOR" | "NUMBER";
+  trendyolAttributeId?: number | null;
   sortOrder?: number;
   isActive?: boolean;
 };
@@ -155,6 +157,7 @@ export type AdminUpdateProductAttributeDefinitionInput = {
   slug?: string;
   name?: string;
   displayType?: "TEXT" | "COLOR" | "NUMBER";
+  trendyolAttributeId?: number | null;
   sortOrder?: number;
   isActive?: boolean;
 };
@@ -195,10 +198,35 @@ export type AdminProductVariantItem = AdminProductVariantInput & {
   id: string;
 };
 
+export type AdminProductAttributeValueMarketplaceMappingItem = {
+  id: string;
+  attributeDefinitionId: string;
+  attributeName: string;
+  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  localValue: string;
+  externalAttributeValueId: number | null;
+  externalAttributeValueName: string | null;
+  customAttributeValue: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminUpsertProductAttributeValueMarketplaceMappingInput = {
+  attributeDefinitionId: string;
+  channel?: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  localValue: string;
+  externalAttributeValueId?: number | null;
+  externalAttributeValueName?: string | null;
+  customAttributeValue?: string | null;
+  isActive?: boolean;
+};
+
 export type AdminBrandItem = {
   id: string;
   slug: string;
   name: string;
+  trendyolBrandId: number | null;
   isActive: boolean;
   productCount: number;
 };
@@ -217,6 +245,7 @@ export type AdminSupplierItem = {
 export type AdminCreateBrandInput = {
   slug: string;
   name: string;
+  trendyolBrandId?: number | null;
   isActive?: boolean;
 };
 
@@ -224,6 +253,7 @@ export type AdminUpdateBrandInput = {
   id: string;
   slug?: string;
   name?: string;
+  trendyolBrandId?: number | null;
   isActive?: boolean;
 };
 
@@ -291,6 +321,7 @@ export type AdminCategoryListItem = {
   id: string;
   slug: string;
   name: string;
+  trendyolCategoryId: number | null;
   parentId: string | null;
   parentName: string | null;
   productCount: number;
@@ -317,6 +348,7 @@ export type AdminCategoryListResult = {
 export type AdminCreateCategoryInput = {
   slug: string;
   name: string;
+  trendyolCategoryId?: number | null;
   parentId?: string | null;
 };
 
@@ -324,6 +356,7 @@ export type AdminUpdateCategoryInput = {
   id: string;
   slug?: string;
   name?: string;
+  trendyolCategoryId?: number | null;
   parentId?: string | null;
 };
 

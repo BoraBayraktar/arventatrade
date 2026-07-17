@@ -8,6 +8,29 @@ import {
 } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    await requireUserRoles(["ADMIN", "EDITOR"]);
+    const { id } = await context.params;
+    const item = await catalogAdminService.getProductById(id);
+
+    if (!item) {
+      return NextResponse.json({ message: "Product not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ item });
+  } catch (error) {
+    if (error instanceof AuthContextError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
+
+    return NextResponse.json({ message: "Unexpected error" }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },

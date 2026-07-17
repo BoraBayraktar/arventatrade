@@ -1,5 +1,6 @@
 export type ProductInventoryAvailability = {
   productId: string;
+  variantId?: string | null;
   slug: string;
   sku: string;
   name: string;
@@ -16,6 +17,7 @@ export type ProductInventoryAvailability = {
 
 export type SyncProductInventoryInput = {
   productId: string;
+  variantId?: string;
   sku: string;
   warehouseId?: string;
   warehouseCode?: string;
@@ -27,6 +29,7 @@ export type SyncProductInventoryInput = {
 
 export type TransferProductInventoryInput = {
   productId: string;
+  variantId?: string;
   sku: string;
   fromWarehouseCode: string;
   toWarehouseCode: string;
@@ -36,6 +39,7 @@ export type TransferProductInventoryInput = {
 
 export type RecordProductInventoryMovementInput = {
   productId: string;
+  variantId?: string;
   sku: string;
   warehouseCode: string;
   quantity: number;
@@ -149,6 +153,10 @@ export type AdminInventoryMovementPreview = {
 
 export type AdminInventoryItem = {
   productId: string;
+  variantId?: string | null;
+  variantSku?: string | null;
+  variantTitle?: string | null;
+  variantOptionSummary?: string | null;
   slug: string;
   sku: string;
   name: string;
@@ -239,6 +247,11 @@ export type AdminInventoryTransactionLineItem = {
   toWarehouseCode: string | null;
   inventoryItemSku: string;
   inventoryItemName: string;
+  variantId?: string | null;
+  variantSku?: string | null;
+  variantTitle?: string | null;
+  unitCost?: number | null;
+  lineTotal?: number | null;
 };
 
 export type AdminInventorySourceDocument = {

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import type { Locale } from "@/lib/i18n";
 import type { AdminSupplierItem } from "@/modules/catalog/contracts/catalog-admin.contract";
+import type { AdminProductVariantItem } from "@/modules/catalog/contracts/catalog-admin.contract";
 import type {
   AdminInventoryAlertSummary,
   AdminExternalStockEventMonitoring,
@@ -858,6 +859,9 @@ export function InventoryManager({
   const [drawerTransferWarehouseCode, setDrawerTransferWarehouseCode] = useState("");
   const [drawerTransferQuantity, setDrawerTransferQuantity] = useState("1");
   const [drawerTransferNote, setDrawerTransferNote] = useState("");
+  const [drawerProductVariants, setDrawerProductVariants] = useState<AdminProductVariantItem[]>([]);
+  const [drawerSelectedVariantId, setDrawerSelectedVariantId] = useState("");
+  const [pendingDrawerVariants, setPendingDrawerVariants] = useState(false);
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [quickActionMode, setQuickActionMode] = useState<DrawerMode>("view");
   const [pendingQuickAction, setPendingQuickAction] = useState(false);
@@ -1712,6 +1716,9 @@ export function InventoryManager({
     setDrawerTransferWarehouseCode("");
     setDrawerTransferQuantity("1");
     setDrawerTransferNote("");
+    setDrawerProductVariants([]);
+    setDrawerSelectedVariantId(item.variantId ?? "");
+    setPendingDrawerVariants(false);
     setFeedback(null);
   }
 
@@ -1742,7 +1749,93 @@ export function InventoryManager({
     setDrawerTransferWarehouseCode("");
     setDrawerTransferQuantity("1");
     setDrawerTransferNote("");
+    setDrawerProductVariants([]);
+    setDrawerSelectedVariantId("");
+    setPendingDrawerVariants(false);
   }
+
+  useEffect(() => {
+    if (!drawerItem) {
+      return;
+    }
+
+    const { productId, variantId } = drawerItem;
+    let cancelled = false;
+
+    async function loadProductVariants() {
+      setPendingDrawerVariants(true);
+      try {
+        const response = await fetch(`/api/admin/products/${productId}`, {
+          method: "GET",
+        });
+
+        if (!response.ok) {
+          if (!cancelled) {
+            setDrawerProductVariants([]);
+            setDrawerSelectedVariantId(variantId ?? "");
+          }
+          return;
+        }
+
+        const payload = await response.json() as {
+          item?: {
+            variants?: AdminProductVariantItem[];
+          };
+        };
+        const variants = payload.item?.variants ?? [];
+
+        if (cancelled) {
+          return;
+        }
+
+        setDrawerProductVariants(variants);
+        const defaultVariantId = variantId
+          ?? variants.find((variant) => variant.isDefault)?.id
+          ?? variants[0]?.id
+          ?? "";
+        setDrawerSelectedVariantId(defaultVariantId);
+      } catch {
+        if (!cancelled) {
+          setDrawerProductVariants([]);
+          setDrawerSelectedVariantId(variantId ?? "");
+        }
+      } finally {
+        if (!cancelled) {
+          setPendingDrawerVariants(false);
+        }
+      }
+    }
+
+    void loadProductVariants();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [drawerItem]);
+
+  const selectedDrawerVariant = useMemo(
+    () => drawerProductVariants.find((variant) => variant.id === drawerSelectedVariantId) ?? null,
+    [drawerProductVariants, drawerSelectedVariantId],
+  );
+
+  useEffect(() => {
+    if (!drawerItem) {
+      return;
+    }
+
+    if (selectedDrawerVariant) {
+      setDrawerPurchaseUnitCost(
+        selectedDrawerVariant.purchasePriceOverride !== null && selectedDrawerVariant.purchasePriceOverride !== undefined
+          ? String(selectedDrawerVariant.purchasePriceOverride)
+          : drawerItem.purchasePrice !== null
+            ? String(drawerItem.purchasePrice)
+            : "",
+      );
+      return;
+    }
+
+    setDrawerPurchaseUnitCost(drawerItem.purchasePrice !== null ? String(drawerItem.purchasePrice) : "");
+  }, [drawerItem, selectedDrawerVariant]);
 
   async function submitQuickActionLookup(overrideQuery?: string) {
     const normalizedQuery = (overrideQuery ?? quickActionQuery).trim();
@@ -2103,6 +2196,7 @@ export function InventoryManager({
     if (!drawerItem) {
       return;
     }
+    const activeSku = selectedDrawerVariant?.sku ?? drawerItem.sku;
 
     const targetOnHandStock = Number(drawerTargetOnHand);
     const reorderPoint = Number(drawerReorderPoint);
@@ -2128,7 +2222,8 @@ export function InventoryManager({
         },
         body: JSON.stringify({
           productId: drawerItem.productId,
-          sku: drawerItem.sku,
+          variantId: selectedDrawerVariant?.id ?? undefined,
+          sku: activeSku,
           warehouseCode: drawerItem.warehouseCode ?? undefined,
           targetOnHandStock,
           reorderPoint,
@@ -2157,6 +2252,7 @@ export function InventoryManager({
     if (!drawerItem || !drawerItem.warehouseCode) {
       return;
     }
+    const activeSku = selectedDrawerVariant?.sku ?? drawerItem.sku;
 
     const quantity = Number(drawerTransferQuantity);
     if (!drawerTransferWarehouseCode.trim() || !Number.isInteger(quantity) || quantity <= 0) {
@@ -2176,7 +2272,8 @@ export function InventoryManager({
         },
         body: JSON.stringify({
           productId: drawerItem.productId,
-          sku: drawerItem.sku,
+          variantId: selectedDrawerVariant?.id ?? undefined,
+          sku: activeSku,
           fromWarehouseCode: drawerItem.warehouseCode,
           toWarehouseCode: drawerTransferWarehouseCode,
           quantity,
@@ -2204,6 +2301,7 @@ export function InventoryManager({
     if (!drawerItem || !drawerItem.warehouseCode) {
       return;
     }
+    const activeSku = selectedDrawerVariant?.sku ?? drawerItem.sku;
 
     const quantity = Number(drawerMovementQuantity);
     if (!Number.isInteger(quantity) || quantity <= 0) {
@@ -2224,7 +2322,8 @@ export function InventoryManager({
         },
         body: JSON.stringify({
           productId: drawerItem.productId,
-          sku: drawerItem.sku,
+          variantId: selectedDrawerVariant?.id ?? undefined,
+          sku: activeSku,
           warehouseCode: drawerItem.warehouseCode,
           quantity,
           note: drawerNote.trim() || (mode === "stock_in" ? "Stok yöneticisi stok girişi" : "Stok yöneticisi stok çıkışı"),
@@ -3554,6 +3653,9 @@ export function InventoryManager({
                 drawerPurchaseReference={drawerPurchaseReference}
                 drawerPurchaseExternalStatus={drawerPurchaseExternalStatus}
                 drawerPurchaseUnitCost={drawerPurchaseUnitCost}
+                drawerProductVariants={drawerProductVariants}
+                drawerSelectedVariantId={drawerSelectedVariantId}
+                pendingDrawerVariants={pendingDrawerVariants}
                 setDrawerMode={setDrawerMode}
                 setDrawerTargetOnHand={setDrawerTargetOnHand}
                 setDrawerReorderPoint={setDrawerReorderPoint}
@@ -3570,6 +3672,7 @@ export function InventoryManager({
                 setDrawerPurchaseReference={setDrawerPurchaseReference}
                 setDrawerPurchaseExternalStatus={setDrawerPurchaseExternalStatus}
                 setDrawerPurchaseUnitCost={setDrawerPurchaseUnitCost}
+                setDrawerSelectedVariantId={setDrawerSelectedVariantId}
                 formatDate={formatDate}
                 formatInventoryNote={formatInventoryNote}
                 formatSourceDocument={formatSourceDocument}
@@ -4169,12 +4272,24 @@ export function InventoryManager({
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold text-neutral-950">{line.inventoryItemName}</p>
+                          {line.variantTitle ? (
+                            <p className="mt-1 text-xs text-neutral-600">
+                              Varyant: {line.variantTitle}
+                              {line.variantSku ? ` • ${line.variantSku}` : ""}
+                            </p>
+                          ) : null}
                           <p className="text-xs text-neutral-500">{labels.sku}: {line.inventoryItemSku}</p>
                         </div>
                         <p className="text-sm font-semibold text-neutral-950">{line.quantity}</p>
                       </div>
                       <div className="mt-2 grid gap-1 text-xs text-neutral-600">
                         <p>{labels.warehouse}: {line.fromWarehouseCode ?? labels.notSpecified} {line.toWarehouseCode ? `→ ${line.toWarehouseCode}` : ""}</p>
+                        {line.unitCost !== null && line.unitCost !== undefined ? (
+                          <p>Birim maliyet: {formatCurrency(line.unitCost, locale)}</p>
+                        ) : null}
+                        {line.lineTotal !== null && line.lineTotal !== undefined ? (
+                          <p>Satır toplamı: {formatCurrency(line.lineTotal, locale)}</p>
+                        ) : null}
                         {line.note ? <p>{labels.adjustmentNote}: {line.note}</p> : null}
                       </div>
                     </article>

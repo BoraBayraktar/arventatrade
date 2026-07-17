@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { documentService } from "@/modules/documents/services/document.service";
 import type {
   AdminCreatePaymentRecordInput,
   AdminPaymentRecordItem,
@@ -48,6 +49,15 @@ export class PaymentsService {
     const enrichedItems = await Promise.all(items.map(async (item) => {
       const records = item.supplierId ? (paymentRecordTotals.get(item.supplierId) ?? []) : [];
       const recordedAmount = records.reduce((sum, record) => sum + record.amount, 0);
+      const detailedDocuments = await Promise.all(
+        item.documents.map((document) => documentService.getBusinessDocumentById(document.id)),
+      );
+      const topVariantSummary = detailedDocuments
+        .flatMap((document) => document.lines)
+        .sort((left, right) => (right.lineTotal ?? 0) - (left.lineTotal ?? 0))
+        .slice(0, 2)
+        .map((line) => line.productVariantTitle ? `${line.productName} / ${line.productVariantTitle}` : line.productName)
+        .join(" + ") || null;
 
       return {
         supplierId: item.supplierId ?? "",
@@ -60,6 +70,7 @@ export class PaymentsService {
         lastIssueDate: item.lastIssueDate,
         recordedPaymentCount: records.length,
         remainingAmount: Math.max(0, Number((item.totalAmount - recordedAmount).toFixed(2))),
+        topVariantSummary,
         detailHref: `/${locale}/admin/finance/payments/${encodeURIComponent(item.supplierKey)}`,
         sourceHref: `/${locale}/admin/documents`,
       };

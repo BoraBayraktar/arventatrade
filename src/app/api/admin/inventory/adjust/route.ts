@@ -7,6 +7,7 @@ import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 const adjustInventorySchema = z.object({
   productId: z.string().trim().min(1),
+  variantId: z.string().trim().min(1).optional(),
   sku: z.string().trim().min(1).max(64),
   warehouseCode: z.string().trim().min(1).max(32).optional(),
   targetOnHandStock: z.coerce.number().int().min(0),
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
 
     await inventoryService.syncProductInventoryState({
       productId: payload.productId,
+      variantId: payload.variantId,
       sku: payload.sku,
       warehouseCode: payload.warehouseCode,
       targetOnHandStock: payload.targetOnHandStock,
@@ -38,6 +40,7 @@ export async function POST(request: Request) {
       summary: `Manuel stok düzeltmesi uygulandı: ${payload.sku}`,
       metadata: {
         warehouseCode: payload.warehouseCode ?? null,
+        variantId: payload.variantId ?? null,
         targetOnHandStock: payload.targetOnHandStock,
         reorderPoint: payload.reorderPoint ?? null,
         safetyStock: payload.safetyStock ?? null,

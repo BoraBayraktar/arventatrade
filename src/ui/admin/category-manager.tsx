@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useTrendyolCatalogSearch } from "@/ui/admin/use-trendyol-catalog-search";
 
 type Category = {
   id: string;
   slug: string;
   name: string;
+  trendyolCategoryId: number | null;
   parentId: string | null;
   parentName: string | null;
   productCount: number;
@@ -33,6 +35,10 @@ type Labels = {
   slug: string;
   name: string;
   productCount: string;
+  trendyolId: string;
+  trendyolSearch: string;
+  trendyolSearchHint: string;
+  trendyolSelected: string;
   parentCategory: string;
   filterProducts: string;
   filterAllProducts: string;
@@ -80,12 +86,21 @@ type DrawerMode = "create" | "edit";
 type CategoryForm = {
   slug: string;
   name: string;
+  trendyolCategoryId: string;
   parentId: string;
+};
+
+type TrendyolCategoryOption = {
+  id: number;
+  name: string;
+  path: string;
+  leaf: boolean;
 };
 
 const emptyForm: CategoryForm = {
   slug: "",
   name: "",
+  trendyolCategoryId: "",
   parentId: "",
 };
 
@@ -93,6 +108,7 @@ function mapPayload(form: CategoryForm) {
   return {
     slug: form.slug,
     name: form.name,
+    trendyolCategoryId: form.trendyolCategoryId.trim() ? Number(form.trendyolCategoryId) : null,
     parentId: form.parentId.trim() ? form.parentId : null,
   };
 }
@@ -112,6 +128,10 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
   const [editingId, setEditingId] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<CategoryForm>(emptyForm);
   const [editForm, setEditForm] = useState<CategoryForm>(emptyForm);
+  const trendyolCategorySearch = useTrendyolCatalogSearch<TrendyolCategoryOption>({
+    endpoint: "/api/admin/integrations/marketplaces/trendyol/catalog/categories",
+    enabled: Boolean(drawerMode),
+  });
 
   const activeForm = drawerMode === "edit" ? editForm : createForm;
   const activeTitle = drawerMode === "edit" ? labels.edit : labels.createTitle;
@@ -265,6 +285,7 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
     setError(null);
     setEditingId(null);
     setCreateForm(emptyForm);
+    trendyolCategorySearch.clear();
     setDrawerMode("create");
   }
 
@@ -274,8 +295,11 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
     setEditForm({
       slug: category.slug,
       name: category.name,
+      trendyolCategoryId: category.trendyolCategoryId ? String(category.trendyolCategoryId) : "",
       parentId: category.parentId ?? "",
     });
+    trendyolCategorySearch.setQuery(category.name);
+    trendyolCategorySearch.setItems([]);
     setDrawerMode("edit");
   }
 
@@ -428,12 +452,13 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
   }
 
   function exportCategories() {
-    const header = ["name", "slug", "parentSlug", "productCount"];
+    const header = ["name", "slug", "trendyolCategoryId", "parentSlug", "productCount"];
     const rows = result.items.map((category) => {
       const parentSlug = category.parentId ? parentCandidates.find((item) => item.id === category.parentId)?.slug ?? "" : "";
       return [
         toCsvValue(category.name),
         toCsvValue(category.slug),
+        toCsvValue(category.trendyolCategoryId ?? ""),
         toCsvValue(parentSlug),
         toCsvValue(category.productCount),
       ];
@@ -491,6 +516,7 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
           body: JSON.stringify({
             name: row.name.trim(),
             slug: row.slug.trim(),
+            trendyolCategoryId: row.trendyolcategoryid?.trim() ? Number(row.trendyolcategoryid) : null,
             parentId: parentSlug ? parentSlugMap.get(parentSlug) ?? null : null,
           }),
         });
@@ -587,9 +613,10 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
         </div>
 
         <div className="overflow-hidden rounded-xl border border-neutral-200">
-          <div className="hidden grid-cols-[1fr_1fr_1fr_120px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+          <div className="hidden grid-cols-[1fr_1fr_120px_1fr_120px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
             <span>{labels.name}</span>
             <span>{labels.slug}</span>
+            <span>{labels.trendyolId}</span>
             <span>{labels.parentCategory}</span>
             <span>{labels.productCount}</span>
             <span className="text-right">Islem</span>
@@ -600,11 +627,12 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
           ) : (
             <div className="divide-y divide-neutral-200">
               {result.items.map((category) => (
-                <article key={category.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_1fr_120px_190px] lg:items-center">
+                <article key={category.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_120px_1fr_120px_190px] lg:items-center">
                   <div>
                     <h3 className="font-medium text-neutral-950">{category.name}</h3>
                   </div>
                   <p className="text-sm text-neutral-500">{category.slug}</p>
+                  <p className="text-sm text-neutral-500">{category.trendyolCategoryId ?? "-"}</p>
                   <p className="text-sm text-neutral-500">{getParentBreadcrumb(category)}</p>
                   <p className="text-sm font-semibold text-neutral-950">{category.productCount}</p>
                   <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -648,6 +676,47 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
               <div className="grid gap-2">
                 <Label>{labels.name}</Label>
                 <Input value={activeForm.name} onChange={(event) => patchActiveField("name", event.target.value)} required />
+              </div>
+              <div className="grid gap-2">
+                <Label>{labels.trendyolId}</Label>
+                <Input
+                  value={trendyolCategorySearch.query}
+                  onChange={(event) => trendyolCategorySearch.setQuery(event.target.value)}
+                  placeholder={labels.trendyolSearch}
+                  disabled={loading}
+                />
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                  {activeForm.trendyolCategoryId ? (
+                    <div className="mb-2 flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                      <span className="text-neutral-700">{labels.trendyolSelected}: {activeForm.trendyolCategoryId}</span>
+                      <button type="button" className="text-xs font-medium text-rose-600" onClick={() => patchActiveField("trendyolCategoryId", "")}>
+                        {labels.delete}
+                      </button>
+                    </div>
+                  ) : null}
+                  {trendyolCategorySearch.busy ? (
+                    <p className="text-sm text-neutral-500">{labels.loading}</p>
+                  ) : trendyolCategorySearch.items.length === 0 ? (
+                    <p className="text-sm text-neutral-500">{labels.trendyolSearchHint}</p>
+                  ) : (
+                    <div className="grid gap-1">
+                      {trendyolCategorySearch.items.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => {
+                            patchActiveField("trendyolCategoryId", String(option.id));
+                            trendyolCategorySearch.setQuery(option.path);
+                            trendyolCategorySearch.setItems([]);
+                          }}
+                          className="rounded-lg bg-white px-3 py-2 text-left text-sm transition hover:bg-cyan-50"
+                        >
+                          <span className="font-medium text-neutral-950">{option.path}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label>{labels.parentCategory}</Label>

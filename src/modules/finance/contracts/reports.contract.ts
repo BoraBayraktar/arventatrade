@@ -39,9 +39,29 @@ export type AdminFinanceReportDetailRow = {
   href?: string;
 };
 
+export type AdminFinanceReportTableColumn = {
+  key: string;
+  label: string;
+  align?: "left" | "right";
+};
+
+export type AdminFinanceReportTableRow = {
+  id: string;
+  href?: string;
+  cells: Record<string, string>;
+};
+
+export type AdminFinanceReportTable = {
+  title: string;
+  description: string;
+  columns: AdminFinanceReportTableColumn[];
+  rows: AdminFinanceReportTableRow[];
+};
+
 export type AdminFinanceReportDetail = {
   title: string;
   description: string;
   metrics: AdminFinanceReportDetailMetric[];
   rows: AdminFinanceReportDetailRow[];
+  table?: AdminFinanceReportTable | null;
 };

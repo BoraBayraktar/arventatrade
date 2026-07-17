@@ -17,7 +17,7 @@ function buildIdempotencyKey(args: {
   return `${args.channel}:${args.jobType}:${args.entityType}:${args.entityId}${args.suffix ? `:${args.suffix}` : ""}`;
 }
 
-function toJsonInput(value: Prisma.JsonValue | null | undefined) {
+function toJsonInput(value: Prisma.JsonValue | Record<string, unknown> | null | undefined) {
   if (value === null || value === undefined) {
     return Prisma.JsonNull;
   }
@@ -157,12 +157,18 @@ export class IntegrationRepository {
     return reserved;
   }
 
-  async markJobSuccess(id: string) {
+  async markJobSuccess(args: {
+    id: string;
+    externalReference?: string | null;
+    responsePayload?: Prisma.JsonValue | Record<string, unknown> | null;
+  }) {
     return prisma.integrationSyncJob.update({
-      where: { id },
+      where: { id: args.id },
       data: {
         status: "SUCCESS",
         processedAt: new Date(),
+        externalReference: args.externalReference ?? null,
+        responsePayload: toJsonInput(args.responsePayload ?? null),
         lastError: null,
       },
     });
@@ -281,6 +287,65 @@ export class IntegrationRepository {
         lastError: null,
         payload: cleanedPayload,
       },
+    });
+  }
+
+  async findJobById(id: string) {
+    return prisma.integrationSyncJob.findFirst({
+      where: {
+        id,
+        deleted: false,
+      },
+    });
+  }
+
+  async updateJobResponsePayload(args: {
+    id: string;
+    responsePayload: Prisma.JsonValue | Record<string, unknown> | null;
+    externalReference?: string | null;
+  }) {
+    return prisma.integrationSyncJob.update({
+      where: {
+        id: args.id,
+      },
+      data: {
+        responsePayload: toJsonInput(args.responsePayload),
+        ...(args.externalReference !== undefined ? { externalReference: args.externalReference } : {}),
+      },
+    });
+  }
+
+  async listPendingTrendyolBatchCheckJobs(args: { limit: number; staleBefore: Date }) {
+    return prisma.integrationSyncJob.findMany({
+      where: {
+        deleted: false,
+        channel: "TRENDYOL",
+        jobType: {
+          in: ["PRODUCT_SYNC", "STOCK_SYNC", "PRICE_SYNC"],
+        },
+        status: "SUCCESS",
+        externalReference: {
+          not: null,
+        },
+        OR: [
+          {
+            responsePayload: {
+              path: ["batchCheckedAt"],
+              equals: Prisma.JsonNull,
+            },
+          },
+          {
+            responsePayload: {
+              path: ["batchCheckedAt"],
+              lt: args.staleBefore.toISOString(),
+            },
+          },
+        ],
+      },
+      orderBy: {
+        processedAt: "asc",
+      },
+      take: args.limit,
     });
   }
 

@@ -80,6 +80,27 @@ export function SupplierPayableDetailManager({ locale, item, labels }: Props) {
               <p>{labels.lastIssueDate}: {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(document.issueDate))}</p>
               <p>{labels.totalAmount}: {(document.totalAmount ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {document.currency}</p>
             </div>
+            <div className="mt-4 space-y-2">
+              {document.lines.map((line) => (
+                <article key={line.id} className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700">
+                  <p className="font-semibold text-neutral-950">{line.productName}</p>
+                  {line.productVariantTitle ? (
+                    <p className="mt-1 text-xs text-neutral-600">
+                      Varyant: {line.productVariantTitle}
+                      {line.productVariantSku ? ` • ${line.productVariantSku}` : ""}
+                    </p>
+                  ) : null}
+                  <p className="mt-1">
+                    SKU: {line.productSku} • {line.quantity}
+                  </p>
+                  <p className="mt-1 text-xs text-neutral-600">
+                    Birim maliyet: {line.unitPrice === null ? labels.notSpecified : `${line.unitPrice.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${line.currency}`}
+                    {" • "}
+                    Satır toplamı: {line.lineTotal === null ? labels.notSpecified : `${line.lineTotal.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${line.currency}`}
+                  </p>
+                </article>
+              ))}
+            </div>
           </article>
         ))}
       </section>

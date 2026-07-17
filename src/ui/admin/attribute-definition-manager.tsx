@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { AdminProductAttributeDefinitionItem } from "@/modules/catalog/contracts/catalog-admin.contract";
+import type {
+  AdminProductAttributeDefinitionItem,
+  AdminProductAttributeValueMarketplaceMappingItem,
+} from "@/modules/catalog/contracts/catalog-admin.contract";
+import { useTrendyolCatalogSearch } from "@/ui/admin/use-trendyol-catalog-search";
 
 type Labels = {
   title: string;
@@ -21,6 +25,12 @@ type Labels = {
   attributeDisplayText: string;
   attributeDisplayColor: string;
   attributeDisplayNumber: string;
+  trendyolId: string;
+  trendyolCategorySearch: string;
+  trendyolCategorySearchHint: string;
+  trendyolAttributeSearchHint: string;
+  trendyolValueSearchHint: string;
+  trendyolSelected: string;
   variantAxisUsageCount: string;
   page: string;
   create: string;
@@ -36,10 +46,35 @@ type Labels = {
   statusActive: string;
   statusArchived: string;
   selectedCount: string;
+  valueMappingsTitle: string;
+  valueMappingsDescription: string;
+  localValue: string;
+  externalValueId: string;
+  externalValueName: string;
+  customValue: string;
+};
+
+type TrendyolCategoryOption = {
+  id: number;
+  path: string;
+};
+
+type TrendyolAttributeOption = {
+  id: number;
+  name: string;
+  required: boolean;
+  allowCustom: boolean;
+  varianter: boolean;
+};
+
+type TrendyolAttributeValueOption = {
+  id: number;
+  name: string;
 };
 
 type Props = {
   items: AdminProductAttributeDefinitionItem[];
+  valueMappings: AdminProductAttributeValueMarketplaceMappingItem[];
   labels: Labels;
 };
 
@@ -49,6 +84,7 @@ type FormState = {
   slug: string;
   name: string;
   displayType: AdminProductAttributeDefinitionItem["displayType"];
+  trendyolAttributeId: string;
   sortOrder: string;
   isActive: boolean;
 };
@@ -57,6 +93,7 @@ const EMPTY_FORM: FormState = {
   slug: "",
   name: "",
   displayType: "TEXT",
+  trendyolAttributeId: "",
   sortOrder: "0",
   isActive: true,
 };
@@ -100,7 +137,7 @@ function toCsvValue(value: string | number | boolean) {
   return normalized;
 }
 
-export function AttributeDefinitionManager({ items, labels }: Props) {
+export function AttributeDefinitionManager({ items, valueMappings, labels }: Props) {
   const router = useRouter();
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
   const [pending, setPending] = useState(false);
@@ -112,6 +149,28 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [mappingRows, setMappingRows] = useState(valueMappings);
+  const [mappingDrafts, setMappingDrafts] = useState<Record<string, {
+    externalAttributeValueId: string;
+    externalAttributeValueName: string;
+    customAttributeValue: string;
+  }>>(() => Object.fromEntries(valueMappings.map((item) => [item.id, {
+    externalAttributeValueId: item.externalAttributeValueId ? String(item.externalAttributeValueId) : "",
+    externalAttributeValueName: item.externalAttributeValueName ?? "",
+    customAttributeValue: item.customAttributeValue ?? "",
+  }])));
+  const [attributeCategoryId, setAttributeCategoryId] = useState("");
+  const [trendyolAttributeOptions, setTrendyolAttributeOptions] = useState<TrendyolAttributeOption[]>([]);
+  const [trendyolAttributeLookupBusy, setTrendyolAttributeLookupBusy] = useState(false);
+  const [mappingCategoryId, setMappingCategoryId] = useState("");
+  const [trendyolValueOptionsByMappingId, setTrendyolValueOptionsByMappingId] = useState<Record<string, TrendyolAttributeValueOption[]>>({});
+  const attributeCategorySearch = useTrendyolCatalogSearch<TrendyolCategoryOption>({
+    endpoint: "/api/admin/integrations/marketplaces/trendyol/catalog/categories",
+    enabled: Boolean(drawerMode),
+  });
+  const mappingCategorySearch = useTrendyolCatalogSearch<TrendyolCategoryOption>({
+    endpoint: "/api/admin/integrations/marketplaces/trendyol/catalog/categories",
+  });
 
   const filteredItems = useMemo(() => {
     const normalized = searchQuery.trim().toLocaleLowerCase("tr-TR");
@@ -126,6 +185,43 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
 
   const allVisibleSelected = filteredItems.length > 0 && filteredItems.every((item) => selectedIds.includes(item.id));
 
+  useEffect(() => {
+    if (!attributeCategoryId) {
+      setTrendyolAttributeOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadAttributes() {
+      setTrendyolAttributeLookupBusy(true);
+
+      try {
+        const response = await fetch(`/api/admin/integrations/marketplaces/trendyol/catalog/attributes?categoryId=${encodeURIComponent(attributeCategoryId)}`);
+
+        if (!response.ok) {
+          setTrendyolAttributeOptions([]);
+          return;
+        }
+
+        const payload = await response.json() as { items: TrendyolAttributeOption[] };
+        if (!cancelled) {
+          setTrendyolAttributeOptions(payload.items);
+        }
+      } finally {
+        if (!cancelled) {
+          setTrendyolAttributeLookupBusy(false);
+        }
+      }
+    }
+
+    void loadAttributes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attributeCategoryId]);
+
   function resetMessages() {
     setError(null);
     setSuccess(null);
@@ -135,6 +231,9 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
     resetMessages();
     setEditingId(null);
     setForm(EMPTY_FORM);
+    attributeCategorySearch.clear();
+    setAttributeCategoryId("");
+    setTrendyolAttributeOptions([]);
     setDrawerMode("create");
   }
 
@@ -145,9 +244,13 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
       slug: item.slug,
       name: item.name,
       displayType: item.displayType,
+      trendyolAttributeId: item.trendyolAttributeId ? String(item.trendyolAttributeId) : "",
       sortOrder: String(item.sortOrder),
       isActive: item.isActive,
     });
+    attributeCategorySearch.clear();
+    setAttributeCategoryId("");
+    setTrendyolAttributeOptions([]);
     setDrawerMode("edit");
   }
 
@@ -163,6 +266,100 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
 
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateMappingDraft(id: string, key: "externalAttributeValueId" | "externalAttributeValueName" | "customAttributeValue", value: string) {
+    setMappingDrafts((prev) => ({
+      ...prev,
+      [id]: {
+        externalAttributeValueId: prev[id]?.externalAttributeValueId ?? "",
+        externalAttributeValueName: prev[id]?.externalAttributeValueName ?? "",
+        customAttributeValue: prev[id]?.customAttributeValue ?? "",
+        [key]: value,
+      },
+    }));
+  }
+
+  async function loadMappingValueOptions(item: AdminProductAttributeValueMarketplaceMappingItem) {
+    const definition = items.find((candidate) => candidate.id === item.attributeDefinitionId);
+
+    if (!mappingCategoryId || !definition?.trendyolAttributeId) {
+      setError(labels.trendyolValueSearchHint);
+      return;
+    }
+
+    setPending(true);
+    resetMessages();
+
+    try {
+      const response = await fetch(`/api/admin/integrations/marketplaces/trendyol/catalog/attribute-values?categoryId=${encodeURIComponent(mappingCategoryId)}&attributeId=${definition.trendyolAttributeId}`);
+
+      if (!response.ok) {
+        setError(labels.trendyolValueSearchHint);
+        return;
+      }
+
+      const payload = await response.json() as { items: TrendyolAttributeValueOption[] };
+      setTrendyolValueOptionsByMappingId((prev) => ({ ...prev, [item.id]: payload.items }));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function refreshMappings() {
+    const response = await fetch("/api/admin/product-attributes/value-mappings?channel=TRENDYOL");
+    if (!response.ok) {
+      throw new Error("Trendyol deger eslemeleri yenilenemedi.");
+    }
+
+    const payload = await response.json() as { items: AdminProductAttributeValueMarketplaceMappingItem[] };
+    setMappingRows(payload.items);
+    setMappingDrafts(Object.fromEntries(payload.items.map((item) => [item.id, {
+      externalAttributeValueId: item.externalAttributeValueId ? String(item.externalAttributeValueId) : "",
+      externalAttributeValueName: item.externalAttributeValueName ?? "",
+      customAttributeValue: item.customAttributeValue ?? "",
+    }])));
+  }
+
+  async function saveMapping(item: AdminProductAttributeValueMarketplaceMappingItem) {
+    const draft = mappingDrafts[item.id] ?? {
+      externalAttributeValueId: "",
+      externalAttributeValueName: "",
+      customAttributeValue: "",
+    };
+
+    setPending(true);
+    resetMessages();
+
+    try {
+      const response = await fetch("/api/admin/product-attributes/value-mappings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attributeDefinitionId: item.attributeDefinitionId,
+          channel: "TRENDYOL",
+          localValue: item.localValue,
+          externalAttributeValueId: draft.externalAttributeValueId.trim() ? Number(draft.externalAttributeValueId) : null,
+          externalAttributeValueName: draft.externalAttributeValueName.trim() || null,
+          customAttributeValue: draft.customAttributeValue.trim() || null,
+          isActive: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(body?.message ?? "Trendyol deger eslemesi kaydedilemedi.");
+        return;
+      }
+
+      await refreshMappings();
+      setSuccess("Trendyol deger eslemesi kaydedildi.");
+      router.refresh();
+    } catch {
+      setError("Trendyol deger eslemesi kaydedilemedi.");
+    } finally {
+      setPending(false);
+    }
   }
 
   function toggleSelection(id: string) {
@@ -187,6 +384,7 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
         slug: form.slug.trim(),
         name: form.name.trim(),
         displayType: form.displayType,
+        trendyolAttributeId: form.trendyolAttributeId.trim() ? Number(form.trendyolAttributeId) : null,
         sortOrder: Number(form.sortOrder || "0"),
         isActive: form.isActive,
       };
@@ -251,11 +449,12 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
 
   function exportCsv() {
     resetMessages();
-    const header = ["name", "slug", "displayType", "sortOrder", "isActive", "productCount"];
+    const header = ["name", "slug", "displayType", "trendyolAttributeId", "sortOrder", "isActive", "productCount"];
     const rows = items.map((item) => [
       toCsvValue(item.name),
       toCsvValue(item.slug),
       toCsvValue(item.displayType),
+      toCsvValue(item.trendyolAttributeId ?? ""),
       toCsvValue(item.sortOrder),
       toCsvValue(item.isActive),
       toCsvValue(item.productCount),
@@ -308,6 +507,7 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
             name: row.name.trim(),
             slug: row.slug.trim(),
             displayType: row.displaytype === "COLOR" || row.displaytype === "NUMBER" ? row.displaytype : "TEXT",
+            trendyolAttributeId: row.trendyolattributeid?.trim() ? Number(row.trendyolattributeid) : null,
             sortOrder: Number(row.sortorder || "0"),
             isActive: row.isactive ? row.isactive.toLowerCase() !== "false" : true,
           }),
@@ -417,6 +617,7 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-neutral-600">
                       <p>{labels.slug}: {item.slug}</p>
                       <p>{labels.attributeDisplayType}: {item.displayType}</p>
+                      <p>{labels.trendyolId}: {item.trendyolAttributeId ?? "-"}</p>
                       <p>{labels.page}: {item.sortOrder}</p>
                       <p>{labels.variantAxisUsageCount}: {item.productCount}</p>
                     </div>
@@ -448,6 +649,7 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
                   <th className="px-4 py-3">{labels.attributeName}</th>
                   <th className="px-4 py-3">{labels.slug}</th>
                   <th className="px-4 py-3">{labels.attributeDisplayType}</th>
+                  <th className="px-4 py-3">{labels.trendyolId}</th>
                   <th className="px-4 py-3">{labels.page}</th>
                   <th className="px-4 py-3">{labels.variantAxisUsageCount}</th>
                   <th className="px-4 py-3">{labels.status}</th>
@@ -457,7 +659,7 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
               <tbody className="divide-y divide-neutral-200 bg-white">
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-neutral-500">
+                    <td colSpan={9} className="px-4 py-10 text-center text-sm text-neutral-500">
                       {labels.empty}
                     </td>
                   </tr>
@@ -475,6 +677,7 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
                       <td className="px-4 py-3 font-medium text-neutral-950">{item.name}</td>
                       <td className="px-4 py-3 text-neutral-600">{item.slug}</td>
                       <td className="px-4 py-3 text-neutral-600">{item.displayType}</td>
+                      <td className="px-4 py-3 text-neutral-600">{item.trendyolAttributeId ?? "-"}</td>
                       <td className="px-4 py-3 text-neutral-600">{item.sortOrder}</td>
                       <td className="px-4 py-3 text-neutral-600">{item.productCount}</td>
                       <td className="px-4 py-3">
@@ -505,6 +708,144 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-cyan-200 bg-cyan-50/40 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-neutral-950">{labels.valueMappingsTitle}</h3>
+              <p className="mt-1 text-sm text-neutral-600">{labels.valueMappingsDescription}</p>
+            </div>
+            <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => void refreshMappings()}>
+              {labels.search}
+            </Button>
+          </div>
+
+          <div className="mt-4 grid gap-3 rounded-xl border border-cyan-200 bg-white p-3">
+            <Label>{labels.trendyolCategorySearch}</Label>
+            <Input
+              value={mappingCategorySearch.query}
+              onChange={(event) => {
+                mappingCategorySearch.setQuery(event.target.value);
+                setMappingCategoryId("");
+                setTrendyolValueOptionsByMappingId({});
+              }}
+              placeholder={labels.trendyolCategorySearch}
+              disabled={pending}
+            />
+            {mappingCategoryId ? (
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-cyan-50 px-3 py-2 text-sm">
+                <span className="text-cyan-800">{labels.trendyolSelected}: {mappingCategoryId}</span>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-rose-600"
+                  onClick={() => {
+                    setMappingCategoryId("");
+                    setTrendyolValueOptionsByMappingId({});
+                  }}
+                >
+                  {labels.delete}
+                </button>
+              </div>
+            ) : null}
+            {mappingCategorySearch.busy ? (
+              <p className="text-sm text-neutral-500">{labels.saving}</p>
+            ) : mappingCategorySearch.items.length === 0 ? (
+              <p className="text-sm text-neutral-500">{labels.trendyolCategorySearchHint}</p>
+            ) : (
+              <div className="grid max-h-52 gap-1 overflow-y-auto">
+                {mappingCategorySearch.items.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      setMappingCategoryId(String(option.id));
+                      mappingCategorySearch.setQuery(option.path);
+                      mappingCategorySearch.setItems([]);
+                      setTrendyolValueOptionsByMappingId({});
+                    }}
+                    className="rounded-lg bg-neutral-50 px-3 py-2 text-left text-sm transition hover:bg-cyan-50"
+                  >
+                    {option.path}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 overflow-hidden rounded-xl border border-cyan-200 bg-white">
+            {mappingRows.length === 0 ? (
+              <p className="p-4 text-sm text-neutral-500">{labels.empty}</p>
+            ) : (
+              <div className="divide-y divide-neutral-200">
+                {mappingRows.map((item) => {
+                  const definition = items.find((candidate) => candidate.id === item.attributeDefinitionId);
+                  const draft = mappingDrafts[item.id] ?? {
+                    externalAttributeValueId: "",
+                    externalAttributeValueName: "",
+                    customAttributeValue: "",
+                  };
+                  const canLoadTrendyolValues = Boolean(mappingCategoryId && definition?.trendyolAttributeId);
+                  const valueLookupHint = !mappingCategoryId
+                    ? labels.trendyolCategorySearchHint
+                    : !definition?.trendyolAttributeId
+                      ? labels.trendyolAttributeSearchHint
+                      : labels.trendyolValueSearchHint;
+
+                  return (
+                    <article key={item.id} className="grid gap-3 p-4 lg:grid-cols-[1fr_1fr_1.5fr_1fr_110px] lg:items-end">
+                      <div>
+                        <p className="text-xs font-medium text-neutral-500">{labels.attributeName}</p>
+                        <p className="mt-1 text-sm font-semibold text-neutral-950">{item.attributeName}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-neutral-500">{labels.localValue}</p>
+                        <p className="mt-1 text-sm text-neutral-700">{item.localValue}</p>
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">{labels.externalValueId}</Label>
+                        <Button type="button" variant="secondary" size="sm" disabled={pending || !canLoadTrendyolValues} onClick={() => void loadMappingValueOptions(item)}>
+                          {labels.search}
+                        </Button>
+                        {(trendyolValueOptionsByMappingId[item.id] ?? []).length > 0 ? (
+                          <div className="max-h-44 overflow-y-auto rounded-lg border border-neutral-200 bg-neutral-50 p-2">
+                            {trendyolValueOptionsByMappingId[item.id].map((option) => (
+                              <button
+                                key={option.id}
+                                type="button"
+                                className="block w-full rounded-md px-2 py-1 text-left text-xs hover:bg-white"
+                                onClick={() => {
+                                  updateMappingDraft(item.id, "externalAttributeValueId", String(option.id));
+                                  updateMappingDraft(item.id, "externalAttributeValueName", option.name);
+                                  setTrendyolValueOptionsByMappingId((prev) => ({ ...prev, [item.id]: [] }));
+                                }}
+                              >
+                                {option.name}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-neutral-500">
+                            {draft.externalAttributeValueId ? `${labels.trendyolSelected}: ${draft.externalAttributeValueId}` : valueLookupHint}
+                          </p>
+                        )}
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">{labels.externalValueName}</Label>
+                        <Input
+                          value={draft.externalAttributeValueName}
+                          onChange={(event) => updateMappingDraft(item.id, "externalAttributeValueName", event.target.value)}
+                        />
+                      </div>
+                      <Button type="button" size="sm" disabled={pending} onClick={() => void saveMapping(item)}>
+                        {labels.save}
+                      </Button>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -551,6 +892,71 @@ export function AttributeDefinitionManager({ items, labels }: Props) {
                 <div className="grid gap-2">
                   <Label>{labels.page}</Label>
                   <Input type="number" min="0" step="1" value={form.sortOrder} onChange={(event) => updateForm("sortOrder", event.target.value)} />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>{labels.trendyolId}</Label>
+                <Input
+                  value={attributeCategorySearch.query}
+                  onChange={(event) => attributeCategorySearch.setQuery(event.target.value)}
+                  placeholder={labels.trendyolCategorySearch}
+                  disabled={pending}
+                />
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                  {form.trendyolAttributeId ? (
+                    <div className="mb-2 flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                      <span className="text-neutral-700">{labels.trendyolSelected}: {form.trendyolAttributeId}</span>
+                      <button type="button" className="text-xs font-medium text-rose-600" onClick={() => updateForm("trendyolAttributeId", "")}>
+                        {labels.delete}
+                      </button>
+                    </div>
+                  ) : null}
+                  {!attributeCategoryId ? (
+                    <>
+                      {attributeCategorySearch.busy ? (
+                        <p className="text-sm text-neutral-500">{labels.saving}</p>
+                      ) : attributeCategorySearch.items.length === 0 ? (
+                        <p className="text-sm text-neutral-500">{labels.trendyolCategorySearchHint}</p>
+                      ) : (
+                        <div className="grid gap-1">
+                          {attributeCategorySearch.items.map((option) => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              onClick={() => {
+                                setAttributeCategoryId(String(option.id));
+                                attributeCategorySearch.setQuery(option.path);
+                                attributeCategorySearch.setItems([]);
+                              }}
+                              className="rounded-lg bg-white px-3 py-2 text-left text-sm transition hover:bg-cyan-50"
+                            >
+                              {option.path}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : trendyolAttributeLookupBusy ? (
+                    <p className="text-sm text-neutral-500">{labels.saving}</p>
+                  ) : trendyolAttributeOptions.length === 0 ? (
+                    <p className="text-sm text-neutral-500">{labels.trendyolAttributeSearchHint}</p>
+                  ) : (
+                    <div className="grid gap-1">
+                      {trendyolAttributeOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => updateForm("trendyolAttributeId", String(option.id))}
+                          className="rounded-lg bg-white px-3 py-2 text-left text-sm transition hover:bg-cyan-50"
+                        >
+                          <span className="font-medium text-neutral-950">{option.name}</span>
+                          <span className="ml-2 text-xs text-neutral-500">
+                            {option.required ? "Zorunlu" : "Opsiyonel"}{option.varianter ? " - Varyant" : ""}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <label className="flex items-center gap-3 rounded-xl border border-neutral-200 px-4 py-3 text-sm text-neutral-700">

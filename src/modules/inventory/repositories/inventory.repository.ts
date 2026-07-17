@@ -14,6 +14,7 @@ import type {
 
 type SyncInventoryStateArgs = {
   productId: string;
+  variantId?: string;
   sku: string;
   warehouseCode?: string;
   targetOnHandStock?: number;
@@ -24,6 +25,7 @@ type SyncInventoryStateArgs = {
 
 type TransferInventoryArgs = {
   productId: string;
+  variantId?: string;
   sku: string;
   fromWarehouseCode: string;
   toWarehouseCode: string;
@@ -33,6 +35,7 @@ type TransferInventoryArgs = {
 
 type RecordInventoryMovementArgs = {
   productId: string;
+  variantId?: string;
   sku: string;
   warehouseCode: string;
   quantity: number;
@@ -72,6 +75,108 @@ type CreateExternalStockEventArgs = {
 
 export class InventoryRepository {
   private readonly serializableRetryCount = 3;
+
+  private async resolveInventoryTarget(
+    tx: Prisma.TransactionClient,
+    args: { productId: string; variantId?: string },
+  ) {
+    const product = await tx.product.findFirst({
+      where: {
+        id: args.productId,
+        deleted: false,
+      },
+      select: {
+        id: true,
+        sku: true,
+        stock: true,
+        purchasePrice: true,
+        inventoryItem: {
+          select: {
+            id: true,
+            skuSnapshot: true,
+            inventoryLevels: {
+              where: {
+                warehouse: {
+                  isActive: true,
+                },
+              },
+              select: {
+                id: true,
+                onHand: true,
+                reserved: true,
+                reorderPoint: true,
+                safetyStock: true,
+                warehouseId: true,
+                warehouse: {
+                  select: {
+                    id: true,
+                    isDefault: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      throw new Error(`PRODUCT_NOT_FOUND:${args.productId}`);
+    }
+
+    const variant = args.variantId
+      ? await tx.productVariant.findFirst({
+          where: {
+            id: args.variantId,
+            productId: product.id,
+            deleted: false,
+          },
+          select: {
+            id: true,
+            sku: true,
+            purchasePriceOverride: true,
+            inventoryItem: {
+              select: {
+                id: true,
+                skuSnapshot: true,
+                inventoryLevels: {
+                  where: {
+                    warehouse: {
+                      isActive: true,
+                    },
+                  },
+                  select: {
+                    id: true,
+                    onHand: true,
+                    reserved: true,
+                    reorderPoint: true,
+                    safetyStock: true,
+                    warehouseId: true,
+                    warehouse: {
+                      select: {
+                        id: true,
+                        isDefault: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        })
+      : null;
+
+    if (args.variantId && !variant) {
+      throw new Error(`PRODUCT_VARIANT_NOT_FOUND:${args.variantId}`);
+    }
+
+    return {
+      product,
+      variant,
+      inventoryItem: variant?.inventoryItem ?? product.inventoryItem ?? null,
+      inventoryOwner: variant ? "VARIANT" as const : "PRODUCT" as const,
+    };
+  }
 
   private toAvailableStock(onHand: number, reserved: number) {
     return Math.max(0, onHand - reserved);
@@ -142,10 +247,15 @@ export class InventoryRepository {
   }
 
   // Product.stock is a legacy summary. Aggregate truth always comes from active inventory levels.
-  private async recalculateProductStock(tx: Prisma.TransactionClient, productId: string, inventoryItemId: string) {
+  private async recalculateProductStock(tx: Prisma.TransactionClient, productId: string) {
     const activeLevels = await tx.inventoryLevel.findMany({
       where: {
-        inventoryItemId,
+        inventoryItem: {
+          OR: [
+            { productId },
+            { productVariant: { productId } },
+          ],
+        },
         warehouse: {
           isActive: true,
         },
@@ -179,6 +289,19 @@ export class InventoryRepository {
                 { slug: { contains: args.search, mode: "insensitive" as const } },
                 { sku: { contains: args.search, mode: "insensitive" as const } },
                 { barcode: { contains: args.search, mode: "insensitive" as const } },
+                {
+                  variants: {
+                    some: {
+                      deleted: false,
+                      OR: [
+                        { title: { contains: args.search, mode: "insensitive" as const } },
+                        { sku: { contains: args.search, mode: "insensitive" as const } },
+                        { barcode: { contains: args.search, mode: "insensitive" as const } },
+                        { optionSummary: { contains: args.search, mode: "insensitive" as const } },
+                      ],
+                    },
+                  },
+                },
               ],
             }
           : {}),
@@ -210,6 +333,7 @@ export class InventoryRepository {
         inventoryItem: {
           select: {
             id: true,
+            skuSnapshot: true,
             inventoryLevels: {
               where: {
                 warehouse: {
@@ -232,6 +356,59 @@ export class InventoryRepository {
                     code: true,
                     name: true,
                     isDefault: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        variants: {
+          where: {
+            deleted: false,
+          },
+          orderBy: [
+            { isDefault: "desc" },
+            { sortOrder: "asc" },
+            { createdAt: "asc" },
+          ],
+          select: {
+            id: true,
+            sku: true,
+            title: true,
+            optionSummary: true,
+            barcode: true,
+            imageUrl: true,
+            priceOverride: true,
+            purchasePriceOverride: true,
+            compareAtPriceOverride: true,
+            inventoryItem: {
+              select: {
+                id: true,
+                skuSnapshot: true,
+                inventoryLevels: {
+                  where: {
+                    warehouse: {
+                      isActive: true,
+                      ...(args.warehouseCode
+                        ? {
+                            code: args.warehouseCode,
+                          }
+                        : {}),
+                    },
+                  },
+                  select: {
+                    onHand: true,
+                    reserved: true,
+                    reorderPoint: true,
+                    safetyStock: true,
+                    warehouse: {
+                      select: {
+                        id: true,
+                        code: true,
+                        name: true,
+                        isDefault: true,
+                      },
+                    },
                   },
                 },
               },
@@ -270,6 +447,101 @@ export class InventoryRepository {
       },
       take: Math.max(inventoryItemIds.length * movementTake, movementTake),
     });
+  }
+
+  async findInventoryTarget(args: { productId: string; variantId?: string }) {
+    const product = await prisma.product.findFirst({
+      where: {
+        id: args.productId,
+        deleted: false,
+      },
+      select: {
+        id: true,
+        slug: true,
+        sku: true,
+        name: true,
+        imageUrl: true,
+        currency: true,
+        price: true,
+        compareAtPrice: true,
+        stock: true,
+        inventoryItem: {
+          select: {
+            id: true,
+            skuSnapshot: true,
+            inventoryLevels: {
+              where: {
+                warehouse: {
+                  isActive: true,
+                },
+              },
+              select: {
+                onHand: true,
+                reserved: true,
+                warehouse: {
+                  select: {
+                    id: true,
+                    code: true,
+                    isDefault: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      return null;
+    }
+
+    const variant = args.variantId
+      ? await prisma.productVariant.findFirst({
+          where: {
+            id: args.variantId,
+            productId: product.id,
+            deleted: false,
+          },
+          select: {
+            id: true,
+            sku: true,
+            title: true,
+            priceOverride: true,
+            compareAtPriceOverride: true,
+            imageUrl: true,
+            inventoryItem: {
+              select: {
+                id: true,
+                skuSnapshot: true,
+                inventoryLevels: {
+                  where: {
+                    warehouse: {
+                      isActive: true,
+                    },
+                  },
+                  select: {
+                    onHand: true,
+                    reserved: true,
+                    warehouse: {
+                      select: {
+                        id: true,
+                        code: true,
+                        isDefault: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        })
+      : null;
+
+    return {
+      ...product,
+      variants: variant ? [variant] : [],
+    };
   }
 
   async createInventoryExportHistory(input: {
@@ -444,6 +716,14 @@ export class InventoryRepository {
             receiptDate: true,
             externalReference: true,
             supplierName: true,
+            lines: {
+              select: {
+                productId: true,
+                productVariantId: true,
+                unitCost: true,
+                lineTotal: true,
+              },
+            },
           },
         },
         lines: {
@@ -455,7 +735,15 @@ export class InventoryRepository {
               include: {
                 product: {
                   select: {
+                    id: true,
                     name: true,
+                  },
+                },
+                productVariant: {
+                  select: {
+                    id: true,
+                    sku: true,
+                    title: true,
                   },
                 },
               },
@@ -1038,48 +1326,8 @@ export class InventoryRepository {
 
   async syncProductInventoryState(args: SyncInventoryStateArgs) {
     return this.runSerializableTransaction(async (tx) => {
-      const product = await tx.product.findFirst({
-        where: {
-          id: args.productId,
-          deleted: false,
-        },
-        select: {
-          id: true,
-          sku: true,
-          stock: true,
-          inventoryItem: {
-            select: {
-              id: true,
-              skuSnapshot: true,
-              inventoryLevels: {
-                where: {
-                  warehouse: {
-                    isActive: true,
-                  },
-                },
-                select: {
-                  id: true,
-                  onHand: true,
-                  reserved: true,
-                  reorderPoint: true,
-                  safetyStock: true,
-                  warehouseId: true,
-                  warehouse: {
-                    select: {
-                      id: true,
-                      isDefault: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
-
-      if (!product) {
-        throw new Error(`PRODUCT_NOT_FOUND:${args.productId}`);
-      }
+      const target = await this.resolveInventoryTarget(tx, args);
+      const { product, variant, inventoryItem, inventoryOwner } = target;
 
       let warehouse = args.warehouseCode
         ? await tx.warehouse.findFirst({
@@ -1126,11 +1374,12 @@ export class InventoryRepository {
         });
       }
 
-      let inventoryItemId = product.inventoryItem?.id;
+      let inventoryItemId = inventoryItem?.id;
       if (!inventoryItemId) {
         const inventoryItem = await tx.inventoryItem.create({
           data: {
-            productId: product.id,
+            productId: inventoryOwner === "PRODUCT" ? product.id : null,
+            productVariantId: variant?.id ?? null,
             skuSnapshot: args.sku,
           },
           select: {
@@ -1138,7 +1387,7 @@ export class InventoryRepository {
           },
         });
         inventoryItemId = inventoryItem.id;
-      } else if (product.inventoryItem?.skuSnapshot !== args.sku) {
+      } else if (inventoryItem?.skuSnapshot !== args.sku) {
         await tx.inventoryItem.update({
           where: {
             id: inventoryItemId,
@@ -1149,7 +1398,7 @@ export class InventoryRepository {
         });
       }
 
-      const existingLevel = product.inventoryItem?.inventoryLevels.find((level) => level.warehouse.id === warehouse.id);
+      const existingLevel = inventoryItem?.inventoryLevels.find((level) => level.warehouse.id === warehouse.id);
       let onHandStock = existingLevel?.onHand ?? product.stock;
       const reservedStock = existingLevel?.reserved ?? 0;
 
@@ -1209,10 +1458,10 @@ export class InventoryRepository {
         if (args.targetOnHandStock !== undefined && delta !== 0) {
           const inventoryTransaction = await this.createInventoryTransaction(tx, {
             type: "MANUAL_ADJUSTMENT",
-            reference: product.sku,
+            reference: args.sku,
             sourceDocumentType: "INVENTORY_ADJUSTMENT",
-            sourceDocumentId: product.id,
-            sourceDocumentNumber: product.sku,
+            sourceDocumentId: variant?.id ?? product.id,
+            sourceDocumentNumber: args.sku,
             note: args.note ?? "Katalog yönetimi stok eşitlemesi",
           });
 
@@ -1237,15 +1486,15 @@ export class InventoryRepository {
               metadata: {
                 transactionNumber: inventoryTransaction.transactionNumber,
                 sourceDocumentType: "INVENTORY_ADJUSTMENT",
-                sourceDocumentId: product.id,
-                sourceDocumentNumber: product.sku,
+                sourceDocumentId: variant?.id ?? product.id,
+                sourceDocumentNumber: args.sku,
               },
             },
           });
         }
       }
 
-      await this.recalculateProductStock(tx, product.id, inventoryItemId);
+      await this.recalculateProductStock(tx, product.id);
     });
   }
 
@@ -1255,26 +1504,8 @@ export class InventoryRepository {
         throw new Error("WAREHOUSE_TRANSFER_SAME_SOURCE_TARGET");
       }
 
-      const product = await tx.product.findFirst({
-        where: {
-          id: args.productId,
-          deleted: false,
-        },
-        select: {
-          id: true,
-          sku: true,
-          inventoryItem: {
-            select: {
-              id: true,
-              skuSnapshot: true,
-            },
-          },
-        },
-      });
-
-      if (!product) {
-        throw new Error(`PRODUCT_NOT_FOUND:${args.productId}`);
-      }
+      const target = await this.resolveInventoryTarget(tx, args);
+      const { product, variant, inventoryItem, inventoryOwner } = target;
 
       const [fromWarehouse, toWarehouse] = await Promise.all([
         tx.warehouse.findFirst({
@@ -1307,11 +1538,12 @@ export class InventoryRepository {
         throw new Error(`WAREHOUSE_NOT_FOUND:${args.toWarehouseCode}`);
       }
 
-      let inventoryItemId = product.inventoryItem?.id;
+      let inventoryItemId = inventoryItem?.id;
       if (!inventoryItemId) {
         const inventoryItem = await tx.inventoryItem.create({
           data: {
-            productId: product.id,
+            productId: inventoryOwner === "PRODUCT" ? product.id : null,
+            productVariantId: variant?.id ?? null,
             skuSnapshot: args.sku,
           },
           select: {
@@ -1319,7 +1551,7 @@ export class InventoryRepository {
           },
         });
         inventoryItemId = inventoryItem.id;
-      } else if (product.inventoryItem?.skuSnapshot !== args.sku) {
+      } else if (inventoryItem?.skuSnapshot !== args.sku) {
         await tx.inventoryItem.update({
           where: {
             id: inventoryItemId,
@@ -1401,7 +1633,7 @@ export class InventoryRepository {
         type: "TRANSFER",
         reference: transferReference,
         sourceDocumentType: "WAREHOUSE_TRANSFER",
-        sourceDocumentId: product.id,
+        sourceDocumentId: variant?.id ?? product.id,
         sourceDocumentNumber: transferReference,
         sourceDocumentUrl: "/admin/inventory/transactions",
         note: args.note ?? `Transfer ${fromWarehouse.code} -> ${toWarehouse.code}`,
@@ -1430,7 +1662,7 @@ export class InventoryRepository {
             transferReference,
             transactionNumber: inventoryTransaction.transactionNumber,
             sourceDocumentType: "WAREHOUSE_TRANSFER",
-            sourceDocumentId: product.id,
+            sourceDocumentId: variant?.id ?? product.id,
             sourceDocumentNumber: transferReference,
             fromWarehouseCode: fromWarehouse.code,
             toWarehouseCode: toWarehouse.code,
@@ -1450,7 +1682,7 @@ export class InventoryRepository {
             transferReference,
             transactionNumber: inventoryTransaction.transactionNumber,
             sourceDocumentType: "WAREHOUSE_TRANSFER",
-            sourceDocumentId: product.id,
+            sourceDocumentId: variant?.id ?? product.id,
             sourceDocumentNumber: transferReference,
             fromWarehouseCode: fromWarehouse.code,
             toWarehouseCode: toWarehouse.code,
@@ -1458,32 +1690,14 @@ export class InventoryRepository {
         },
       });
 
-      await this.recalculateProductStock(tx, product.id, inventoryItemId);
+      await this.recalculateProductStock(tx, product.id);
     });
   }
 
   async recordProductInventoryMovement(args: RecordInventoryMovementArgs) {
     return this.runSerializableTransaction(async (tx) => {
-      const product = await tx.product.findFirst({
-        where: {
-          id: args.productId,
-          deleted: false,
-        },
-        select: {
-          id: true,
-          purchasePrice: true,
-          inventoryItem: {
-            select: {
-              id: true,
-              skuSnapshot: true,
-            },
-          },
-        },
-      });
-
-      if (!product) {
-        throw new Error(`PRODUCT_NOT_FOUND:${args.productId}`);
-      }
+      const target = await this.resolveInventoryTarget(tx, args);
+      const { product, variant, inventoryItem, inventoryOwner } = target;
 
       const warehouse = await tx.warehouse.findFirst({
         where: {
@@ -1500,11 +1714,12 @@ export class InventoryRepository {
         throw new Error(`WAREHOUSE_NOT_FOUND:${args.warehouseCode}`);
       }
 
-      let inventoryItemId = product.inventoryItem?.id;
+      let inventoryItemId = inventoryItem?.id;
       if (!inventoryItemId) {
         const inventoryItem = await tx.inventoryItem.create({
           data: {
-            productId: product.id,
+            productId: inventoryOwner === "PRODUCT" ? product.id : null,
+            productVariantId: variant?.id ?? null,
             skuSnapshot: args.sku,
           },
           select: {
@@ -1512,7 +1727,7 @@ export class InventoryRepository {
           },
         });
         inventoryItemId = inventoryItem.id;
-      } else if (product.inventoryItem?.skuSnapshot !== args.sku) {
+      } else if (inventoryItem?.skuSnapshot !== args.sku) {
         await tx.inventoryItem.update({
           where: {
             id: inventoryItemId,
@@ -1578,7 +1793,7 @@ export class InventoryRepository {
         type: args.type === "PURCHASE_RECEIPT" ? "STOCK_IN" : "STOCK_OUT",
         reference: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentNumber ?? args.sku) : args.sku,
         sourceDocumentType: args.documentType ?? (args.type === "PURCHASE_RECEIPT" ? "PURCHASE_RECEIPT" : "STOCK_WRITE_OFF"),
-        sourceDocumentId: args.type === "PURCHASE_RECEIPT" ? null : product.id,
+        sourceDocumentId: args.type === "PURCHASE_RECEIPT" ? null : (variant?.id ?? product.id),
         sourceDocumentNumber: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentNumber ?? args.sku) : args.sku,
         sourceDocumentDate: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentDate ?? null) : null,
         externalReference: args.sourceDocumentReference ?? null,
@@ -1626,6 +1841,7 @@ export class InventoryRepository {
           data: {
             purchaseReceiptId: createdReceipt.id,
             productId: product.id,
+            productVariantId: variant?.id ?? null,
             quantity: args.quantity,
             unitCost: args.unitCost ?? null,
             lineTotal: args.unitCost !== undefined && args.unitCost !== null ? new Prisma.Decimal(args.unitCost).mul(args.quantity) : null,
@@ -1693,18 +1909,20 @@ export class InventoryRepository {
           metadata: {
             transactionNumber: inventoryTransaction.transactionNumber,
             sourceDocumentType: args.documentType ?? (args.type === "PURCHASE_RECEIPT" ? "PURCHASE_RECEIPT" : "STOCK_WRITE_OFF"),
-            sourceDocumentId: purchaseReceiptId ?? product.id,
+            sourceDocumentId: purchaseReceiptId ?? variant?.id ?? product.id,
             sourceDocumentNumber: args.type === "PURCHASE_RECEIPT" ? (args.sourceDocumentNumber ?? args.sku) : args.sku,
             sourceDocumentUrl: args.type === "PURCHASE_RECEIPT" && purchaseReceiptId ? null : null,
             supplierName: args.sourceDocumentSupplier ?? null,
             externalReference: args.sourceDocumentReference ?? null,
             externalSystemStatus: args.externalSystemStatus ?? null,
             unitCost: args.unitCost ?? null,
+            productVariantId: variant?.id ?? null,
+            productVariantSku: variant?.sku ?? null,
           },
         },
       });
 
-      await this.recalculateProductStock(tx, product.id, inventoryItemId);
+      await this.recalculateProductStock(tx, product.id);
     });
   }
 
@@ -2160,13 +2378,13 @@ export class InventoryRepository {
 
         if (currentLevel.onHand !== line.systemOnHand) {
           throw new Error(
-            `STOCK_COUNT_STALE_LEVEL:${line.inventoryItem.product.sku}:${line.warehouse.code}:${line.systemOnHand}:${currentLevel.onHand}`,
+            `STOCK_COUNT_STALE_LEVEL:${line.inventoryItem.product?.sku ?? line.inventoryItem.skuSnapshot}:${line.warehouse.code}:${line.systemOnHand}:${currentLevel.onHand}`,
           );
         }
 
         if (currentLevel.reserved > 0) {
           throw new Error(
-            `STOCK_COUNT_HAS_ACTIVE_RESERVATIONS:${line.inventoryItem.product.sku}:${line.warehouse.code}:${currentLevel.reserved}`,
+            `STOCK_COUNT_HAS_ACTIVE_RESERVATIONS:${line.inventoryItem.product?.sku ?? line.inventoryItem.skuSnapshot}:${line.warehouse.code}:${currentLevel.reserved}`,
           );
         }
 
@@ -2228,11 +2446,17 @@ export class InventoryRepository {
           select: {
             id: true,
             productId: true,
+            productVariant: {
+              select: {
+                productId: true,
+              },
+            },
           },
         });
 
-        if (inventoryItem) {
-          await this.recalculateProductStock(tx, inventoryItem.productId, inventoryItem.id);
+        const productId = inventoryItem?.productId ?? inventoryItem?.productVariant?.productId ?? null;
+        if (productId) {
+          await this.recalculateProductStock(tx, productId);
         }
       }
 
@@ -2248,7 +2472,7 @@ export class InventoryRepository {
       return {
         transactionNumber: transaction.transactionNumber,
         countNumber: stockCount.countNumber,
-        productIds: Array.from(new Set(linesToApply.map((line) => line.inventoryItem.product.id))),
+        productIds: Array.from(new Set(linesToApply.flatMap((line) => line.inventoryItem.product?.id ? [line.inventoryItem.product.id] : []))),
         touchedTargets: linesToApply.map((line) => ({
           inventoryItemId: line.inventoryItemId,
           warehouseId: line.warehouseId,
@@ -2325,9 +2549,9 @@ export class InventoryRepository {
             ? "LOW_STOCK"
             : null;
         const message = nextType === "OUT_OF_STOCK"
-          ? `${level.inventoryItem.product.name} ürünü ${level.warehouse.code} deposunda tükendi`
+          ? `${level.inventoryItem.product?.name ?? level.inventoryItem.skuSnapshot} ürünü ${level.warehouse.code} deposunda tükendi`
           : nextType === "LOW_STOCK"
-            ? `${level.inventoryItem.product.name} ürünü ${level.warehouse.code} deposunda kritik stok seviyesinin altında`
+            ? `${level.inventoryItem.product?.name ?? level.inventoryItem.skuSnapshot} ürünü ${level.warehouse.code} deposunda kritik stok seviyesinin altında`
             : null;
 
         if (!nextType || !message) {
@@ -2394,7 +2618,7 @@ export class InventoryRepository {
           type: created.type,
           message: created.message,
           warehouseCode: level.warehouse.code,
-          productName: level.inventoryItem.product.name,
+          productName: level.inventoryItem.product?.name ?? level.inventoryItem.skuSnapshot,
         });
       }
 

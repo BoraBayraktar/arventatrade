@@ -5,8 +5,11 @@ export type AdminBusinessDocumentSyncStatus = "NOT_SENT" | "QUEUED" | "SENT" | "
 export type AdminBusinessDocumentLineItem = {
   id: string;
   productId: string | null;
+  productVariantId: string | null;
   productSku: string;
+  productVariantSku: string | null;
   productName: string;
+  productVariantTitle: string | null;
   quantity: number;
   unitPrice: number | null;
   lineTotal: number | null;

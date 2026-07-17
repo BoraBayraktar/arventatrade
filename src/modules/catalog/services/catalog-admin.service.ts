@@ -15,6 +15,7 @@ import type {
   AdminCreateProductInput,
   AdminCreateSupplierInput,
   AdminProductAttributeDefinitionItem,
+  AdminProductAttributeValueMarketplaceMappingItem,
   AdminProductAttributeLinkInput,
   AdminProductQuestionItem,
   AdminProductQuestionListQuery,
@@ -30,6 +31,7 @@ import type {
   AdminUpdateBrandInput,
   AdminUpdateCategoryInput,
   AdminUpdateProductInput,
+  AdminUpsertProductAttributeValueMarketplaceMappingInput,
   AdminUpdateSupplierInput,
 } from "@/modules/catalog/contracts/catalog-admin.contract";
 import { CatalogAdminRepository } from "@/modules/catalog/repositories/catalog-admin.repository";
@@ -155,6 +157,7 @@ const updateProductSchema = z.object({
 const createBrandSchema = z.object({
   slug: z.string().trim().min(2).max(120),
   name: z.string().trim().min(2).max(120),
+  trendyolBrandId: z.coerce.number().int().positive().optional().nullable(),
   isActive: z.boolean().default(true),
 });
 
@@ -162,6 +165,7 @@ const updateBrandSchema = z.object({
   id: z.string().trim().min(1),
   slug: z.string().trim().min(2).max(120).optional(),
   name: z.string().trim().min(2).max(120).optional(),
+  trendyolBrandId: z.coerce.number().int().positive().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
@@ -188,6 +192,7 @@ const createAttributeDefinitionSchema = z.object({
   slug: z.string().trim().min(2).max(120),
   name: z.string().trim().min(2).max(120),
   displayType: z.enum(["TEXT", "COLOR", "NUMBER"]).default("TEXT"),
+  trendyolAttributeId: z.coerce.number().int().positive().optional().nullable(),
   sortOrder: z.coerce.number().int().min(0).default(0),
   isActive: z.boolean().default(true),
 });
@@ -197,8 +202,19 @@ const updateAttributeDefinitionSchema = z.object({
   slug: z.string().trim().min(2).max(120).optional(),
   name: z.string().trim().min(2).max(120).optional(),
   displayType: z.enum(["TEXT", "COLOR", "NUMBER"]).optional(),
+  trendyolAttributeId: z.coerce.number().int().positive().optional().nullable(),
   sortOrder: z.coerce.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
+});
+
+const upsertAttributeValueMarketplaceMappingSchema = z.object({
+  attributeDefinitionId: z.string().trim().min(1),
+  channel: z.enum(["TRENDYOL", "N11", "EDOCS_MOCK"]).default("TRENDYOL"),
+  localValue: z.string().trim().min(1).max(240),
+  externalAttributeValueId: z.coerce.number().int().positive().optional().nullable(),
+  externalAttributeValueName: z.string().trim().max(240).optional().nullable(),
+  customAttributeValue: z.string().trim().max(240).optional().nullable(),
+  isActive: z.boolean().default(true),
 });
 
 const categoryListQuerySchema = z.object({
@@ -281,6 +297,7 @@ function mapBrand(item: {
   id: string;
   slug: string;
   name: string;
+  trendyolBrandId: number | null;
   isActive: boolean;
   _count: { products: number };
 }): AdminBrandItem {
@@ -288,6 +305,7 @@ function mapBrand(item: {
     id: item.id,
     slug: item.slug,
     name: item.name,
+    trendyolBrandId: item.trendyolBrandId,
     isActive: item.isActive,
     productCount: item._count.products,
   };
@@ -320,6 +338,7 @@ function mapAttributeDefinition(item: {
   slug: string;
   name: string;
   displayType: "TEXT" | "COLOR" | "NUMBER";
+  trendyolAttributeId: number | null;
   sortOrder: number;
   isActive: boolean;
   _count: { productLinks: number };
@@ -329,15 +348,48 @@ function mapAttributeDefinition(item: {
     slug: item.slug,
     name: item.name,
     displayType: item.displayType,
+    trendyolAttributeId: item.trendyolAttributeId,
     sortOrder: item.sortOrder,
     isActive: item.isActive,
     productCount: item._count.productLinks,
   };
 }
 
+function mapAttributeValueMarketplaceMapping(item: {
+  id: string;
+  attributeDefinitionId: string;
+  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  localValue: string;
+  externalAttributeValueId: number | null;
+  externalAttributeValueName: string | null;
+  customAttributeValue: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  attributeDefinition: {
+    id: string;
+    name: string;
+  };
+}): AdminProductAttributeValueMarketplaceMappingItem {
+  return {
+    id: item.id,
+    attributeDefinitionId: item.attributeDefinitionId,
+    attributeName: item.attributeDefinition.name,
+    channel: item.channel,
+    localValue: item.localValue,
+    externalAttributeValueId: item.externalAttributeValueId,
+    externalAttributeValueName: item.externalAttributeValueName,
+    customAttributeValue: item.customAttributeValue,
+    isActive: item.isActive,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+  };
+}
+
 const createCategorySchema = z.object({
   slug: z.string().trim().min(2),
   name: z.string().trim().min(2),
+  trendyolCategoryId: z.coerce.number().int().positive().optional().nullable(),
   parentId: z.string().trim().min(1).optional().nullable(),
 });
 
@@ -346,6 +398,7 @@ const updateCategorySchema = z
     id: z.string().trim().min(1),
     slug: z.string().trim().min(2).optional(),
     name: z.string().trim().min(2).optional(),
+    trendyolCategoryId: z.coerce.number().int().positive().optional().nullable(),
     parentId: z.string().trim().min(1).optional().nullable(),
   })
   .refine((value) => value.slug !== undefined || value.name !== undefined || value.parentId !== undefined, {
@@ -529,6 +582,7 @@ function mapCategory(category: {
   id: string;
   slug: string;
   name: string;
+  trendyolCategoryId: number | null;
   parentId: string | null;
   _count: {
     products: number;
@@ -538,6 +592,7 @@ function mapCategory(category: {
     id: category.id,
     slug: category.slug,
     name: category.name,
+    trendyolCategoryId: category.trendyolCategoryId,
     parentId: category.parentId,
     parentName,
     productCount: category._count.products,
@@ -801,6 +856,16 @@ export class CatalogAdminService {
       total,
       totalPages: Math.max(1, Math.ceil(total / parsed.pageSize)),
     };
+  }
+
+  async getProductById(id: string): Promise<AdminProductListItem | null> {
+    const product = await this.repository.findActiveProductForAdminById(id);
+    if (!product) {
+      return null;
+    }
+
+    const salesSummary = await this.repository.summarizeProductSales([product.id]);
+    return mapProduct(product, salesSummary.get(product.id));
   }
 
   async createProduct(input: AdminCreateProductInput): Promise<AdminProductListItem> {
@@ -1102,6 +1167,54 @@ export class CatalogAdminService {
 
     const updated = await this.repository.updateAttributeDefinition(parsed);
     return mapAttributeDefinition(updated);
+  }
+
+  async listAttributeValueMarketplaceMappings(channel: "TRENDYOL" | "N11" | "EDOCS_MOCK" = "TRENDYOL"): Promise<AdminProductAttributeValueMarketplaceMappingItem[]> {
+    const [mappings, localValues] = await Promise.all([
+      this.repository.listAttributeValueMarketplaceMappings(channel),
+      this.repository.listDistinctVariantAttributeValues(),
+    ]);
+    const mappedByKey = new Map(mappings.map((item) => [`${item.attributeDefinitionId}:${item.localValue}`, item]));
+    const inferred = localValues
+      .filter((item) => item.value.trim().length > 0)
+      .filter((item, index, array) => array.findIndex((candidate) => (
+        candidate.attributeDefinitionId === item.attributeDefinitionId
+        && candidate.value.trim().toLocaleLowerCase("tr-TR") === item.value.trim().toLocaleLowerCase("tr-TR")
+      )) === index)
+      .filter((item) => !mappedByKey.has(`${item.attributeDefinitionId}:${item.value}`))
+      .map((item) => ({
+        id: `inferred:${item.attributeDefinitionId}:${item.value}`,
+        attributeDefinitionId: item.attributeDefinitionId,
+        attributeName: item.attributeDefinition.name,
+        channel,
+        localValue: item.value,
+        externalAttributeValueId: null,
+        externalAttributeValueName: null,
+        customAttributeValue: null,
+        isActive: false,
+        createdAt: "",
+        updatedAt: "",
+      }));
+
+    return [
+      ...mappings.map(mapAttributeValueMarketplaceMapping),
+      ...inferred,
+    ].sort((left, right) => (
+      left.attributeName.localeCompare(right.attributeName, "tr")
+      || left.localValue.localeCompare(right.localValue, "tr")
+    ));
+  }
+
+  async upsertAttributeValueMarketplaceMapping(input: AdminUpsertProductAttributeValueMarketplaceMappingInput): Promise<AdminProductAttributeValueMarketplaceMappingItem> {
+    const parsed = upsertAttributeValueMarketplaceMappingSchema.parse(input);
+    const attributeDefinition = await this.repository.findAttributeDefinitionById(parsed.attributeDefinitionId);
+
+    if (!attributeDefinition) {
+      throw new Error("Attribute definition not found");
+    }
+
+    const saved = await this.repository.upsertAttributeValueMarketplaceMapping(parsed);
+    return mapAttributeValueMarketplaceMapping(saved);
   }
 
   async deleteAttributeDefinition(id: string): Promise<AdminProductAttributeDefinitionItem> {

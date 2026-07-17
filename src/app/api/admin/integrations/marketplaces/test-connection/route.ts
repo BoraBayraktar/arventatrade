@@ -1,0 +1,36 @@
+import { NextResponse } from "next/server";
+import { ZodError } from "zod";
+
+import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
+
+export async function POST(request: Request) {
+  try {
+    await requireUserRoles(["ADMIN"]);
+    const payload = await request.json();
+    const result = await marketplaceIntegrationService.testConnection(payload);
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof AuthContextError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
+
+    if (error instanceof ZodError) {
+      return NextResponse.json({ message: error.issues[0]?.message ?? "Validation failed" }, { status: 400 });
+    }
+
+    if (error instanceof Error && error.message === "TRENDYOL_CONFIG_NOT_FOUND") {
+      return NextResponse.json({ message: "Trendyol config not found" }, { status: 404 });
+    }
+
+    if (error instanceof Error && error.message === "TRENDYOL_CONFIG_INCOMPLETE") {
+      return NextResponse.json({ message: "Trendyol config is incomplete" }, { status: 400 });
+    }
+
+    if (error instanceof Error && error.message.startsWith("TRENDYOL_GET_SHIPMENT_PACKAGES_FAILED")) {
+      return NextResponse.json({ message: "Trendyol connection failed" }, { status: 502 });
+    }
+
+    return NextResponse.json({ message: "Unexpected error" }, { status: 500 });
+  }
+}

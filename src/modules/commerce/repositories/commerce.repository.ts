@@ -336,6 +336,18 @@ export class CommerceRepository {
     });
   }
 
+  async findOrderByNumber(orderNumber: string) {
+    return prisma.order.findUnique({
+      where: {
+        orderNumber,
+      },
+      select: {
+        id: true,
+        orderNumber: true,
+      },
+    });
+  }
+
   async createOrderAndCommitInventory(args: {
     orderNumber: string;
     lines: CommerceLineQuote[];

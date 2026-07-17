@@ -11,6 +11,7 @@ model Category {
   id              String           @id @default(cuid())
   slug            String           @unique
   name            String
+  trendyolCategoryId Int?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   deleted         Boolean          @default(false)
@@ -24,12 +25,14 @@ model Category {
 
   @@index([deleted])
   @@index([parentId])
+  @@index([trendyolCategoryId])
 }
 
 model Brand {
   id            String    @id @default(cuid())
   slug          String    @unique
   name          String
+  trendyolBrandId Int?
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -39,23 +42,24 @@ model Brand {
   products      Product[]
 
   @@index([deleted, isActive])
+  @@index([trendyolBrandId])
 }
 
 model Supplier {
-  id              String    @id @default(cuid())
-  slug            String    @unique
-  name            String
-  taxNumber       String?
-  email           String?
-  phone           String?
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deleted         Boolean   @default(false)
-  deletedDate     DateTime?
-  deletedUserId   String?
-  paymentRecords  PaymentRecord[]
-  primaryProducts Product[]
+  id                String             @id @default(cuid())
+  slug              String             @unique
+  name              String
+  taxNumber         String?
+  email             String?
+  phone             String?
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deleted           Boolean            @default(false)
+  deletedDate       DateTime?
+  deletedUserId     String?
+  paymentRecords    PaymentRecord[]
+  primaryProducts   Product[]
   businessDocuments BusinessDocument[]
 
   @@index([deleted, isActive])
@@ -63,21 +67,21 @@ model Supplier {
 }
 
 model CustomerAccount {
-  id            String   @id @default(cuid())
-  slug          String   @unique
-  name          String
-  email         String?
-  phone         String?
-  taxNumber     String?
-  address       String?
-  note          String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deleted       Boolean  @default(false)
-  deletedDate   DateTime?
-  deletedUserId String?
-  orders        Order[]
+  id                String             @id @default(cuid())
+  slug              String             @unique
+  name              String
+  email             String?
+  phone             String?
+  taxNumber         String?
+  address           String?
+  note              String?
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deleted           Boolean            @default(false)
+  deletedDate       DateTime?
+  deletedUserId     String?
+  orders            Order[]
   businessDocuments BusinessDocument[]
 
   @@index([deleted, isActive])
@@ -86,21 +90,21 @@ model CustomerAccount {
 }
 
 model FinancialAccount {
-  id             String               @id @default(cuid())
-  name           String
-  type           FinancialAccountType
-  currency       String               @default("TRY")
-  openingBalance Decimal              @default(0) @db.Decimal(10, 2)
-  isActive       Boolean              @default(true)
-  note           String?
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
-  deleted        Boolean              @default(false)
-  deletedDate    DateTime?
-  deletedUserId  String?
-  transactions   CashTransaction[]
+  id                String               @id @default(cuid())
+  name              String
+  type              FinancialAccountType
+  currency          String               @default("TRY")
+  openingBalance    Decimal              @default(0) @db.Decimal(10, 2)
+  isActive          Boolean              @default(true)
+  note              String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deleted           Boolean              @default(false)
+  deletedDate       DateTime?
+  deletedUserId     String?
+  transactions      CashTransaction[]
   collectionRecords CollectionRecord[]
-  paymentRecords  PaymentRecord[]
+  paymentRecords    PaymentRecord[]
 
   @@index([deleted, isActive])
   @@index([type, isActive])
@@ -135,74 +139,99 @@ model CashTransaction {
 }
 
 model ProductAttributeDefinition {
-  id            String                  @id @default(cuid())
-  slug          String                  @unique
+  id            String                         @id @default(cuid())
+  slug          String                         @unique
   name          String
-  displayType   ProductAttributeDisplayType @default(TEXT)
-  sortOrder     Int                     @default(0)
-  isActive      Boolean                 @default(true)
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
-  deleted       Boolean                 @default(false)
+  trendyolAttributeId Int?
+  displayType   ProductAttributeDisplayType    @default(TEXT)
+  sortOrder     Int                            @default(0)
+  isActive      Boolean                        @default(true)
+  createdAt     DateTime                       @default(now())
+  updatedAt     DateTime                       @updatedAt
+  deleted       Boolean                        @default(false)
   deletedDate   DateTime?
   deletedUserId String?
+  marketplaceValueMappings ProductAttributeValueMarketplaceMapping[]
   productLinks  ProductAttributeLink[]
   variantValues ProductVariantAttributeValue[]
 
   @@index([deleted, isActive, sortOrder])
+  @@index([trendyolAttributeId])
+}
+
+model ProductAttributeValueMarketplaceMapping {
+  id                         String                     @id @default(cuid())
+  attributeDefinitionId      String
+  channel                    IntegrationChannel
+  localValue                 String
+  externalAttributeValueId   Int?
+  externalAttributeValueName String?
+  customAttributeValue       String?
+  isActive                   Boolean                    @default(true)
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
+  deleted                    Boolean                    @default(false)
+  deletedDate                DateTime?
+  deletedUserId              String?
+  attributeDefinition        ProductAttributeDefinition @relation(fields: [attributeDefinitionId], references: [id])
+
+  @@unique([attributeDefinitionId, channel, localValue])
+  @@index([channel, deleted, isActive])
+  @@index([attributeDefinitionId, deleted])
 }
 
 model Product {
-  id              String              @id @default(cuid())
-  slug            String              @unique
-  name            String
-  description     String
-  barcode         String?
-  unitType        ProductUnitType     @default(PIECE)
-  productType     ProductType         @default(PHYSICAL)
-  price           Decimal             @db.Decimal(10, 2)
-  purchasePrice   Decimal?            @db.Decimal(10, 2)
-  currency        String              @default("TRY")
-  vatRate         Int                 @default(20)
-  stockTrackingEnabled Boolean        @default(true)
-  imageUrl        String
-  imageUrls       String[]            @default([])
-  categoryId      String?
-  brandId         String?
-  primarySupplierId String?
-  status          ProductStatus       @default(ACTIVE)
-  salesEnabled    Boolean             @default(true)
-  purchaseEnabled Boolean             @default(true)
-  internalNote    String?
-  searchKeywords  String[]            @default([])
-  preferredSalesWarehouseId String?
+  id                           String                        @id @default(cuid())
+  slug                         String                        @unique
+  name                         String
+  description                  String
+  barcode                      String?
+  unitType                     ProductUnitType               @default(PIECE)
+  productType                  ProductType                   @default(PHYSICAL)
+  price                        Decimal                       @db.Decimal(10, 2)
+  purchasePrice                Decimal?                      @db.Decimal(10, 2)
+  currency                     String                        @default("TRY")
+  vatRate                      Int                           @default(20)
+  stockTrackingEnabled         Boolean                       @default(true)
+  imageUrl                     String
+  imageUrls                    String[]                      @default([])
+  categoryId                   String?
+  brandId                      String?
+  primarySupplierId            String?
+  status                       ProductStatus                 @default(ACTIVE)
+  salesEnabled                 Boolean                       @default(true)
+  purchaseEnabled              Boolean                       @default(true)
+  internalNote                 String?
+  searchKeywords               String[]                      @default([])
+  preferredSalesWarehouseId    String?
   preferredPurchaseWarehouseId String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  deleted         Boolean             @default(false)
-  deletedDate     DateTime?
-  deletedUserId   String?
-  sku             String              @unique
-  compareAtPrice  Decimal?            @db.Decimal(10, 2)
-  stock           Int                 @default(0)
-  orderItems      OrderItem[]
-  brand           Brand?              @relation(fields: [brandId], references: [id])
-  category        Category?           @relation(fields: [categoryId], references: [id])
-  inventoryItem   InventoryItem?
-  interaction     ProductInteraction?
-  primarySupplier Supplier?           @relation(fields: [primarySupplierId], references: [id])
-  preferredSalesWarehouse Warehouse?  @relation("PreferredSalesWarehouseProducts", fields: [preferredSalesWarehouseId], references: [id])
-  preferredPurchaseWarehouse Warehouse? @relation("PreferredPurchaseWarehouseProducts", fields: [preferredPurchaseWarehouseId], references: [id])
-  reviews         ProductReview[]
-  questions       ProductQuestion[]
-  attributeLinks  ProductAttributeLink[]
-  variants        ProductVariant[]
-  storefrontItems StorefrontItem[]
-  externalStockEvents ExternalStockEvent[]
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  deleted                      Boolean                       @default(false)
+  deletedDate                  DateTime?
+  deletedUserId                String?
+  sku                          String                        @unique
+  compareAtPrice               Decimal?                      @db.Decimal(10, 2)
+  stock                        Int                           @default(0)
+  orderItems                   OrderItem[]
+  brand                        Brand?                        @relation(fields: [brandId], references: [id])
+  category                     Category?                     @relation(fields: [categoryId], references: [id])
+  inventoryItem                InventoryItem?
+  interaction                  ProductInteraction?
+  primarySupplier              Supplier?                     @relation(fields: [primarySupplierId], references: [id])
+  preferredSalesWarehouse      Warehouse?                    @relation("PreferredSalesWarehouseProducts", fields: [preferredSalesWarehouseId], references: [id])
+  preferredPurchaseWarehouse   Warehouse?                    @relation("PreferredPurchaseWarehouseProducts", fields: [preferredPurchaseWarehouseId], references: [id])
+  reviews                      ProductReview[]
+  questions                    ProductQuestion[]
+  attributeLinks               ProductAttributeLink[]
+  variants                     ProductVariant[]
+  storefrontItems              StorefrontItem[]
+  externalStockEvents          ExternalStockEvent[]
   inventoryIntegrationMappings InventoryIntegrationMapping[]
-  purchaseReceiptLines PurchaseReceiptLine[]
-  businessDocumentLines BusinessDocumentLine[]
-  inventoryHistoryEvents InventoryHistoryEvent[]
+  marketplaceOrderLines        MarketplaceOrderLine[]
+  purchaseReceiptLines         PurchaseReceiptLine[]
+  businessDocumentLines        BusinessDocumentLine[]
+  inventoryHistoryEvents       InventoryHistoryEvent[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -216,15 +245,15 @@ model Product {
 }
 
 model ProductAttributeLink {
-  id                   String                      @id @default(cuid())
-  productId            String
+  id                    String                     @id @default(cuid())
+  productId             String
   attributeDefinitionId String
-  isVariantAxis        Boolean                     @default(false)
-  sortOrder            Int                         @default(0)
-  createdAt            DateTime                    @default(now())
-  updatedAt            DateTime                    @updatedAt
-  attributeDefinition  ProductAttributeDefinition  @relation(fields: [attributeDefinitionId], references: [id])
-  product              Product                     @relation(fields: [productId], references: [id])
+  isVariantAxis         Boolean                    @default(false)
+  sortOrder             Int                        @default(0)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  attributeDefinition   ProductAttributeDefinition @relation(fields: [attributeDefinitionId], references: [id])
+  product               Product                    @relation(fields: [productId], references: [id])
 
   @@unique([productId, attributeDefinitionId])
   @@index([attributeDefinitionId, isVariantAxis])
@@ -232,44 +261,48 @@ model ProductAttributeLink {
 }
 
 model ProductVariant {
-  id                String                       @id @default(cuid())
-  productId         String
-  slug              String                       @unique
-  sku               String                       @unique
-  barcode           String?
-  title             String
-  optionSummary     String
-  priceOverride     Decimal?                     @db.Decimal(10, 2)
-  purchasePriceOverride Decimal?                 @db.Decimal(10, 2)
-  compareAtPriceOverride Decimal?                @db.Decimal(10, 2)
-  imageUrl          String?
-  imageUrls         String[]                     @default([])
-  stockOverride     Int?
-  salesEnabled      Boolean                      @default(true)
-  isDefault         Boolean                      @default(false)
-  sortOrder         Int                          @default(0)
-  createdAt         DateTime                     @default(now())
-  updatedAt         DateTime                     @updatedAt
-  deleted           Boolean                      @default(false)
-  deletedDate       DateTime?
-  deletedUserId     String?
-  product           Product                      @relation(fields: [productId], references: [id])
-  attributeValues   ProductVariantAttributeValue[]
-  orderItems        OrderItem[]
+  id                     String                         @id @default(cuid())
+  productId              String
+  slug                   String                         @unique
+  sku                    String                         @unique
+  barcode                String?
+  title                  String
+  optionSummary          String
+  priceOverride          Decimal?                       @db.Decimal(10, 2)
+  purchasePriceOverride  Decimal?                       @db.Decimal(10, 2)
+  compareAtPriceOverride Decimal?                       @db.Decimal(10, 2)
+  imageUrl               String?
+  imageUrls              String[]                       @default([])
+  stockOverride          Int?
+  salesEnabled           Boolean                        @default(true)
+  isDefault              Boolean                        @default(false)
+  sortOrder              Int                            @default(0)
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+  deleted                Boolean                        @default(false)
+  deletedDate            DateTime?
+  deletedUserId          String?
+  product                Product                        @relation(fields: [productId], references: [id])
+  attributeValues        ProductVariantAttributeValue[]
+  inventoryItem          InventoryItem?
+  orderItems             OrderItem[]
+  marketplaceOrderLines  MarketplaceOrderLine[]
+  purchaseReceiptLines   PurchaseReceiptLine[]
+  businessDocumentLines  BusinessDocumentLine[]
 
   @@index([productId, deleted, salesEnabled, sortOrder])
   @@index([barcode])
 }
 
 model ProductVariantAttributeValue {
-  id                   String                      @id @default(cuid())
-  productVariantId     String
+  id                    String                     @id @default(cuid())
+  productVariantId      String
   attributeDefinitionId String
-  value                String
-  createdAt            DateTime                    @default(now())
-  updatedAt            DateTime                    @updatedAt
-  attributeDefinition  ProductAttributeDefinition  @relation(fields: [attributeDefinitionId], references: [id])
-  productVariant       ProductVariant              @relation(fields: [productVariantId], references: [id])
+  value                 String
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  attributeDefinition   ProductAttributeDefinition @relation(fields: [attributeDefinitionId], references: [id])
+  productVariant        ProductVariant             @relation(fields: [productVariantId], references: [id])
 
   @@unique([productVariantId, attributeDefinitionId])
   @@index([attributeDefinitionId, value])
@@ -375,6 +408,7 @@ model Order {
   stockReservations    StockReservation[]
   statusHistory        OrderStatusHistory[]
   businessDocuments    BusinessDocument[]
+  marketplacePackages  MarketplaceOrderPackage[]
   customerAccount      CustomerAccount?            @relation(fields: [customerAccountId], references: [id])
 
   @@index([deleted])
@@ -385,31 +419,31 @@ model Order {
 }
 
 model OrderItem {
-  id              String    @id @default(cuid())
-  orderId         String
-  productId       String?
-  productVariantId String?
-  productSlug     String
-  productSku      String
-  productVariantSlug String?
-  productVariantSku String?
-  productVariantTitle String?
+  id                          String          @id @default(cuid())
+  orderId                     String
+  productId                   String?
+  productVariantId            String?
+  productSlug                 String
+  productSku                  String
+  productVariantSlug          String?
+  productVariantSku           String?
+  productVariantTitle         String?
   productVariantOptionSummary String?
-  productName     String
-  productImageUrl String
-  quantity        Int
-  unitPrice       Decimal   @db.Decimal(10, 2)
-  compareAtPrice  Decimal?  @db.Decimal(10, 2)
-  lineTotal       Decimal   @db.Decimal(10, 2)
-  currency        String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deleted         Boolean   @default(false)
-  deletedDate     DateTime?
-  deletedUserId   String?
-  order           Order     @relation(fields: [orderId], references: [id])
-  product         Product?  @relation(fields: [productId], references: [id])
-  productVariant  ProductVariant? @relation(fields: [productVariantId], references: [id])
+  productName                 String
+  productImageUrl             String
+  quantity                    Int
+  unitPrice                   Decimal         @db.Decimal(10, 2)
+  compareAtPrice              Decimal?        @db.Decimal(10, 2)
+  lineTotal                   Decimal         @db.Decimal(10, 2)
+  currency                    String
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime        @updatedAt
+  deleted                     Boolean         @default(false)
+  deletedDate                 DateTime?
+  deletedUserId               String?
+  order                       Order           @relation(fields: [orderId], references: [id])
+  product                     Product?        @relation(fields: [productId], references: [id])
+  productVariant              ProductVariant? @relation(fields: [productVariantId], references: [id])
 
   @@index([orderId])
   @@index([productId])
@@ -456,22 +490,22 @@ model OrderPaymentStatusHistory {
 }
 
 model CollectionRecord {
-  id             String                 @id @default(cuid())
-  orderId        String
+  id                 String                 @id @default(cuid())
+  orderId            String
   financialAccountId String?
-  amount         Decimal                @db.Decimal(10, 2)
-  currency       String                 @default("TRY")
-  status         CollectionRecordStatus @default(RECORDED)
-  collectedAt    DateTime
-  note           String?
-  recordedByUserId String?
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
-  deleted        Boolean                @default(false)
-  deletedDate    DateTime?
-  deletedUserId  String?
-  order          Order                  @relation(fields: [orderId], references: [id])
-  financialAccount FinancialAccount?    @relation(fields: [financialAccountId], references: [id])
+  amount             Decimal                @db.Decimal(10, 2)
+  currency           String                 @default("TRY")
+  status             CollectionRecordStatus @default(RECORDED)
+  collectedAt        DateTime
+  note               String?
+  recordedByUserId   String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  deleted            Boolean                @default(false)
+  deletedDate        DateTime?
+  deletedUserId      String?
+  order              Order                  @relation(fields: [orderId], references: [id])
+  financialAccount   FinancialAccount?      @relation(fields: [financialAccountId], references: [id])
 
   @@index([orderId, collectedAt])
   @@index([financialAccountId, collectedAt])
@@ -480,22 +514,22 @@ model CollectionRecord {
 }
 
 model PaymentRecord {
-  id               String              @id @default(cuid())
-  supplierId       String
+  id                 String              @id @default(cuid())
+  supplierId         String
   financialAccountId String?
-  amount           Decimal             @db.Decimal(10, 2)
-  currency         String              @default("TRY")
-  status           PaymentRecordStatus @default(RECORDED)
-  paidAt           DateTime
-  note             String?
-  recordedByUserId String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  deleted          Boolean             @default(false)
-  deletedDate      DateTime?
-  deletedUserId    String?
-  supplier         Supplier            @relation(fields: [supplierId], references: [id])
-  financialAccount FinancialAccount?   @relation(fields: [financialAccountId], references: [id])
+  amount             Decimal             @db.Decimal(10, 2)
+  currency           String              @default("TRY")
+  status             PaymentRecordStatus @default(RECORDED)
+  paidAt             DateTime
+  note               String?
+  recordedByUserId   String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  deleted            Boolean             @default(false)
+  deletedDate        DateTime?
+  deletedUserId      String?
+  supplier           Supplier            @relation(fields: [supplierId], references: [id])
+  financialAccount   FinancialAccount?   @relation(fields: [financialAccountId], references: [id])
 
   @@index([supplierId, paidAt])
   @@index([financialAccountId, paidAt])
@@ -504,38 +538,38 @@ model PaymentRecord {
 }
 
 model BusinessDocument {
-  id                    String                       @id @default(cuid())
-  documentNumber        String                       @unique
-  documentType          BusinessDocumentType
-  status                BusinessDocumentStatus       @default(DRAFT)
-  issueDate             DateTime
-  currency              String                       @default("TRY")
-  totalAmount           Decimal?                     @db.Decimal(10, 2)
-  externalReference     String?
-  externalSystemStatus  BusinessDocumentSyncStatus   @default(NOT_SENT)
-  providerConfigId      String?
-  counterpartyName      String
-  counterpartyTaxNumber String?
-  counterpartyTaxOffice String?
-  counterpartyEmail     String?
-  counterpartyAddress   String?
-  note                  String?
-  supplierId            String?
-  customerAccountId     String?
-  orderId               String?
+  id                     String                     @id @default(cuid())
+  documentNumber         String                     @unique
+  documentType           BusinessDocumentType
+  status                 BusinessDocumentStatus     @default(DRAFT)
+  issueDate              DateTime
+  currency               String                     @default("TRY")
+  totalAmount            Decimal?                   @db.Decimal(10, 2)
+  externalReference      String?
+  externalSystemStatus   BusinessDocumentSyncStatus @default(NOT_SENT)
+  providerConfigId       String?
+  counterpartyName       String
+  counterpartyTaxNumber  String?
+  counterpartyTaxOffice  String?
+  counterpartyEmail      String?
+  counterpartyAddress    String?
+  note                   String?
+  supplierId             String?
+  customerAccountId      String?
+  orderId                String?
   inventoryTransactionId String?
-  createdAt             DateTime                     @default(now())
-  updatedAt             DateTime                     @updatedAt
-  deleted               Boolean                      @default(false)
-  deletedDate           DateTime?
-  deletedUserId         String?
-  dispatches            BusinessDocumentDispatch[]
-  lines                 BusinessDocumentLine[]
-  supplier              Supplier?                    @relation(fields: [supplierId], references: [id])
-  customerAccount       CustomerAccount?             @relation(fields: [customerAccountId], references: [id])
-  order                 Order?                       @relation(fields: [orderId], references: [id])
-  inventoryTransaction  InventoryTransaction?        @relation(fields: [inventoryTransactionId], references: [id])
-  providerConfig        DocumentProviderConfig?      @relation(fields: [providerConfigId], references: [id])
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  deleted                Boolean                    @default(false)
+  deletedDate            DateTime?
+  deletedUserId          String?
+  dispatches             BusinessDocumentDispatch[]
+  lines                  BusinessDocumentLine[]
+  supplier               Supplier?                  @relation(fields: [supplierId], references: [id])
+  customerAccount        CustomerAccount?           @relation(fields: [customerAccountId], references: [id])
+  order                  Order?                     @relation(fields: [orderId], references: [id])
+  inventoryTransaction   InventoryTransaction?      @relation(fields: [inventoryTransactionId], references: [id])
+  providerConfig         DocumentProviderConfig?    @relation(fields: [providerConfigId], references: [id])
 
   @@index([documentType, issueDate])
   @@index([status, issueDate])
@@ -548,23 +582,28 @@ model BusinessDocument {
 }
 
 model BusinessDocumentLine {
-  id                 String            @id @default(cuid())
-  businessDocumentId String
-  productId          String?
-  productSku         String
-  productName        String
-  quantity           Int
-  unitPrice          Decimal?          @db.Decimal(10, 2)
-  lineTotal          Decimal?          @db.Decimal(10, 2)
-  currency           String            @default("TRY")
-  note               String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  businessDocument   BusinessDocument  @relation(fields: [businessDocumentId], references: [id])
-  product            Product?          @relation(fields: [productId], references: [id])
+  id                  String           @id @default(cuid())
+  businessDocumentId  String
+  productId           String?
+  productVariantId    String?
+  productSku          String
+  productVariantSku   String?
+  productName         String
+  productVariantTitle String?
+  quantity            Int
+  unitPrice           Decimal?         @db.Decimal(10, 2)
+  lineTotal           Decimal?         @db.Decimal(10, 2)
+  currency            String           @default("TRY")
+  note                String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  businessDocument    BusinessDocument @relation(fields: [businessDocumentId], references: [id])
+  product             Product?         @relation(fields: [productId], references: [id])
+  productVariant      ProductVariant?  @relation(fields: [productVariantId], references: [id])
 
   @@index([businessDocumentId])
   @@index([productId])
+  @@index([productVariantId])
 }
 
 model BusinessDocumentDispatch {
@@ -590,82 +629,86 @@ model BusinessDocumentDispatch {
 }
 
 model DocumentProviderConfig {
-  id                    String              @id @default(cuid())
-  providerCode          String              @unique
-  channel               IntegrationChannel
-  displayName           String
-  endpointUrl           String?
-  senderLabel           String?
-  senderVkn            String?
-  username              String?
-  secretKey             String?
-  companyName           String?
-  webhookSecret         String?
-  supportsStatusSync    Boolean             @default(true)
-  isActive              Boolean             @default(true)
-  isDefault             Boolean             @default(false)
-  note                  String?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  deleted               Boolean             @default(false)
-  deletedDate           DateTime?
-  deletedUserId         String?
-  documents             BusinessDocument[]
+  id                 String             @id @default(cuid())
+  providerCode       String             @unique
+  channel            IntegrationChannel
+  displayName        String
+  endpointUrl        String?
+  senderLabel        String?
+  senderVkn          String?
+  username           String?
+  secretKey          String?
+  companyName        String?
+  webhookSecret      String?
+  supportsStatusSync Boolean            @default(true)
+  isActive           Boolean            @default(true)
+  isDefault          Boolean            @default(false)
+  note               String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  deleted            Boolean            @default(false)
+  deletedDate        DateTime?
+  deletedUserId      String?
+  documents          BusinessDocument[]
 
   @@index([channel, isActive, deleted])
   @@index([isDefault, deleted])
 }
 
 model Warehouse {
-  id                 String              @id @default(cuid())
-  code               String              @unique
-  name               String
-  description        String?
-  address            String?
-  contactName        String?
-  contactPhone       String?
-  priority           Int                 @default(100)
-  isActive           Boolean             @default(true)
-  isDefault          Boolean             @default(false)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  inventoryLevels    InventoryLevel[]
-  inventoryAlerts    InventoryAlert[]
-  incomingInventoryTransactions InventoryTransactionLine[] @relation("InventoryTransactionLineToWarehouse")
-  inventoryMovements InventoryMovement[]
-  outgoingInventoryTransactions InventoryTransactionLine[] @relation("InventoryTransactionLineFromWarehouse")
-  stockCounts        StockCount[]
-  stockCountLines    StockCountLine[]
-  preferredPurchaseProducts Product[]    @relation("PreferredPurchaseWarehouseProducts")
-  preferredSalesProducts Product[]       @relation("PreferredSalesWarehouseProducts")
-  stockReservations  StockReservation[]
-  externalStockEvents ExternalStockEvent[]
-  inventoryIntegrationMappings InventoryIntegrationMapping[]
-  purchaseReceipts   PurchaseReceipt[]
-  inventoryHistoryEvents InventoryHistoryEvent[]
+  id                            String                        @id @default(cuid())
+  code                          String                        @unique
+  name                          String
+  description                   String?
+  address                       String?
+  contactName                   String?
+  contactPhone                  String?
+  priority                      Int                           @default(100)
+  isActive                      Boolean                       @default(true)
+  isDefault                     Boolean                       @default(false)
+  createdAt                     DateTime                      @default(now())
+  updatedAt                     DateTime                      @updatedAt
+  inventoryLevels               InventoryLevel[]
+  inventoryAlerts               InventoryAlert[]
+  incomingInventoryTransactions InventoryTransactionLine[]    @relation("InventoryTransactionLineToWarehouse")
+  inventoryMovements            InventoryMovement[]
+  outgoingInventoryTransactions InventoryTransactionLine[]    @relation("InventoryTransactionLineFromWarehouse")
+  stockCounts                   StockCount[]
+  stockCountLines               StockCountLine[]
+  preferredPurchaseProducts     Product[]                     @relation("PreferredPurchaseWarehouseProducts")
+  preferredSalesProducts        Product[]                     @relation("PreferredSalesWarehouseProducts")
+  stockReservations             StockReservation[]
+  externalStockEvents           ExternalStockEvent[]
+  inventoryIntegrationMappings  InventoryIntegrationMapping[]
+  purchaseReceipts              PurchaseReceipt[]
+  inventoryHistoryEvents        InventoryHistoryEvent[]
 
   @@index([isActive, isDefault])
   @@index([priority])
 }
 
 model InventoryItem {
-  id                 String              @id @default(cuid())
-  productId          String              @unique
-  skuSnapshot        String
-  costingMethod      InventoryCostingMethod @default(AVERAGE_COST)
-  averageUnitCost    Decimal?            @db.Decimal(10, 2)
-  lastPurchaseUnitCost Decimal?          @db.Decimal(10, 2)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  inventoryAlerts    InventoryAlert[]
+  id                        String                     @id @default(cuid())
+  productId                 String?
+  productVariantId          String?                    @unique
+  skuSnapshot               String
+  costingMethod             InventoryCostingMethod     @default(AVERAGE_COST)
+  averageUnitCost           Decimal?                   @db.Decimal(10, 2)
+  lastPurchaseUnitCost      Decimal?                   @db.Decimal(10, 2)
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  inventoryAlerts           InventoryAlert[]
   inventoryTransactionLines InventoryTransactionLine[]
-  product            Product             @relation(fields: [productId], references: [id])
-  inventoryLevels    InventoryLevel[]
-  inventoryMovements InventoryMovement[]
-  stockCountLines    StockCountLine[]
-  stockReservations  StockReservation[]
+  product                   Product?                   @relation(fields: [productId], references: [id])
+  productVariant            ProductVariant?            @relation(fields: [productVariantId], references: [id])
+  inventoryLevels           InventoryLevel[]
+  inventoryMovements        InventoryMovement[]
+  stockCountLines           StockCountLine[]
+  stockReservations         StockReservation[]
 
+  @@unique([productId])
   @@index([productId])
+  @@index([productVariantId])
 }
 
 model InventoryLevel {
@@ -687,19 +730,19 @@ model InventoryLevel {
 }
 
 model StockReservation {
-  id                 String                  @id @default(cuid())
+  id                 String                 @id @default(cuid())
   inventoryItemId    String
   warehouseId        String
   orderId            String?
   reference          String?
   quantity           Int
-  status             StockReservationStatus  @default(ACTIVE)
+  status             StockReservationStatus @default(ACTIVE)
   expiresAt          DateTime?
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-  inventoryItem      InventoryItem           @relation(fields: [inventoryItemId], references: [id])
-  warehouse          Warehouse               @relation(fields: [warehouseId], references: [id])
-  order              Order?                  @relation(fields: [orderId], references: [id])
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  inventoryItem      InventoryItem          @relation(fields: [inventoryItemId], references: [id])
+  warehouse          Warehouse              @relation(fields: [warehouseId], references: [id])
+  order              Order?                 @relation(fields: [orderId], references: [id])
   inventoryMovements InventoryMovement[]
 
   @@index([inventoryItemId, status])
@@ -737,34 +780,34 @@ model InventoryMovement {
 }
 
 model StockCount {
-  id             String            @id @default(cuid())
-  countNumber    String            @unique
-  warehouseId    String?
-  status         StockCountStatus  @default(DRAFT)
-  countedAt      DateTime
-  note           String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  warehouse      Warehouse?        @relation(fields: [warehouseId], references: [id])
-  lines          StockCountLine[]
+  id          String           @id @default(cuid())
+  countNumber String           @unique
+  warehouseId String?
+  status      StockCountStatus @default(DRAFT)
+  countedAt   DateTime
+  note        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  warehouse   Warehouse?       @relation(fields: [warehouseId], references: [id])
+  lines       StockCountLine[]
 
   @@index([status, countedAt])
   @@index([warehouseId])
 }
 
 model StockCountLine {
-  id               String      @id @default(cuid())
-  stockCountId     String
-  inventoryItemId  String
-  warehouseId      String
-  systemOnHand     Int
-  countedOnHand    Int?
-  note             String?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  stockCount       StockCount  @relation(fields: [stockCountId], references: [id])
-  inventoryItem    InventoryItem @relation(fields: [inventoryItemId], references: [id])
-  warehouse        Warehouse   @relation(fields: [warehouseId], references: [id])
+  id              String        @id @default(cuid())
+  stockCountId    String
+  inventoryItemId String
+  warehouseId     String
+  systemOnHand    Int
+  countedOnHand   Int?
+  note            String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  stockCount      StockCount    @relation(fields: [stockCountId], references: [id])
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  warehouse       Warehouse     @relation(fields: [warehouseId], references: [id])
 
   @@unique([stockCountId, inventoryItemId, warehouseId])
   @@index([warehouseId])
@@ -772,20 +815,20 @@ model StockCountLine {
 }
 
 model InventoryAlert {
-  id                 String                @id @default(cuid())
+  id                 String               @id @default(cuid())
   inventoryItemId    String
   warehouseId        String
   type               InventoryAlertType
-  status             InventoryAlertStatus  @default(ACTIVE)
+  status             InventoryAlertStatus @default(ACTIVE)
   message            String
   createdMovementId  String?
   resolvedMovementId String?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  inventoryItem      InventoryItem         @relation(fields: [inventoryItemId], references: [id])
-  warehouse          Warehouse             @relation(fields: [warehouseId], references: [id])
-  createdMovement    InventoryMovement?    @relation("InventoryAlertCreatedMovement", fields: [createdMovementId], references: [id])
-  resolvedMovement   InventoryMovement?    @relation("InventoryAlertResolvedMovement", fields: [resolvedMovementId], references: [id])
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  inventoryItem      InventoryItem        @relation(fields: [inventoryItemId], references: [id])
+  warehouse          Warehouse            @relation(fields: [warehouseId], references: [id])
+  createdMovement    InventoryMovement?   @relation("InventoryAlertCreatedMovement", fields: [createdMovementId], references: [id])
+  resolvedMovement   InventoryMovement?   @relation("InventoryAlertResolvedMovement", fields: [resolvedMovementId], references: [id])
 
   @@index([status, type, createdAt])
   @@index([warehouseId])
@@ -793,44 +836,44 @@ model InventoryAlert {
 }
 
 model InventoryTransaction {
-  id                String                     @id @default(cuid())
-  transactionNumber String                     @unique
-  type              InventoryTransactionType
-  reference         String?
-  sourceDocumentType String?
-  sourceDocumentId  String?
+  id                   String                     @id @default(cuid())
+  transactionNumber    String                     @unique
+  type                 InventoryTransactionType
+  reference            String?
+  sourceDocumentType   String?
+  sourceDocumentId     String?
   sourceDocumentNumber String?
-  sourceDocumentUrl String?
-  sourceDocumentDate DateTime?
-  externalReference String?
+  sourceDocumentUrl    String?
+  sourceDocumentDate   DateTime?
+  externalReference    String?
   externalSystemStatus String?
-  counterpartyName  String?
-  note              String?
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
-  lines             InventoryTransactionLine[]
-  movements         InventoryMovement[]
-  purchaseReceipt   PurchaseReceipt?
-  businessDocuments BusinessDocument[]
+  counterpartyName     String?
+  note                 String?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  lines                InventoryTransactionLine[]
+  movements            InventoryMovement[]
+  purchaseReceipt      PurchaseReceipt?
+  businessDocuments    BusinessDocument[]
 
   @@index([type, createdAt])
   @@index([sourceDocumentType, sourceDocumentNumber])
 }
 
 model PurchaseReceipt {
-  id              String                @id @default(cuid())
-  receiptNumber   String                @unique
-  supplierName    String
-  receiptDate     DateTime
+  id                String                @id @default(cuid())
+  receiptNumber     String                @unique
+  supplierName      String
+  receiptDate       DateTime
   externalReference String?
-  note            String?
-  warehouseId     String
-  transactionId   String                @unique
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
-  warehouse       Warehouse             @relation(fields: [warehouseId], references: [id])
-  transaction     InventoryTransaction  @relation(fields: [transactionId], references: [id])
-  lines           PurchaseReceiptLine[]
+  note              String?
+  warehouseId       String
+  transactionId     String                @unique
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  warehouse         Warehouse             @relation(fields: [warehouseId], references: [id])
+  transaction       InventoryTransaction  @relation(fields: [transactionId], references: [id])
+  lines             PurchaseReceiptLine[]
 
   @@index([warehouseId, receiptDate])
   @@index([supplierName, receiptDate])
@@ -840,6 +883,7 @@ model PurchaseReceiptLine {
   id                String          @id @default(cuid())
   purchaseReceiptId String
   productId         String
+  productVariantId  String?
   quantity          Int
   unitCost          Decimal?        @db.Decimal(10, 2)
   lineTotal         Decimal?        @db.Decimal(10, 2)
@@ -847,9 +891,11 @@ model PurchaseReceiptLine {
   createdAt         DateTime        @default(now())
   purchaseReceipt   PurchaseReceipt @relation(fields: [purchaseReceiptId], references: [id])
   product           Product         @relation(fields: [productId], references: [id])
+  productVariant    ProductVariant? @relation(fields: [productVariantId], references: [id])
 
   @@index([purchaseReceiptId])
   @@index([productId])
+  @@index([productVariantId])
 }
 
 model InventoryTransactionLine {
@@ -886,6 +932,8 @@ model IntegrationSyncJob {
   nextAttemptAt  DateTime               @default(now())
   lastAttemptAt  DateTime?
   processedAt    DateTime?
+  externalReference String?
+  responsePayload Json?
   lastError      String?
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
@@ -926,38 +974,134 @@ model IntegrationDeadLetter {
   @@index([entityType, entityId])
 }
 
+model MarketplaceIntegrationConfig {
+  id                   String                    @id @default(cuid())
+  channel              IntegrationChannel
+  displayName          String
+  sellerId             String
+  apiKeyEncrypted      String
+  apiSecretEncrypted   String
+  userAgent            String
+  storeFrontCode       String?
+  endpointUrl          String?
+  trendyolCargoCompanyId Int?
+  trendyolShipmentAddressId Int?
+  trendyolReturningAddressId Int?
+  trendyolOrigin       String?
+  trendyolDimensionalWeight Decimal?                  @db.Decimal(10, 2)
+  environment          MarketplaceEnvironment    @default(PRODUCTION)
+  syncWindowMinutes    Int                       @default(60)
+  lastSuccessfulSyncAt DateTime?
+  lastCursorAt         DateTime?
+  isActive             Boolean                   @default(true)
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  deleted              Boolean                   @default(false)
+  deletedDate          DateTime?
+  deletedUserId        String?
+  packages             MarketplaceOrderPackage[]
+
+  @@unique([channel, sellerId, deleted])
+  @@index([channel, isActive, deleted])
+}
+
+model MarketplaceOrderPackage {
+  id                  String                         @id @default(cuid())
+  configId            String
+  channel             IntegrationChannel
+  externalPackageId   String
+  externalOrderNumber String
+  packageStatus       String
+  importStatus        MarketplacePackageImportStatus @default(RECEIVED)
+  orderDate           DateTime?
+  lastModifiedDate    DateTime?
+  customerName        String?
+  customerEmail       String?
+  shipmentAddress     Json?
+  invoiceAddress      Json?
+  cargoProviderName   String?
+  cargoTrackingNumber String?
+  rawPayload          Json?
+  matchedOrderId      String?
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
+  deleted             Boolean                        @default(false)
+  deletedDate         DateTime?
+  deletedUserId       String?
+  config              MarketplaceIntegrationConfig   @relation(fields: [configId], references: [id])
+  matchedOrder        Order?                         @relation(fields: [matchedOrderId], references: [id])
+  lines               MarketplaceOrderLine[]
+
+  @@unique([channel, configId, externalPackageId])
+  @@index([configId, deleted])
+  @@index([channel, packageStatus, deleted])
+  @@index([externalOrderNumber])
+  @@index([matchedOrderId])
+}
+
+model MarketplaceOrderLine {
+  id               String                          @id @default(cuid())
+  packageId        String
+  externalLineId   String
+  merchantSku      String?
+  barcode          String?
+  productName      String
+  quantity         Int
+  unitPrice        Decimal?                        @db.Decimal(10, 2)
+  currency         String                          @default("TRY")
+  matchStatus      MarketplaceOrderLineMatchStatus @default(UNMATCHED)
+  productId        String?
+  productVariantId String?
+  rawPayload       Json?
+  createdAt        DateTime                        @default(now())
+  updatedAt        DateTime                        @updatedAt
+  deleted          Boolean                         @default(false)
+  deletedDate      DateTime?
+  deletedUserId    String?
+  package          MarketplaceOrderPackage         @relation(fields: [packageId], references: [id])
+  product          Product?                        @relation(fields: [productId], references: [id])
+  productVariant   ProductVariant?                 @relation(fields: [productVariantId], references: [id])
+
+  @@unique([packageId, externalLineId])
+  @@index([packageId, deleted])
+  @@index([merchantSku])
+  @@index([barcode])
+  @@index([productId])
+  @@index([productVariantId])
+}
+
 model InventoryIntegrationMapping {
-  id                    String              @id @default(cuid())
+  id                    String               @id @default(cuid())
   channel               IntegrationChannel
   externalProductId     String?
   externalSku           String?
   externalWarehouseCode String?
   productId             String
   warehouseId           String?
-  allowInboundUpdates   Boolean             @default(false)
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  deleted               Boolean             @default(false)
+  allowInboundUpdates   Boolean              @default(false)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  deleted               Boolean              @default(false)
   deletedDate           DateTime?
   deletedUserId         String?
-  product               Product             @relation(fields: [productId], references: [id])
-  warehouse             Warehouse?          @relation(fields: [warehouseId], references: [id])
+  product               Product              @relation(fields: [productId], references: [id])
+  warehouse             Warehouse?           @relation(fields: [warehouseId], references: [id])
   externalStockEvents   ExternalStockEvent[]
 
+  @@unique([channel, externalProductId, externalWarehouseCode])
+  @@unique([channel, externalSku, externalWarehouseCode])
   @@index([channel, deleted])
   @@index([productId, deleted])
   @@index([warehouseId, deleted])
-  @@unique([channel, externalProductId, externalWarehouseCode])
-  @@unique([channel, externalSku, externalWarehouseCode])
 }
 
 model ExternalStockEvent {
-  id                    String                     @id @default(cuid())
+  id                    String                       @id @default(cuid())
   channel               IntegrationChannel
-  eventKey              String                     @unique
+  eventKey              String                       @unique
   eventType             ExternalStockEventType
-  direction             ExternalStockEventDirection @default(INBOUND)
-  status                ExternalStockEventStatus   @default(RECEIVED)
+  direction             ExternalStockEventDirection  @default(INBOUND)
+  status                ExternalStockEventStatus     @default(RECEIVED)
   externalProductId     String?
   externalSku           String?
   externalWarehouseCode String?
@@ -972,11 +1116,11 @@ model ExternalStockEvent {
   appliedAvailable      Int?
   errorMessage          String?
   processedAt           DateTime?
-  createdAt             DateTime                   @default(now())
-  updatedAt             DateTime                   @updatedAt
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
   mapping               InventoryIntegrationMapping? @relation(fields: [mappingId], references: [id])
-  product               Product?                   @relation(fields: [productId], references: [id])
-  warehouse             Warehouse?                 @relation(fields: [warehouseId], references: [id])
+  product               Product?                     @relation(fields: [productId], references: [id])
+  warehouse             Warehouse?                   @relation(fields: [warehouseId], references: [id])
 
   @@index([channel, status, createdAt])
   @@index([mappingId])
@@ -1014,35 +1158,35 @@ model StorefrontItem {
 }
 
 model User {
-  id            String             @id @default(cuid())
-  email         String             @unique
-  name          String
-  passwordHash  String
-  role          UserRole           @default(EDITOR)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  deleted       Boolean            @default(false)
-  deletedDate   DateTime?
-  deletedUserId String?
-  notifications UserNotification[]
-  socialAccounts SocialAccount[]
-  inventoryPreference UserInventoryPreference?
+  id                       String                   @id @default(cuid())
+  email                    String                   @unique
+  name                     String
+  passwordHash             String
+  role                     UserRole                 @default(EDITOR)
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  deleted                  Boolean                  @default(false)
+  deletedDate              DateTime?
+  deletedUserId            String?
+  notifications            UserNotification[]
+  socialAccounts           SocialAccount[]
+  inventoryPreference      UserInventoryPreference?
   inventoryExportHistories InventoryExportHistory[]
 
   @@index([deleted])
 }
 
 model InventoryExportHistory {
-  id                   String   @id @default(cuid())
-  actorUserId          String?
-  total                Int      @default(0)
-  search               String?
-  stockStatusFilter    String?
-  reservationFilter    String?
-  warehouseFilter      String?
-  movementTypeFilter   String?
-  createdAt            DateTime @default(now())
-  actor                User?    @relation(fields: [actorUserId], references: [id])
+  id                 String   @id @default(cuid())
+  actorUserId        String?
+  total              Int      @default(0)
+  search             String?
+  stockStatusFilter  String?
+  reservationFilter  String?
+  warehouseFilter    String?
+  movementTypeFilter String?
+  createdAt          DateTime @default(now())
+  actor              User?    @relation(fields: [actorUserId], references: [id])
 
   @@index([createdAt])
   @@index([actorUserId, createdAt])
@@ -1106,7 +1250,7 @@ model AuditLog {
 }
 
 model InventoryHistoryEvent {
-  id                String                    @id @default(cuid())
+  id                String                     @id @default(cuid())
   eventType         InventoryHistoryEventType
   entityType        InventoryHistoryEntityType
   entityId          String?
@@ -1119,9 +1263,9 @@ model InventoryHistoryEvent {
   title             String
   summary           String
   metadata          Json?
-  createdAt         DateTime                  @default(now())
-  product           Product?                  @relation(fields: [productId], references: [id])
-  warehouse         Warehouse?                @relation(fields: [warehouseId], references: [id])
+  createdAt         DateTime                   @default(now())
+  product           Product?                   @relation(fields: [productId], references: [id])
+  warehouse         Warehouse?                 @relation(fields: [warehouseId], references: [id])
 
   @@index([createdAt])
   @@index([eventType, createdAt])
@@ -1152,12 +1296,17 @@ enum IntegrationJobType {
   PRODUCT_SYNC
   PRICE_SYNC
   STOCK_SYNC
+  ORDER_IMPORT
+  ORDER_STATUS_SYNC
   DOCUMENT_OUTBOUND
   DOCUMENT_STATUS_SYNC
 }
 
 enum IntegrationEntityType {
   PRODUCT
+  MARKETPLACE_ACCOUNT
+  MARKETPLACE_PACKAGE
+  ORDER
   BUSINESS_DOCUMENT
 }
 
@@ -1167,6 +1316,26 @@ enum IntegrationJobStatus {
   SUCCESS
   FAILED
   DEAD_LETTER
+}
+
+enum MarketplaceEnvironment {
+  PRODUCTION
+  STAGE
+}
+
+enum MarketplacePackageImportStatus {
+  RECEIVED
+  READY_FOR_ORDER
+  NEEDS_REVIEW
+  ORDER_CREATED
+  FAILED
+}
+
+enum MarketplaceOrderLineMatchStatus {
+  MATCHED
+  UNMATCHED
+  AMBIGUOUS
+  IGNORED
 }
 
 enum ExternalStockEventType {

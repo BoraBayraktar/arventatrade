@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2, Plus, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Minimize2, MoreHorizontal, Plus, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -241,6 +241,17 @@ type Labels = {
   alertHealthy: string;
   reviewInventory: string;
   reviewTransactions: string;
+  trendyolPreflight: string;
+  trendyolPreflightReady: string;
+  trendyolPreflightBlocked: string;
+  trendyolPreflightWarnings: string;
+  trendyolPreflightIssues: string;
+  trendyolDraftPayload: string;
+  trendyolQueueProductSync: string;
+  trendyolProductSyncQueued: string;
+  trendyolProductSyncTracking: string;
+  trendyolProductSyncJobStatus: string;
+  trendyolProductSyncCheckAgain: string;
   brandName: string;
   supplierName: string;
   supplierTaxNumber: string;
@@ -320,6 +331,7 @@ type ProductManagerProps = {
   attributeDefinitions: AttributeDefinition[];
   warehouses: AdminWarehouseItem[];
   canDelete: boolean;
+  canManageIntegrations: boolean;
 };
 
 type ProductForm = {
@@ -354,6 +366,27 @@ type ProductForm = {
 };
 
 type DrawerMode = "create" | "edit";
+
+type TrendyolPreflightResult = {
+  productId: string;
+  sku: string;
+  title: string;
+  readyForTrendyolProductV2: boolean;
+  blockingIssues: string[];
+  warnings: string[];
+  mappedAttributeValueCount: number;
+  variantCount: number;
+  productV2DraftPayload: { items: unknown[] } | null;
+};
+
+type TrendyolProductSyncTracking = {
+  productId: string;
+  productTitle: string;
+  sku: string;
+  jobId: string | null;
+  status: string;
+};
+
 type VariantGenerationState = Record<string, string>;
 
 const NONE_VALUE = "__none__";
@@ -682,6 +715,7 @@ export function ProductManager({
   attributeDefinitions,
   warehouses,
   canDelete,
+  canManageIntegrations,
 }: ProductManagerProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -699,15 +733,24 @@ export function ProductManager({
   const [imageUploading, setImageUploading] = useState(false);
   const [drawerFullscreen, setDrawerFullscreen] = useState(false);
   const [variantEditorIndex, setVariantEditorIndex] = useState<number | null>(null);
+  const [openVariantActionMenuIndex, setOpenVariantActionMenuIndex] = useState<number | null>(null);
+  const [variantAxisPickerOpen, setVariantAxisPickerOpen] = useState(false);
+  const [variantAxisQuery, setVariantAxisQuery] = useState("");
   const [variantGenerationValues, setVariantGenerationValues] = useState<VariantGenerationState>({});
   const [variantGenerationOpen, setVariantGenerationOpen] = useState(false);
   const [importingCsv, setImportingCsv] = useState(false);
   const [importSummary, setImportSummary] = useState<string | null>(null);
+  const [trendyolPreflightBusyId, setTrendyolPreflightBusyId] = useState<string | null>(null);
+  const [trendyolPreflightResult, setTrendyolPreflightResult] = useState<TrendyolPreflightResult | null>(null);
+  const [trendyolProductSyncBusyId, setTrendyolProductSyncBusyId] = useState<string | null>(null);
+  const [trendyolProductSyncTracking, setTrendyolProductSyncTracking] = useState<TrendyolProductSyncTracking | null>(null);
   const [brandOptions, setBrandOptions] = useState<Brand[]>(brands);
   const [supplierOptions, setSupplierOptions] = useState<Supplier[]>(suppliers);
   const [attributeDefinitionOptions, setAttributeDefinitionOptions] = useState<AttributeDefinition[]>(attributeDefinitions);
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
+  const variantActionMenuRef = useRef<HTMLDivElement | null>(null);
+  const variantAxisPickerRef = useRef<HTMLDivElement | null>(null);
 
   const emptyForm = useMemo<ProductForm>(
     () => ({
@@ -757,6 +800,19 @@ export function ProductManager({
       .filter((item): item is AttributeDefinition => Boolean(item)),
     [activeForm.attributeLinks, attributeDefinitionOptions],
   );
+  const filteredVariantAxisOptions = useMemo(() => {
+    const normalizedQuery = variantAxisQuery.trim().toLocaleLowerCase("tr-TR");
+    const activeDefinitions = attributeDefinitionOptions.filter((item) => item.isActive);
+
+    if (!normalizedQuery) {
+      return activeDefinitions;
+    }
+
+    return activeDefinitions.filter((item) =>
+      item.name.toLocaleLowerCase("tr-TR").includes(normalizedQuery)
+      || item.slug.toLocaleLowerCase("tr-TR").includes(normalizedQuery),
+    );
+  }, [attributeDefinitionOptions, variantAxisQuery]);
   const variantGenerationSuggestions = useMemo(
     () =>
       selectedVariantAxisDefinitions.reduce<Record<string, string[]>>((acc, definition) => {
@@ -775,6 +831,43 @@ export function ProductManager({
     () => (editingId ? initialResult.items.find((item) => item.id === editingId) ?? null : null),
     [editingId, initialResult.items],
   );
+  const activeCurrency = currentEditingProduct?.currency ?? "TRY";
+
+  useEffect(() => {
+    if (openVariantActionMenuIndex === null) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!variantActionMenuRef.current?.contains(event.target as Node)) {
+        setOpenVariantActionMenuIndex(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [openVariantActionMenuIndex]);
+
+  useEffect(() => {
+    if (!variantAxisPickerOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!variantAxisPickerRef.current?.contains(event.target as Node)) {
+        setVariantAxisPickerOpen(false);
+        setVariantAxisQuery("");
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [variantAxisPickerOpen]);
+
   const currentDecisionAlerts = useMemo(() => {
     if (!currentEditingProduct) {
       return [];
@@ -1570,6 +1663,80 @@ export function ProductManager({
     }
   }
 
+  async function checkTrendyolPreflight(productId: string) {
+    setTrendyolPreflightBusyId(productId);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/integrations/marketplaces/products/${productId}/preflight`);
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(payload?.message ?? labels.opFailed);
+        return;
+      }
+
+      const payload = await response.json() as TrendyolPreflightResult;
+      setTrendyolPreflightResult(payload);
+    } catch {
+      setError(labels.opFailed);
+    } finally {
+      setTrendyolPreflightBusyId(null);
+    }
+  }
+
+  async function queueTrendyolProductSync(result: TrendyolPreflightResult) {
+    if (!result.readyForTrendyolProductV2) {
+      return;
+    }
+
+    setTrendyolProductSyncBusyId(result.productId);
+    setError(null);
+    setImportSummary(null);
+
+    try {
+      const response = await fetch("/api/admin/integrations/jobs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          channel: "TRENDYOL",
+          jobType: "PRODUCT_SYNC",
+          entityType: "PRODUCT",
+          entityIds: [result.productId],
+          maxAttempts: 3,
+          idempotencySuffix: `${result.sku}:${new Date().toISOString()}`,
+          payload: {
+            trigger: "PRODUCT_UPDATE",
+            reference: result.sku,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(payload?.message ?? labels.opFailed);
+        return;
+      }
+
+      const payload = await response.json() as { jobs?: Array<{ id: string; status: string }> };
+      const job = payload.jobs?.[0] ?? null;
+      setTrendyolProductSyncTracking({
+        productId: result.productId,
+        productTitle: result.title,
+        sku: result.sku,
+        jobId: job?.id ?? null,
+        status: job?.status ?? "PENDING",
+      });
+      setImportSummary(labels.trendyolProductSyncQueued);
+    } catch {
+      setError(labels.opFailed);
+    } finally {
+      setTrendyolProductSyncBusyId(null);
+    }
+  }
+
   async function deleteProduct(productId: string) {
     setLoading(true);
     setError(null);
@@ -1647,6 +1814,98 @@ export function ProductManager({
       <div className="p-5">
         {error ? <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p> : null}
         {importSummary ? <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">{importSummary}</p> : null}
+        {trendyolProductSyncTracking ? (
+          <div className="mb-4 rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">{labels.trendyolProductSyncTracking}</p>
+                <h3 className="mt-1 text-base font-semibold text-neutral-950">{trendyolProductSyncTracking.productTitle}</h3>
+                <p className="mt-1 text-sm text-neutral-700">
+                  SKU: {trendyolProductSyncTracking.sku} • {labels.trendyolProductSyncJobStatus}: {trendyolProductSyncTracking.status}
+                  {trendyolProductSyncTracking.jobId ? ` • Job: ${trendyolProductSyncTracking.jobId}` : ""}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={trendyolPreflightBusyId === trendyolProductSyncTracking.productId}
+                  onClick={() => void checkTrendyolPreflight(trendyolProductSyncTracking.productId)}
+                >
+                  {trendyolPreflightBusyId === trendyolProductSyncTracking.productId ? labels.loading : labels.trendyolProductSyncCheckAgain}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setTrendyolProductSyncTracking(null)}>
+                  {labels.cancel}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {trendyolPreflightResult ? (
+          <div className={`mb-4 rounded-2xl border p-4 ${
+            trendyolPreflightResult.readyForTrendyolProductV2
+              ? "border-emerald-200 bg-emerald-50"
+              : "border-amber-200 bg-amber-50"
+          }`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{labels.trendyolPreflight}</p>
+                <h3 className="mt-1 text-base font-semibold text-neutral-950">{trendyolPreflightResult.title}</h3>
+                <p className="mt-1 text-sm text-neutral-600">
+                  {trendyolPreflightResult.readyForTrendyolProductV2 ? labels.trendyolPreflightReady : labels.trendyolPreflightBlocked}
+                  {" "}SKU: {trendyolPreflightResult.sku} • Varyant: {trendyolPreflightResult.variantCount} • Mapping: {trendyolPreflightResult.mappedAttributeValueCount}
+                  {trendyolPreflightResult.productV2DraftPayload ? ` • Payload item: ${trendyolPreflightResult.productV2DraftPayload.items.length}` : ""}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {trendyolPreflightResult.readyForTrendyolProductV2 && canManageIntegrations ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void queueTrendyolProductSync(trendyolPreflightResult)}
+                    disabled={trendyolProductSyncBusyId === trendyolPreflightResult.productId}
+                  >
+                    {trendyolProductSyncBusyId === trendyolPreflightResult.productId ? labels.loading : labels.trendyolQueueProductSync}
+                  </Button>
+                ) : null}
+                <Button type="button" variant="ghost" size="sm" onClick={() => setTrendyolPreflightResult(null)}>
+                  {labels.cancel}
+                </Button>
+              </div>
+            </div>
+            {trendyolPreflightResult.blockingIssues.length > 0 ? (
+              <div className="mt-3">
+                <p className="text-sm font-semibold text-amber-900">{labels.trendyolPreflightIssues}</p>
+                <ul className="mt-2 grid gap-1 text-sm text-amber-900">
+                  {trendyolPreflightResult.blockingIssues.map((item) => (
+                    <li key={item}>- {item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {trendyolPreflightResult.warnings.length > 0 ? (
+              <div className="mt-3">
+                <p className="text-sm font-semibold text-neutral-800">{labels.trendyolPreflightWarnings}</p>
+                <ul className="mt-2 grid gap-1 text-sm text-neutral-700">
+                  {trendyolPreflightResult.warnings.map((item) => (
+                    <li key={item}>- {item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {trendyolPreflightResult.productV2DraftPayload ? (
+              <details className="mt-3 rounded-xl border border-neutral-200 bg-white/80 p-3">
+                <summary className="cursor-pointer text-sm font-semibold text-neutral-800">
+                  {labels.trendyolDraftPayload}
+                </summary>
+                <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-neutral-950 p-3 text-xs text-neutral-50">
+                  {JSON.stringify(trendyolPreflightResult.productV2DraftPayload, null, 2)}
+                </pre>
+              </details>
+            ) : null}
+          </div>
+        ) : null}
         <p className="mb-4 text-sm text-neutral-500">{labels.importHint}</p>
         <form className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_220px_220px_220px_220px_auto]" onSubmit={applyFilters}>
           <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={labels.search} />
@@ -1772,6 +2031,15 @@ export function ProductManager({
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 lg:justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={trendyolPreflightBusyId === product.id}
+                      onClick={() => void checkTrendyolPreflight(product.id)}
+                    >
+                      {trendyolPreflightBusyId === product.id ? labels.loading : labels.trendyolPreflight}
+                    </Button>
                     <Button type="button" size="sm" variant="secondary" disabled={loading} onClick={() => openEditDrawer(product)}>
                       {labels.edit}
                     </Button>
@@ -2200,40 +2468,73 @@ export function ProductManager({
 
                 <div className="grid gap-2">
                   <Label>{labels.variantAxes}</Label>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {attributeDefinitionOptions.filter((item) => item.isActive).map((definition) => {
-                      const active = activeForm.attributeLinks.some((item) => item.attributeDefinitionId === definition.id);
-                      return (
-                        <label key={definition.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${active ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-neutral-200 bg-neutral-50 text-neutral-700"}`}>
-                          <input
-                            type="checkbox"
-                            checked={active}
-                            onChange={() => toggleAttributeAxis(definition.id)}
-                            className={checkboxClassName}
-                          />
-                          <span>{definition.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
+                  <div ref={variantAxisPickerRef} className="grid gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setVariantAxisPickerOpen((current) => !current)}
+                      className="flex min-h-11 w-full items-center justify-between rounded-2xl border border-neutral-300 bg-white px-3 py-2 text-left text-sm"
+                    >
+                      <span className={selectedVariantAxisDefinitions.length > 0 ? "text-neutral-950" : "text-neutral-400"}>
+                        {selectedVariantAxisDefinitions.length > 0
+                          ? `${selectedVariantAxisDefinitions.map((item) => item.name).join(", ")}`
+                          : labels.variantAxesHint}
+                      </span>
+                      <span className="text-xs font-medium text-neutral-500">
+                        {selectedVariantAxisDefinitions.length > 0 ? `${selectedVariantAxisDefinitions.length}` : "Sec"}
+                      </span>
+                    </button>
 
-                <div className="grid gap-2">
-                  <Label>{labels.selectedVariantAxes}</Label>
-                  {selectedVariantAxisDefinitions.length === 0 ? (
-                    <p className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-3 py-4 text-sm text-neutral-500">{labels.variantAxesHint}</p>
-                  ) : (
-                    <div className="grid gap-2">
-                      {selectedVariantAxisDefinitions.map((definition) => (
-                        <div key={`axis-selected-${definition.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
-                          <div>
-                            <p className="text-sm font-semibold text-neutral-900">{definition.name}</p>
-                            <p className="text-xs text-neutral-500">{definition.slug} • {labels.variantAxisUsageCount}: {definition.productCount}</p>
-                          </div>
+                    {selectedVariantAxisDefinitions.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedVariantAxisDefinitions.map((definition) => (
+                          <button
+                            key={`selected-axis-${definition.id}`}
+                            type="button"
+                            onClick={() => toggleAttributeAxis(definition.id)}
+                            className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900"
+                          >
+                            <span>{definition.name}</span>
+                            <span aria-hidden="true">x</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {variantAxisPickerOpen ? (
+                      <div className="rounded-2xl border border-neutral-200 bg-white p-3 shadow-xl">
+                        <Input
+                          value={variantAxisQuery}
+                          onChange={(event) => setVariantAxisQuery(event.target.value)}
+                          placeholder={labels.search}
+                          className="h-10"
+                        />
+                        <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
+                          {filteredVariantAxisOptions.length === 0 ? (
+                            <p className="px-2 py-3 text-sm text-neutral-500">{labels.empty}</p>
+                          ) : filteredVariantAxisOptions.map((definition) => {
+                            const active = activeForm.attributeLinks.some((item) => item.attributeDefinitionId === definition.id);
+                            return (
+                              <label
+                                key={definition.id}
+                                className={`flex items-start gap-3 rounded-xl border px-3 py-2 text-sm ${active ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-neutral-200 bg-neutral-50 text-neutral-700"}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={active}
+                                  onChange={() => toggleAttributeAxis(definition.id)}
+                                  className={`${checkboxClassName} mt-0.5`}
+                                />
+                                <span className="min-w-0">
+                                  <span className="block font-medium">{definition.name}</span>
+                                  <span className="block text-xs text-neutral-500">{definition.slug}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="grid gap-3">
@@ -2256,33 +2557,102 @@ export function ProductManager({
                     <p className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-3 py-4 text-sm text-neutral-500">{labels.variantEmptyState}</p>
                   ) : null}
 
-                  {activeForm.variants.map((variant, index) => (
-                    <div key={`variant-${index}`} className="grid gap-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-neutral-950">{variant.title || `${labels.variantTitle} ${index + 1}`}</p>
-                          <p className="text-xs text-neutral-500">{variant.optionSummary || labels.variantsHint}</p>
-                          <p className="text-xs text-neutral-500">{variant.slug || labels.slug} • {variant.sku || labels.sku}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {variant.isDefault ? (
-                            <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-900">{labels.variantDefault}</span>
-                          ) : null}
-                          {!variant.salesEnabled ? (
-                            <span className="rounded-full bg-neutral-200 px-2 py-1 text-xs font-medium text-neutral-700">{labels.outOfStock}</span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <Button type="button" size="sm" variant="outline" onClick={() => openVariantEditor(index)}>
-                          {labels.variantDetails}
-                        </Button>
-                        <Button type="button" size="sm" variant="outline" onClick={() => removeVariantRow(index)}>
-                          {labels.delete}
-                        </Button>
-                      </div>
+                  {activeForm.variants.length > 0 ? (
+                    <div className="overflow-x-auto rounded-2xl border border-neutral-200">
+                      <table className="min-w-full divide-y divide-neutral-200 bg-white text-sm">
+                        <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
+                          <tr>
+                            <th className="px-3 py-2 font-medium">{labels.variantTitle}</th>
+                            <th className="px-3 py-2 font-medium">{labels.sku}</th>
+                            <th className="px-3 py-2 font-medium">{labels.price}</th>
+                            <th className="px-3 py-2 font-medium">{labels.statusLabel}</th>
+                            <th className="px-3 py-2 text-right font-medium">
+                              <span className="sr-only">{labels.variantDetails}</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-200">
+                          {activeForm.variants.map((variant, index) => (
+                            <tr key={`variant-${index}`} className="align-top">
+                              <td className="px-3 py-3">
+                                <div className="space-y-1">
+                                  <p className="font-medium text-neutral-950">
+                                    {variant.title || `${labels.variantTitle} ${index + 1}`}
+                                  </p>
+                                  <p className="text-xs text-neutral-500">
+                                    {variant.optionSummary || labels.variantsHint}
+                                  </p>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 text-neutral-600">
+                                <div>{variant.sku || labels.sku}</div>
+                                <div className="text-xs text-neutral-400">{variant.slug || labels.slug}</div>
+                              </td>
+                              <td className="px-3 py-3 text-neutral-600">
+                                {variant.priceOverride.trim()
+                                  ? formatPrice(Number(variant.priceOverride), activeCurrency, locale)
+                                  : labels.notSpecified}
+                              </td>
+                              <td className="px-3 py-3">
+                                <div className="flex flex-wrap gap-2">
+                                  {variant.isDefault ? (
+                                    <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-900">{labels.variantDefault}</span>
+                                  ) : null}
+                                  {variant.stockOverride.trim() ? (
+                                    <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700">
+                                      {labels.stock}: {variant.stockOverride.trim()}
+                                    </span>
+                                  ) : null}
+                                  {!variant.salesEnabled ? (
+                                    <span className="rounded-full bg-neutral-200 px-2 py-1 text-xs font-medium text-neutral-700">{labels.outOfStock}</span>
+                                  ) : null}
+                                  {variant.salesEnabled && !variant.isDefault ? (
+                                    <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-700">{labels.statusActive}</span>
+                                  ) : null}
+                                </div>
+                              </td>
+                              <td className="px-3 py-3">
+                                <div ref={openVariantActionMenuIndex === index ? variantActionMenuRef : null} className="relative flex justify-end">
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="secondary"
+                                    onClick={() => setOpenVariantActionMenuIndex((current) => current === index ? null : index)}
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                  {openVariantActionMenuIndex === index ? (
+                                    <div className="absolute right-0 top-11 z-10 min-w-40 rounded-xl border border-neutral-200 bg-white p-2 shadow-xl">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          openVariantEditor(index);
+                                          setOpenVariantActionMenuIndex(null);
+                                        }}
+                                        className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
+                                      >
+                                        {labels.variantDetails}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          removeVariantRow(index);
+                                          setOpenVariantActionMenuIndex(null);
+                                        }}
+                                        className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
+                                      >
+                                        {labels.delete}
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
+                  ) : null}
                 </div>
               </section>
 
@@ -2293,40 +2663,58 @@ export function ProductManager({
                     <p className="text-xs text-neutral-500">{labels.featuresHint}</p>
                   ) : null}
 
-                  {activeForm.features.map((feature, index) => (
-                    <div key={`feature-${index}`} className="grid gap-2 rounded-lg border border-neutral-200 bg-white p-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
-                      <div className="grid gap-1">
-                        <Label>{labels.featureKey}</Label>
-                        <Input
-                          value={feature.key}
-                          onChange={(event) => patchFeature(index, { key: event.target.value })}
-                          placeholder="Tip"
-                        />
-                      </div>
-                      <div className="grid gap-1">
-                        <Label>{labels.featureValue}</Label>
-                        <Input
-                          value={feature.value}
-                          onChange={(event) => patchFeature(index, { value: event.target.value })}
-                          placeholder="Kule Tipi"
-                        />
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                        <label className="flex items-center gap-2 text-xs font-medium text-neutral-700">
-                          <input
-                            type="checkbox"
-                            checked={feature.highlighted}
-                            onChange={(event) => patchFeature(index, { highlighted: event.target.checked })}
-                            className={checkboxClassName}
-                          />
-                          {labels.highlightFeature}
-                        </label>
-                        <Button type="button" size="sm" variant="outline" onClick={() => removeFeatureRow(index)}>
-                          {labels.removeFeature}
-                        </Button>
-                      </div>
+                  {activeForm.features.length > 0 ? (
+                    <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+                      <table className="min-w-full divide-y divide-neutral-200 text-sm">
+                        <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
+                          <tr>
+                            <th className="px-3 py-2 font-medium">{labels.featureKey}</th>
+                            <th className="px-3 py-2 font-medium">{labels.featureValue}</th>
+                            <th className="px-3 py-2 font-medium">{labels.highlightFeature}</th>
+                            <th className="px-3 py-2 text-right font-medium">
+                              <span className="sr-only">{labels.removeFeature}</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-200">
+                          {activeForm.features.map((feature, index) => (
+                            <tr key={`feature-${index}`}>
+                              <td className="px-3 py-2">
+                                <Input
+                                  value={feature.key}
+                                  onChange={(event) => patchFeature(index, { key: event.target.value })}
+                                  placeholder="Tip"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input
+                                  value={feature.value}
+                                  onChange={(event) => patchFeature(index, { value: event.target.value })}
+                                  placeholder="Kule Tipi"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <label className="flex items-center gap-2 text-xs font-medium text-neutral-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={feature.highlighted}
+                                    onChange={(event) => patchFeature(index, { highlighted: event.target.checked })}
+                                    className={checkboxClassName}
+                                  />
+                                  <span>{labels.highlightFeature}</span>
+                                </label>
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <Button type="button" size="sm" variant="outline" onClick={() => removeFeatureRow(index)}>
+                                  {labels.removeFeature}
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
+                  ) : null}
 
                   <div>
                     <Button type="button" size="sm" variant="secondary" onClick={addFeatureRow}>
@@ -2425,6 +2813,27 @@ export function ProductManager({
                 </div>
 
                 <div className="grid gap-4 p-5">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {activeForm.attributeLinks.map((link) => {
+                      const definition = attributeDefinitionOptions.find((item) => item.id === link.attributeDefinitionId);
+                      const value = activeVariantEditor.attributes.find((attribute) => attribute.attributeDefinitionId === link.attributeDefinitionId)?.value ?? "";
+                      if (!definition) {
+                        return null;
+                      }
+
+                      return (
+                        <div key={`variant-attribute-${definition.id}`} className="grid gap-2">
+                          <Label>{definition.name}</Label>
+                          <Input
+                            value={value}
+                            onChange={(event) => patchVariantAttribute(variantEditorIndex as number, definition.id, event.target.value)}
+                            placeholder={labels.variantAttributeValue}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div className="grid gap-2">
                       <Label>{labels.variantTitle}</Label>
@@ -2491,26 +2900,6 @@ export function ProductManager({
                     </div>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {activeForm.attributeLinks.map((link) => {
-                      const definition = attributeDefinitionOptions.find((item) => item.id === link.attributeDefinitionId);
-                      const value = activeVariantEditor.attributes.find((attribute) => attribute.attributeDefinitionId === link.attributeDefinitionId)?.value ?? "";
-                      if (!definition) {
-                        return null;
-                      }
-
-                      return (
-                        <div key={`${activeVariantEditor.slug || variantEditorIndex}-${definition.id}`} className="grid gap-2">
-                          <Label>{definition.name}</Label>
-                          <Input
-                            value={value}
-                            onChange={(event) => patchVariantAttribute(variantEditorIndex as number, definition.id, event.target.value)}
-                            placeholder={labels.variantAttributeValue}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
               </aside>
             </div>

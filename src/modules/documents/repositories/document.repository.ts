@@ -394,6 +394,18 @@ export class DocumentRepository {
         externalReference: true,
         externalSystemStatus: true,
         counterpartyName: true,
+        purchaseReceipt: {
+          select: {
+            lines: {
+              select: {
+                productId: true,
+                productVariantId: true,
+                unitCost: true,
+                lineTotal: true,
+              },
+            },
+          },
+        },
         lines: {
           orderBy: { createdAt: "asc" },
           select: {
@@ -408,6 +420,14 @@ export class DocumentRepository {
                     name: true,
                     currency: true,
                     purchasePrice: true,
+                  },
+                },
+                productVariant: {
+                  select: {
+                    id: true,
+                    sku: true,
+                    title: true,
+                    purchasePriceOverride: true,
                   },
                 },
               },
@@ -433,8 +453,11 @@ export class DocumentRepository {
     resolvedTotalAmount?: number | null;
     resolvedLines: Array<{
       productId?: string | null;
+      productVariantId?: string | null;
       productSku: string;
+      productVariantSku?: string | null;
       productName: string;
+      productVariantTitle?: string | null;
       quantity: number;
       unitPrice?: number | null;
       lineTotal?: number | null;
@@ -466,8 +489,11 @@ export class DocumentRepository {
         lines: {
           create: args.resolvedLines.map((line) => ({
             productId: line.productId ?? null,
+            productVariantId: line.productVariantId ?? null,
             productSku: line.productSku,
+            productVariantSku: line.productVariantSku ?? null,
             productName: line.productName,
+            productVariantTitle: line.productVariantTitle ?? null,
             quantity: line.quantity,
             unitPrice: line.unitPrice !== undefined && line.unitPrice !== null ? new Prisma.Decimal(line.unitPrice) : null,
             lineTotal: line.lineTotal !== undefined && line.lineTotal !== null ? new Prisma.Decimal(line.lineTotal) : null,
@@ -524,8 +550,11 @@ export class DocumentRepository {
         lines: {
           create: sourceDocument.lines.map((line: {
             productId: string | null;
+            productVariantId: string | null;
             productSku: string;
+            productVariantSku: string | null;
             productName: string;
+            productVariantTitle: string | null;
             quantity: number;
             unitPrice: Prisma.Decimal | null;
             lineTotal: Prisma.Decimal | null;
@@ -533,8 +562,11 @@ export class DocumentRepository {
             note: string | null;
           }) => ({
             productId: line.productId,
+            productVariantId: line.productVariantId,
             productSku: line.productSku,
+            productVariantSku: line.productVariantSku,
             productName: line.productName,
+            productVariantTitle: line.productVariantTitle,
             quantity: line.quantity,
             unitPrice: line.unitPrice,
             lineTotal: line.lineTotal,

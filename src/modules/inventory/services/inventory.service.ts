@@ -48,11 +48,15 @@ import { InventoryRepository } from "@/modules/inventory/repositories/inventory.
 import { notificationService } from "@/modules/system/services/notification.service";
 
 const availabilityQuerySchema = z.object({
-  productIds: z.array(z.string().trim().min(1)).min(1).max(100),
+  items: z.array(z.object({
+    productId: z.string().trim().min(1),
+    variantId: z.string().trim().min(1).optional(),
+  })).min(1).max(100),
 });
 
 const syncProductInventorySchema = z.object({
   productId: z.string().trim().min(1),
+  variantId: z.string().trim().min(1).optional(),
   sku: z.string().trim().min(1).max(64),
   warehouseId: z.string().trim().min(1).optional(),
   warehouseCode: z.string().trim().min(1).max(32).optional(),
@@ -91,6 +95,7 @@ const receiveExternalStockEventSchema = z.object({
 
 const transferInventorySchema = z.object({
   productId: z.string().trim().min(1),
+  variantId: z.string().trim().min(1).optional(),
   sku: z.string().trim().min(1).max(64),
   fromWarehouseCode: z.string().trim().min(1).max(32),
   toWarehouseCode: z.string().trim().min(1).max(32),
@@ -100,6 +105,7 @@ const transferInventorySchema = z.object({
 
 const recordInventoryMovementSchema = z.object({
   productId: z.string().trim().min(1),
+  variantId: z.string().trim().min(1).optional(),
   sku: z.string().trim().min(1).max(64),
   warehouseCode: z.string().trim().min(1).max(32),
   quantity: z.coerce.number().int().min(1),
@@ -458,94 +464,133 @@ function buildInventoryOverviewItems(
   const includeRecentMovements = options?.includeRecentMovements ?? true;
 
   for (const product of products) {
-    const inventoryLevels = product.inventoryItem?.inventoryLevels ?? [];
-    const inventoryMovements = product.inventoryItem?.id
-      ? (movementsByInventoryItemId.get(product.inventoryItem.id) ?? [])
-      : [];
+    const variantTargets = product.variants
+      .filter((variant) => variant.inventoryItem)
+      .map((variant) => ({
+        variantId: variant.id,
+        variantSku: variant.sku,
+        variantTitle: variant.title,
+        variantOptionSummary: variant.optionSummary,
+        barcode: variant.barcode ?? product.barcode,
+        imageUrl: variant.imageUrl ?? product.imageUrl,
+        unitPrice: variant.priceOverride?.toNumber() ?? product.price.toNumber(),
+        purchasePrice: variant.purchasePriceOverride?.toNumber() ?? product.purchasePrice?.toNumber() ?? null,
+        compareAtPrice: variant.compareAtPriceOverride?.toNumber() ?? product.compareAtPrice?.toNumber() ?? null,
+        inventoryItem: variant.inventoryItem,
+      }));
 
-    if (inventoryLevels.length === 0) {
-      // Buradaki görünüm legacy uyumluluk içindir; stok otoritesi kararı değildir.
-      items.push({
-        productId: product.id,
-        slug: product.slug,
-        sku: product.sku,
-        name: product.name,
-        imageUrl: product.imageUrl,
-        currency: product.currency,
-        barcode: product.barcode,
-        unitType: product.unitType,
-        productType: product.productType,
-        unitPrice: product.price.toNumber(),
-        purchasePrice: product.purchasePrice?.toNumber() ?? null,
-        compareAtPrice: product.compareAtPrice?.toNumber() ?? null,
-        onHandStock: product.stock,
-        reservedStock: 0,
-        availableStock: product.stock,
-        reorderPoint: 0,
-        safetyStock: 0,
-        warehouseCode: null,
-        warehouseName: null,
-        isDefaultWarehouse: false,
-        hasReservations: false,
-        preferredSalesWarehouseCode: product.preferredSalesWarehouse?.code ?? null,
-        preferredPurchaseWarehouseCode: product.preferredPurchaseWarehouse?.code ?? null,
-        warehouseDistribution: includeWarehouseDistribution ? [] : [],
-        lastMovementType: inventoryMovements[0]?.type ?? null,
-        recentMovements: includeRecentMovements
-          ? inventoryMovements.map((movement) => mapMovementPreview(movement))
-          : [],
-        stockStatus: toStockStatus(product.stock),
-        lastMovementAt: inventoryMovements[0]?.createdAt?.toISOString() ?? null,
-      });
-      continue;
-    }
+    const inventoryTargets = variantTargets.length > 0
+      ? variantTargets
+      : [{
+          variantId: null,
+          variantSku: null,
+          variantTitle: null,
+          variantOptionSummary: null,
+          barcode: product.barcode,
+          imageUrl: product.imageUrl,
+          unitPrice: product.price.toNumber(),
+          purchasePrice: product.purchasePrice?.toNumber() ?? null,
+          compareAtPrice: product.compareAtPrice?.toNumber() ?? null,
+          inventoryItem: product.inventoryItem,
+        }];
 
-    for (const level of inventoryLevels) {
-      const availableStock = toAvailableStock(level.onHand, level.reserved);
-      const recentWarehouseMovements = inventoryMovements
-        .filter((movement) => movement.warehouseId === level.warehouse.id)
-        .map((movement) => mapMovementPreview(movement));
-      const lastWarehouseMovement = inventoryMovements.find((movement) => movement.warehouseId === level.warehouse.id);
+    for (const target of inventoryTargets) {
+      const inventoryLevels = target.inventoryItem?.inventoryLevels ?? [];
+      const inventoryMovements = target.inventoryItem?.id
+        ? (movementsByInventoryItemId.get(target.inventoryItem.id) ?? [])
+        : [];
 
-      items.push({
-        productId: product.id,
-        slug: product.slug,
-        sku: product.sku,
-        name: product.name,
-        imageUrl: product.imageUrl,
-        currency: product.currency,
-        barcode: product.barcode,
-        unitType: product.unitType,
-        productType: product.productType,
-        unitPrice: product.price.toNumber(),
-        purchasePrice: product.purchasePrice?.toNumber() ?? null,
-        compareAtPrice: product.compareAtPrice?.toNumber() ?? null,
-        onHandStock: level.onHand,
-        reservedStock: level.reserved,
-        availableStock,
-        reorderPoint: level.reorderPoint,
-        safetyStock: level.safetyStock,
-        warehouseCode: level.warehouse.code,
-        warehouseName: level.warehouse.name,
-        isDefaultWarehouse: level.warehouse.isDefault,
-        hasReservations: level.reserved > 0,
-        preferredSalesWarehouseCode: product.preferredSalesWarehouse?.code ?? null,
-        preferredPurchaseWarehouseCode: product.preferredPurchaseWarehouse?.code ?? null,
-        warehouseDistribution: includeWarehouseDistribution
-          ? inventoryLevels.map((distributionLevel) => ({
-            warehouseCode: distributionLevel.warehouse.code,
-            warehouseName: distributionLevel.warehouse.name,
-            onHandStock: distributionLevel.onHand,
-            reservedStock: distributionLevel.reserved,
-            availableStock: toAvailableStock(distributionLevel.onHand, distributionLevel.reserved),
-            isDefaultWarehouse: distributionLevel.warehouse.isDefault,
-          }))
-          : [],
-        lastMovementType: lastWarehouseMovement?.type ?? null,
-        recentMovements: includeRecentMovements ? recentWarehouseMovements : [],
-        stockStatus: toStockStatus(availableStock),
-        lastMovementAt: lastWarehouseMovement?.createdAt?.toISOString() ?? null,
-      });
+      if (inventoryLevels.length === 0) {
+        items.push({
+          productId: product.id,
+          variantId: target.variantId,
+          variantSku: target.variantSku,
+          variantTitle: target.variantTitle,
+          variantOptionSummary: target.variantOptionSummary,
+          slug: product.slug,
+          sku: target.variantSku ?? product.sku,
+          name: product.name,
+          imageUrl: target.imageUrl,
+          currency: product.currency,
+          barcode: target.barcode,
+          unitType: product.unitType,
+          productType: product.productType,
+          unitPrice: target.unitPrice,
+          purchasePrice: target.purchasePrice,
+          compareAtPrice: target.compareAtPrice,
+          onHandStock: target.variantId ? 0 : product.stock,
+          reservedStock: 0,
+          availableStock: target.variantId ? 0 : product.stock,
+          reorderPoint: 0,
+          safetyStock: 0,
+          warehouseCode: null,
+          warehouseName: null,
+          isDefaultWarehouse: false,
+          hasReservations: false,
+          preferredSalesWarehouseCode: product.preferredSalesWarehouse?.code ?? null,
+          preferredPurchaseWarehouseCode: product.preferredPurchaseWarehouse?.code ?? null,
+          warehouseDistribution: includeWarehouseDistribution ? [] : [],
+          lastMovementType: inventoryMovements[0]?.type ?? null,
+          recentMovements: includeRecentMovements
+            ? inventoryMovements.map((movement) => mapMovementPreview(movement))
+            : [],
+          stockStatus: toStockStatus(target.variantId ? 0 : product.stock),
+          lastMovementAt: inventoryMovements[0]?.createdAt?.toISOString() ?? null,
+        });
+        continue;
+      }
+
+      for (const level of inventoryLevels) {
+        const availableStock = toAvailableStock(level.onHand, level.reserved);
+        const recentWarehouseMovements = inventoryMovements
+          .filter((movement) => movement.warehouseId === level.warehouse.id)
+          .map((movement) => mapMovementPreview(movement));
+        const lastWarehouseMovement = inventoryMovements.find((movement) => movement.warehouseId === level.warehouse.id);
+
+        items.push({
+          productId: product.id,
+          variantId: target.variantId,
+          variantSku: target.variantSku,
+          variantTitle: target.variantTitle,
+          variantOptionSummary: target.variantOptionSummary,
+          slug: product.slug,
+          sku: target.variantSku ?? product.sku,
+          name: product.name,
+          imageUrl: target.imageUrl,
+          currency: product.currency,
+          barcode: target.barcode,
+          unitType: product.unitType,
+          productType: product.productType,
+          unitPrice: target.unitPrice,
+          purchasePrice: target.purchasePrice,
+          compareAtPrice: target.compareAtPrice,
+          onHandStock: level.onHand,
+          reservedStock: level.reserved,
+          availableStock,
+          reorderPoint: level.reorderPoint,
+          safetyStock: level.safetyStock,
+          warehouseCode: level.warehouse.code,
+          warehouseName: level.warehouse.name,
+          isDefaultWarehouse: level.warehouse.isDefault,
+          hasReservations: level.reserved > 0,
+          preferredSalesWarehouseCode: product.preferredSalesWarehouse?.code ?? null,
+          preferredPurchaseWarehouseCode: product.preferredPurchaseWarehouse?.code ?? null,
+          warehouseDistribution: includeWarehouseDistribution
+            ? inventoryLevels.map((distributionLevel) => ({
+              warehouseCode: distributionLevel.warehouse.code,
+              warehouseName: distributionLevel.warehouse.name,
+              onHandStock: distributionLevel.onHand,
+              reservedStock: distributionLevel.reserved,
+              availableStock: toAvailableStock(distributionLevel.onHand, distributionLevel.reserved),
+              isDefaultWarehouse: distributionLevel.warehouse.isDefault,
+            }))
+            : [],
+          lastMovementType: lastWarehouseMovement?.type ?? null,
+          recentMovements: includeRecentMovements ? recentWarehouseMovements : [],
+          stockStatus: toStockStatus(availableStock),
+          lastMovementAt: lastWarehouseMovement?.createdAt?.toISOString() ?? null,
+        });
+      }
     }
   }
 
@@ -897,6 +942,12 @@ function mapInventoryTransaction(item: {
     receiptDate: Date;
     externalReference: string | null;
     supplierName: string;
+    lines: Array<{
+      productId: string;
+      productVariantId: string | null;
+      unitCost: { toNumber: () => number } | null;
+      lineTotal: { toNumber: () => number } | null;
+    }>;
   } | null;
   lines: Array<{
     id: string;
@@ -907,11 +958,19 @@ function mapInventoryTransaction(item: {
     inventoryItem: {
       skuSnapshot: string;
       product: {
+        id: string;
         name: string;
-      };
+      } | null;
+      productVariant: {
+        id: string;
+        sku: string;
+        title: string;
+      } | null;
     };
   }>;
 }): AdminInventoryTransactionItem {
+  const purchaseReceiptLines = item.purchaseReceipt?.lines ?? [];
+
   return {
     id: item.id,
     transactionNumber: item.transactionNumber,
@@ -920,15 +979,29 @@ function mapInventoryTransaction(item: {
     note: item.note,
     sourceDocument: inferInventoryTransactionSource(item),
     createdAt: item.createdAt.toISOString(),
-    lines: item.lines.map((line) => ({
-      id: line.id,
-      quantity: line.quantity,
-      note: line.note,
-      fromWarehouseCode: line.fromWarehouse?.code ?? null,
-      toWarehouseCode: line.toWarehouse?.code ?? null,
-      inventoryItemSku: line.inventoryItem.skuSnapshot,
-      inventoryItemName: line.inventoryItem.product.name,
-    })),
+    lines: item.lines.map((line) => {
+      const matchingReceiptLine = line.inventoryItem.productVariant?.id
+        ? purchaseReceiptLines.find((receiptLine) => receiptLine.productVariantId === line.inventoryItem.productVariant?.id)
+        : purchaseReceiptLines.find((receiptLine) => (
+          receiptLine.productVariantId === null
+          && receiptLine.productId === line.inventoryItem.product?.id
+        ));
+
+      return {
+        id: line.id,
+        quantity: line.quantity,
+        note: line.note,
+        fromWarehouseCode: line.fromWarehouse?.code ?? null,
+        toWarehouseCode: line.toWarehouse?.code ?? null,
+        inventoryItemSku: line.inventoryItem.skuSnapshot,
+        inventoryItemName: line.inventoryItem.product?.name ?? line.inventoryItem.skuSnapshot,
+        variantId: line.inventoryItem.productVariant?.id ?? null,
+        variantSku: line.inventoryItem.productVariant?.sku ?? null,
+        variantTitle: line.inventoryItem.productVariant?.title ?? null,
+        unitCost: matchingReceiptLine?.unitCost?.toNumber() ?? null,
+        lineTotal: matchingReceiptLine?.lineTotal?.toNumber() ?? null,
+      };
+    }),
   };
 }
 
@@ -948,7 +1021,7 @@ function mapInventoryAlert(item: {
     product: {
       id: string;
       name: string;
-    };
+    } | null;
     skuSnapshot: string;
     inventoryLevels: Array<{
       warehouseId: string;
@@ -965,9 +1038,9 @@ function mapInventoryAlert(item: {
 
   return {
     id: item.id,
-    productId: item.inventoryItem.product.id,
+    productId: item.inventoryItem.product?.id ?? item.inventoryItem.skuSnapshot,
     sku: item.inventoryItem.skuSnapshot,
-    productName: item.inventoryItem.product.name,
+    productName: item.inventoryItem.product?.name ?? item.inventoryItem.skuSnapshot,
     warehouseCode: item.warehouse.code,
     warehouseName: item.warehouse.name,
     availableStock,
@@ -1008,16 +1081,16 @@ function mapStockCount(item: {
       product: {
         id: string;
         name: string;
-      };
+      } | null;
     };
   }>;
 }): AdminStockCountItem {
   const lines = item.lines.map((line) => ({
     id: line.id,
     inventoryItemId: line.inventoryItem.id,
-    productId: line.inventoryItem.product.id,
+    productId: line.inventoryItem.product?.id ?? line.inventoryItem.id,
     sku: line.inventoryItem.skuSnapshot,
-    productName: line.inventoryItem.product.name,
+    productName: line.inventoryItem.product?.name ?? line.inventoryItem.skuSnapshot,
     warehouseCode: line.warehouse.code,
     warehouseName: line.warehouse.name,
     systemOnHand: line.systemOnHand,
@@ -1128,6 +1201,25 @@ async function notifyBackofficeUsersForInventoryAlerts(alerts: Array<{
 export class InventoryService {
   constructor(private readonly repository: InventoryRepository) {}
 
+  private async findResolvedInventoryTarget(input: { productId: string; variantId?: string }) {
+    const target = await this.repository.findInventoryTarget(input);
+    if (!target) {
+      return null;
+    }
+
+    const variant = input.variantId ? target.variants[0] ?? null : null;
+    const inventoryItem = variant?.inventoryItem ?? target.inventoryItem ?? null;
+    const inventoryLevels = inventoryItem?.inventoryLevels ?? [];
+    const defaultWarehouse = inventoryLevels.find((level) => level.warehouse.isDefault) ?? inventoryLevels[0] ?? null;
+
+    return {
+      product: target,
+      variant,
+      inventoryItemId: inventoryItem?.id ?? null,
+      defaultWarehouseCode: defaultWarehouse?.warehouse.code ?? null,
+    };
+  }
+
   private async recordHistory(input: {
     eventType:
       | "STOCK_ADJUSTMENT"
@@ -1168,9 +1260,12 @@ export class InventoryService {
       ...input,
       warehouseCode,
     });
-    const product = await this.repository.listActiveProductInventoryByIds([input.productId]);
-    const inventoryItemId = product[0]?.inventoryItem?.id;
-    const resolvedWarehouseCode = warehouseCode ?? product[0]?.inventoryItem?.inventoryLevels.find((level) => level.warehouse.isDefault)?.warehouse.code;
+    const target = await this.findResolvedInventoryTarget({
+      productId: input.productId,
+      variantId: input.variantId,
+    });
+    const inventoryItemId = target?.inventoryItemId ?? null;
+    const resolvedWarehouseCode = warehouseCode ?? target?.defaultWarehouseCode ?? null;
     if (inventoryItemId && resolvedWarehouseCode) {
       const warehouses = await this.repository.listWarehouses();
       const warehouse = warehouses.find((item) => item.code === resolvedWarehouseCode);
@@ -1185,7 +1280,7 @@ export class InventoryService {
         productIds: [input.productId],
         trigger: "MANUAL_ADJUSTMENT",
         reference: `inventory-adjust:${input.productId}:${Date.now()}`,
-        warehouseCode: resolvedWarehouseCode,
+        warehouseCode: resolvedWarehouseCode ?? undefined,
       });
     }
 
@@ -1460,7 +1555,11 @@ export class InventoryService {
       return { item: exactSku, matchType: "SKU", query };
     }
 
-    const bestName = items.find((item) => item.name.toLocaleLowerCase("tr-TR").includes(normalizedQuery)) ?? items[0] ?? null;
+    const bestName = items.find((item) => (
+      item.name.toLocaleLowerCase("tr-TR").includes(normalizedQuery)
+      || item.variantTitle?.toLocaleLowerCase("tr-TR").includes(normalizedQuery)
+      || item.variantOptionSummary?.toLocaleLowerCase("tr-TR").includes(normalizedQuery)
+    )) ?? items[0] ?? null;
     return {
       item: bestName,
       matchType: bestName ? "NAME" : "NONE",
@@ -1556,27 +1655,29 @@ export class InventoryService {
       }),
       this.repository.listInventoryConsistencyRows(),
     ]);
+    const levelsWithProducts = levels.filter((level) => level.inventoryItem.product !== null);
+    const movementsWithProducts = movements.filter((movement) => movement.inventoryItem.product !== null);
 
     const filterOptions: AdminInventoryReportsResult["filterOptions"] = {
       categories: Array.from(
         new Map(
-          levels
-            .filter((level) => level.inventoryItem.product.category)
+          levelsWithProducts
+            .filter((level) => level.inventoryItem.product?.category)
             .map((level) => [
-              level.inventoryItem.product.category!.id,
+              level.inventoryItem.product!.category!.id,
               {
-                id: level.inventoryItem.product.category!.id,
-                name: level.inventoryItem.product.category!.name,
+                id: level.inventoryItem.product!.category!.id,
+                name: level.inventoryItem.product!.category!.name,
               },
             ]),
         ).values(),
       ).sort((left, right) => left.name.localeCompare(right.name, "tr")),
       productTypes: Array.from(
-        new Set(levels.map((level) => level.inventoryItem.product.productType)),
+        new Set(levelsWithProducts.map((level) => level.inventoryItem.product!.productType)),
       ).sort((left, right) => left.localeCompare(right)),
       warehouses: Array.from(
         new Map(
-          levels.map((level) => [
+          levelsWithProducts.map((level) => [
             level.warehouse.code,
             {
               code: level.warehouse.code,
@@ -1585,11 +1686,14 @@ export class InventoryService {
           ]),
         ).values(),
       ).sort((left, right) => left.code.localeCompare(right.code, "tr")),
-      movementTypes: Array.from(new Set(movements.map((movement) => movement.type))).sort((left, right) => left.localeCompare(right)),
+      movementTypes: Array.from(new Set(movementsWithProducts.map((movement) => movement.type))).sort((left, right) => left.localeCompare(right)),
     };
 
-    const filteredLevels = levels.filter((level) => {
+    const filteredLevels = levelsWithProducts.filter((level) => {
       const product = level.inventoryItem.product;
+      if (!product) {
+        return false;
+      }
 
       if (parsed.categoryId && product.categoryId !== parsed.categoryId) {
         return false;
@@ -1619,11 +1723,14 @@ export class InventoryService {
     });
 
     const filteredInventoryItemIds = new Set(filteredLevels.map((level) => level.inventoryItemId));
-    const filteredProductIds = new Set(filteredLevels.map((level) => level.inventoryItem.product.id));
+    const filteredProductIds = new Set(filteredLevels.map((level) => level.inventoryItem.product!.id));
     const filteredWarehouseCodes = new Set(filteredLevels.map((level) => level.warehouse.code));
 
-    const filteredMovements = movements.filter((movement) => {
+    const filteredMovements = movementsWithProducts.filter((movement) => {
       const product = movement.inventoryItem.product;
+      if (!product) {
+        return false;
+      }
 
       if (
         filteredLevels.length === 0
@@ -1700,16 +1807,16 @@ export class InventoryService {
         return threshold > 0 && availableUnits <= threshold;
       })
       .map((level) => ({
-        productId: level.inventoryItem.product.id,
-        productName: level.inventoryItem.product.name,
-        sku: level.inventoryItem.product.sku,
+        productId: level.inventoryItem.product!.id,
+        productName: level.inventoryItem.product!.name,
+        sku: level.inventoryItem.product!.sku,
         warehouseCode: level.warehouse.code,
         warehouseName: level.warehouse.name,
         availableUnits: toAvailableStock(level.onHand, level.reserved),
         reorderPoint: level.reorderPoint,
         safetyStock: level.safetyStock,
-        unitCost: resolveInventoryUnitCostByPreference(level, parsed.costingMethod),
-        unitPrice: level.inventoryItem.product.price.toNumber(),
+        unitCost: resolveInventoryUnitCostByPreference(level as Parameters<typeof resolveInventoryUnitCostByPreference>[0], parsed.costingMethod),
+        unitPrice: level.inventoryItem.product!.price.toNumber(),
       }))
       .sort((left, right) => left.availableUnits - right.availableUnits)
       .slice(0, 8);
@@ -1724,10 +1831,10 @@ export class InventoryService {
     for (const level of filteredLevels) {
       const onHandUnits = level.onHand;
       const availableUnits = toAvailableStock(level.onHand, level.reserved);
-      const unitCost = resolveInventoryUnitCostByPreference(level, parsed.costingMethod);
-      const unitPrice = level.inventoryItem.product.price.toNumber();
+      const unitCost = resolveInventoryUnitCostByPreference(level as Parameters<typeof resolveInventoryUnitCostByPreference>[0], parsed.costingMethod);
+      const unitPrice = level.inventoryItem.product!.price.toNumber();
       const threshold = Math.max(level.reorderPoint, level.safetyStock);
-      const productId = level.inventoryItem.product.id;
+      const productId = level.inventoryItem.product!.id;
       const existingProduct = productAnalyticsMap.get(productId);
 
       totalOnHandUnits += onHandUnits;
@@ -1741,8 +1848,8 @@ export class InventoryService {
       } else {
         productAnalyticsMap.set(productId, {
           productId,
-          productName: level.inventoryItem.product.name,
-          sku: level.inventoryItem.product.sku,
+          productName: level.inventoryItem.product!.name,
+          sku: level.inventoryItem.product!.sku,
           unitPrice,
           availableUnits,
           onHandUnits,
@@ -1810,7 +1917,7 @@ export class InventoryService {
       );
       const movementAbsQuantity = Math.abs(movement.quantity);
       const product = movement.inventoryItem.product;
-      const productAnalytics = productAnalyticsMap.get(product.id);
+      const productAnalytics = product ? productAnalyticsMap.get(product.id) : undefined;
 
       if (isCurrentPeriod) {
         const existingMovement = movementSummaryMap.get(movement.type);
@@ -2208,33 +2315,40 @@ export class InventoryService {
     };
   }
 
-  async getProductAvailability(productIds: string[]): Promise<ProductInventoryAvailability[]> {
+  async getProductAvailability(
+    inputs: Array<string | { productId: string; variantId?: string }>,
+  ): Promise<ProductInventoryAvailability[]> {
     const parsed = availabilityQuerySchema.parse({
-      productIds,
+      items: inputs.map((item) => (typeof item === "string" ? { productId: item } : item)),
     });
 
-    const products = await this.repository.listActiveProductInventoryByIds(parsed.productIds);
+    const targets = await Promise.all(parsed.items.map((item) => this.findResolvedInventoryTarget(item)));
 
-    return products.map((product) => {
-      const inventoryLevels = product.inventoryItem?.inventoryLevels ?? [];
-      const availability = resolveAggregateAvailabilityFromLevels(inventoryLevels, product.stock);
+    return targets.flatMap((target) => {
+      if (!target) {
+        return [];
+      }
+
+      const inventoryLevels = target.variant?.inventoryItem?.inventoryLevels ?? target.product.inventoryItem?.inventoryLevels ?? [];
+      const availability = resolveAggregateAvailabilityFromLevels(inventoryLevels, target.product.stock);
       const defaultWarehouse = inventoryLevels.find((level) => level.warehouse.isDefault) ?? inventoryLevels[0];
 
-      return {
-        productId: product.id,
-        slug: product.slug,
-        sku: product.sku,
-        name: product.name,
-        imageUrl: product.imageUrl,
-        currency: product.currency,
-        unitPrice: product.price.toNumber(),
-        compareAtPrice: product.compareAtPrice?.toNumber() ?? null,
+      return [{
+        productId: target.product.id,
+        variantId: target.variant?.id ?? null,
+        slug: target.product.slug,
+        sku: target.variant?.sku ?? target.product.sku,
+        name: target.variant?.title ?? target.product.name,
+        imageUrl: target.variant?.imageUrl ?? target.product.imageUrl,
+        currency: target.product.currency,
+        unitPrice: target.variant?.priceOverride?.toNumber() ?? target.product.price.toNumber(),
+        compareAtPrice: target.variant?.compareAtPriceOverride?.toNumber() ?? target.product.compareAtPrice?.toNumber() ?? null,
         onHandStock: availability.onHandStock,
         reservedStock: availability.reservedStock,
         availableStock: availability.availableStock,
         inStock: availability.availableStock > 0,
         warehouseCode: defaultWarehouse?.warehouse.code ?? null,
-      };
+      }];
     });
   }
 
@@ -2249,6 +2363,7 @@ export class InventoryService {
       title: "Stok düzeltmesi",
       summary: `${parsed.sku} için stok düzeltmesi uygulandı.`,
       metadata: {
+        variantId: parsed.variantId ?? null,
         sku: parsed.sku,
         warehouseCode: parsed.warehouseCode ?? null,
         targetOnHandStock: parsed.targetOnHandStock ?? null,
@@ -2261,8 +2376,11 @@ export class InventoryService {
   async transferProductInventory(input: TransferProductInventoryInput): Promise<void> {
     const parsed = transferInventorySchema.parse(input);
     await this.repository.transferProductInventory(parsed);
-    const product = await this.repository.listActiveProductInventoryByIds([parsed.productId]);
-    const inventoryItemId = product[0]?.inventoryItem?.id;
+    const target = await this.findResolvedInventoryTarget({
+      productId: parsed.productId,
+      variantId: parsed.variantId,
+    });
+    const inventoryItemId = target?.inventoryItemId ?? null;
     if (inventoryItemId) {
       const warehouses = await this.repository.listWarehouses();
       const targets = warehouses
@@ -2286,6 +2404,7 @@ export class InventoryService {
       title: "Depolar arası transfer",
       summary: `${parsed.sku} için ${parsed.fromWarehouseCode} -> ${parsed.toWarehouseCode} transferi uygulandı.`,
       metadata: {
+        variantId: parsed.variantId ?? null,
         sku: parsed.sku,
         fromWarehouseCode: parsed.fromWarehouseCode,
         toWarehouseCode: parsed.toWarehouseCode,
@@ -2309,8 +2428,11 @@ export class InventoryService {
       sourceDocumentSupplier: resolvedSupplier?.name ?? parsed.sourceDocumentSupplier,
       sourceDocumentDate: parsed.sourceDocumentDate ? new Date(parsed.sourceDocumentDate) : undefined,
     });
-    const product = await this.repository.listActiveProductInventoryByIds([parsed.productId]);
-    const inventoryItemId = product[0]?.inventoryItem?.id;
+    const target = await this.findResolvedInventoryTarget({
+      productId: parsed.productId,
+      variantId: parsed.variantId,
+    });
+    const inventoryItemId = target?.inventoryItemId ?? null;
     if (inventoryItemId) {
       const warehouses = await this.repository.listWarehouses();
       const warehouse = warehouses.find((item) => item.code === parsed.warehouseCode);
@@ -2335,6 +2457,7 @@ export class InventoryService {
       title: parsed.type === "PURCHASE_RECEIPT" ? "Stok girişi" : "Stok çıkışı",
       summary: `${parsed.sku} için ${parsed.quantity} adet ${parsed.type === "PURCHASE_RECEIPT" ? "stok girişi" : "stok çıkışı"} işlendi.`,
       metadata: {
+        variantId: parsed.variantId ?? null,
         sku: parsed.sku,
         warehouseCode: parsed.warehouseCode,
         quantity: parsed.quantity,

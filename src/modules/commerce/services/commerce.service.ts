@@ -433,13 +433,18 @@ export class CommerceService {
   async quote(input: CommerceQuoteInput): Promise<CommerceQuoteResult> {
     const parsed = quoteSchema.parse(input);
     const normalized = normalizeLines(parsed.lines);
-    const products = await inventoryService.getProductAvailability(normalized.map((line) => line.productId));
+    const products = await inventoryService.getProductAvailability(
+      normalized.map((line) => ({
+        productId: line.productId,
+        ...(line.variantId ? { variantId: line.variantId } : {}),
+      })),
+    );
     const sellables = await this.repository.listSellableSnapshots(normalized);
-    const productMap = new Map(products.map((item) => [item.productId, item]));
+    const productMap = new Map(products.map((item) => [`${item.productId}:${item.variantId ?? ""}`, item]));
     const sellableMap = new Map(sellables.map((item) => [`${item.productId}:${item.variantId ?? ""}`, item]));
 
     const lines = normalized.map((line) => {
-      const availability = productMap.get(line.productId);
+      const availability = productMap.get(`${line.productId}:${line.variantId ?? ""}`);
       const sellable = sellableMap.get(`${line.productId}:${line.variantId ?? ""}`);
 
       if (!availability || !sellable) {

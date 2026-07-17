@@ -27,6 +27,9 @@ function hasRequiredDelegates(client: PrismaClient | undefined): client is Prism
     stockCountLine?: unknown;
     inventoryTransaction?: unknown;
     integrationSyncJob?: unknown;
+    marketplaceIntegrationConfig?: unknown;
+    marketplaceOrderPackage?: unknown;
+    marketplaceOrderLine?: unknown;
     collectionRecord?: unknown;
     paymentRecord?: unknown;
     customerAccount?: unknown;
@@ -43,6 +46,9 @@ function hasRequiredDelegates(client: PrismaClient | undefined): client is Prism
     && typeof delegateCheck.stockCountLine !== "undefined"
     && typeof delegateCheck.inventoryTransaction !== "undefined"
     && typeof delegateCheck.integrationSyncJob !== "undefined"
+    && typeof delegateCheck.marketplaceIntegrationConfig !== "undefined"
+    && typeof delegateCheck.marketplaceOrderPackage !== "undefined"
+    && typeof delegateCheck.marketplaceOrderLine !== "undefined"
     && typeof delegateCheck.collectionRecord !== "undefined"
     && typeof delegateCheck.paymentRecord !== "undefined"
     && typeof delegateCheck.customerAccount !== "undefined"

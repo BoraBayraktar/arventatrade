@@ -191,6 +191,7 @@ export function PaymentReadinessManager({ result, accountOptions, labels }: Prop
                   <p>{labels.lastIssueDate}: {item.lastIssueDate ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(item.lastIssueDate)) : "-"}</p>
                   <p>{labels.remainingAmount}: {formatMoney(item.remainingAmount, item.currency)}</p>
                   <p>{labels.recordedPaymentCount}: {item.recordedPaymentCount}</p>
+                  <p className="md:col-span-2 xl:col-span-4">Varyant özeti: {item.topVariantSummary ?? "-"}</p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">

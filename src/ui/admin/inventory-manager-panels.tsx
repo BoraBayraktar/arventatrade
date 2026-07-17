@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AdminSupplierItem } from "@/modules/catalog/contracts/catalog-admin.contract";
+import type { AdminProductVariantItem } from "@/modules/catalog/contracts/catalog-admin.contract";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -408,6 +409,12 @@ export function InventoryQuickActionsPanel({
         {quickActionResult?.item ? (
           <div className="mt-4 rounded-3xl border border-neutral-200 bg-neutral-50/80 p-4">
             <p className="text-sm font-semibold text-neutral-950">{quickActionResult.item.name}</p>
+            {quickActionResult.item.variantTitle ? (
+              <p className="mt-1 text-xs font-medium text-neutral-700">
+                Varyant: {quickActionResult.item.variantTitle}
+                {quickActionResult.item.variantOptionSummary ? ` • ${quickActionResult.item.variantOptionSummary}` : ""}
+              </p>
+            ) : null}
             <p className="mt-1 text-sm text-neutral-600">
               {quickActionResult.item.sku} • Barkod: {quickActionResult.item.barcode ?? labels.notSpecified}
             </p>
@@ -1294,11 +1301,31 @@ export function InventoryTransactionsPanel({
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Belge Numarası</p>
                     <p className="mt-1 text-sm font-semibold text-neutral-950">{transaction.sourceDocument.number ?? labels.notSpecified}</p>
                   </div>
+                  <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Tedarikçi / Karşı taraf</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-950">{transaction.sourceDocument.counterpartyName ?? labels.notSpecified}</p>
+                  </div>
+                  <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">İşlem maliyeti</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-950">
+                      {transaction.lines.some((line) => line.lineTotal !== null && line.lineTotal !== undefined)
+                        ? formatCurrency(
+                          transaction.lines.reduce((sum, line) => sum + (line.lineTotal ?? 0), 0),
+                          locale,
+                        )
+                        : labels.notSpecified}
+                    </p>
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {transaction.lines.slice(0, 3).map((line) => (
                     <span key={line.id} className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-700">
-                      {line.inventoryItemName} • {line.inventoryItemSku} • {line.quantity}
+                      {line.inventoryItemName}
+                      {line.variantTitle ? ` / ${line.variantTitle}` : ""}
+                      {" • "}
+                      {line.inventoryItemSku}
+                      {" • "}
+                      {line.quantity}
                     </span>
                   ))}
                   {transaction.lines.length > 3 ? (
@@ -1735,8 +1762,19 @@ export function InventoryListResultsPanel({
                       <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${statusClass(item.stockStatus)}`}>
                         {statusLabel(item.stockStatus, labels)}
                       </span>
+                      {item.variantTitle ? (
+                        <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-800">
+                          Varyant
+                        </span>
+                      ) : null}
                     </div>
                     <p className="mt-1 truncate text-xs text-neutral-500">/{item.slug} · {labels.sku}: {item.sku}</p>
+                    {item.variantTitle ? (
+                      <p className="mt-1 truncate text-xs text-neutral-600">
+                        {item.variantTitle}
+                        {item.variantOptionSummary ? ` • ${item.variantOptionSummary}` : ""}
+                      </p>
+                    ) : null}
                     <div className="mt-2 flex flex-wrap gap-2">
                       <span className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[11px] text-neutral-700">{formatProductType(item.productType)}</span>
                       <span className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[11px] text-neutral-700">{formatUnitType(item.unitType)}</span>
@@ -1807,6 +1845,14 @@ export function InventoryDrawerOverviewPanel({
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">Ürün Kartı</p>
             <h4 className="mt-2 text-2xl font-semibold">{item.name}</h4>
             <p className="mt-2 text-sm text-white/70">/{item.slug} • {labels.sku}: {item.sku}</p>
+            {item.variantTitle ? (
+              <p className="mt-1 text-sm text-white/75">
+                Stok nesnesi: Varyant • {item.variantTitle}
+                {item.variantOptionSummary ? ` • ${item.variantOptionSummary}` : ""}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-white/75">Stok nesnesi: Ürün</p>
+            )}
             <p className="mt-1 text-xs text-white/60">
               Barkod: {item.barcode ?? labels.notSpecified} • Birim: {formatUnitType(item.unitType)} • Tip: {formatProductType(item.productType)}
             </p>
@@ -2204,6 +2250,9 @@ type InventoryDrawerOperationPanelProps = {
   drawerPurchaseReference: string;
   drawerPurchaseExternalStatus: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED";
   drawerPurchaseUnitCost: string;
+  drawerProductVariants: AdminProductVariantItem[];
+  drawerSelectedVariantId: string;
+  pendingDrawerVariants: boolean;
   setDrawerMode: (mode: DrawerMode) => void;
   setDrawerTargetOnHand: (value: string) => void;
   setDrawerReorderPoint: (value: string) => void;
@@ -2220,6 +2269,7 @@ type InventoryDrawerOperationPanelProps = {
   setDrawerPurchaseReference: (value: string) => void;
   setDrawerPurchaseExternalStatus: (value: "NOT_SENT" | "QUEUED" | "SENT" | "FAILED") => void;
   setDrawerPurchaseUnitCost: (value: string) => void;
+  setDrawerSelectedVariantId: (value: string) => void;
   formatDate: (value: string | null, locale: Locale, fallback: string) => string;
   formatInventoryNote: (note: string | null | undefined) => string | null | undefined;
   formatSourceDocument: (source: {
@@ -2258,6 +2308,9 @@ export function InventoryDrawerOperationPanel({
   drawerPurchaseReference,
   drawerPurchaseExternalStatus,
   drawerPurchaseUnitCost,
+  drawerProductVariants,
+  drawerSelectedVariantId,
+  pendingDrawerVariants,
   setDrawerMode,
   setDrawerTargetOnHand,
   setDrawerReorderPoint,
@@ -2274,6 +2327,7 @@ export function InventoryDrawerOperationPanel({
   setDrawerPurchaseReference,
   setDrawerPurchaseExternalStatus,
   setDrawerPurchaseUnitCost,
+  setDrawerSelectedVariantId,
   formatDate,
   formatInventoryNote,
   formatSourceDocument,
@@ -2318,6 +2372,12 @@ export function InventoryDrawerOperationPanel({
   ];
 
   const activeOperation = operationCards.find((card) => card.id === drawerMode) ?? null;
+  const activeVariant = drawerProductVariants.find((variant) => variant.id === drawerSelectedVariantId) ?? null;
+  const movementQuantity = Number(drawerMovementQuantity || 0);
+  const parsedPurchaseUnitCost = drawerPurchaseUnitCost.trim() ? Number(drawerPurchaseUnitCost) : null;
+  const estimatedPurchaseLineTotal = parsedPurchaseUnitCost !== null && movementQuantity > 0
+    ? parsedPurchaseUnitCost * movementQuantity
+    : null;
   const flowSteps = [
     {
       id: "select",
@@ -2429,6 +2489,7 @@ export function InventoryDrawerOperationPanel({
                   <div className="grid gap-2 text-xs opacity-80 sm:grid-cols-2">
                     <p>Operasyon deposu: {item.warehouseCode ?? labels.notSpecified}</p>
                     <p>Kullanılabilir stok: {item.availableStock}</p>
+                    {activeVariant ? <p>Varyant: {activeVariant.title}</p> : null}
                   </div>
                 </div>
               </div>
@@ -2441,7 +2502,8 @@ export function InventoryDrawerOperationPanel({
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">Uygulama Özeti</p>
               <div className="mt-3 space-y-2 text-sm text-neutral-700">
                 <p>Ürün: <span className="font-semibold text-neutral-950">{item.name}</span></p>
-                <p>SKU: <span className="font-semibold text-neutral-950">{item.sku}</span></p>
+                <p>SKU: <span className="font-semibold text-neutral-950">{activeVariant?.sku ?? item.sku}</span></p>
+                {activeVariant ? <p>Seçim: <span className="font-semibold text-neutral-950">{activeVariant.optionSummary || activeVariant.title}</span></p> : null}
                 <p>Mevcut stok: <span className="font-semibold text-neutral-950">{item.onHandStock}</span></p>
                 <p>Kullanılabilir stok: <span className="font-semibold text-neutral-950">{item.availableStock}</span></p>
                 <p>Rezerve stok: <span className="font-semibold text-neutral-950">{item.reservedStock}</span></p>
@@ -2554,6 +2616,42 @@ export function InventoryDrawerOperationPanel({
                 </button>
               ))}
             </div>
+
+        {drawerProductVariants.length > 0 ? (
+          <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+            <div className="mb-3">
+              <p className="text-sm font-semibold text-neutral-950">Operasyon varyantı</p>
+              <p className="mt-1 text-xs text-neutral-600">
+                Shop seçimini ve gerçek stok nesnesini aynı yerden yönetmek için işlemden önce varyant seç.
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <label className="text-xs font-medium text-neutral-600">Varyant</label>
+              <Select
+                value={drawerSelectedVariantId || "__empty__"}
+                onValueChange={(value) => setDrawerSelectedVariantId(value === "__empty__" ? "" : value)}
+                disabled={pendingDrawerVariants}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={pendingDrawerVariants ? "Varyantlar yükleniyor" : "Varyant seç"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__empty__">{labels.notSpecified}</SelectItem>
+                  {drawerProductVariants.map((variant) => (
+                    <SelectItem key={variant.id} value={variant.id}>
+                      {variant.title} • {variant.sku}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {activeVariant ? (
+                <p className="text-xs text-neutral-500">
+                  {activeVariant.optionSummary || activeVariant.title}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {drawerMode === "edit" ? (
           <form
@@ -2680,6 +2778,31 @@ export function InventoryDrawerOperationPanel({
                 <div className="grid gap-2 md:col-span-2">
                   <label className="text-xs font-medium text-neutral-600">Birim maliyet</label>
                   <Input type="number" min={0} step="0.01" value={drawerPurchaseUnitCost} onChange={(event) => setDrawerPurchaseUnitCost(event.target.value)} placeholder="0.00" />
+                  {activeVariant?.purchasePriceOverride !== null && activeVariant?.purchasePriceOverride !== undefined ? (
+                    <p className="text-xs text-neutral-500">
+                      Varyant varsayılan alış fiyatı: {formatCurrency(activeVariant.purchasePriceOverride, locale)}
+                    </p>
+                  ) : item.purchasePrice !== null ? (
+                    <p className="text-xs text-neutral-500">
+                      Ürün varsayılan alış fiyatı: {formatCurrency(item.purchasePrice, locale)}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="md:col-span-2">
+                  <div className="rounded-2xl border border-emerald-200 bg-white/80 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Maliyet Özeti</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                      <p className="text-sm text-neutral-700">
+                        Stok nesnesi: <span className="font-semibold text-neutral-950">{activeVariant ? activeVariant.title : item.name}</span>
+                      </p>
+                      <p className="text-sm text-neutral-700">
+                        Miktar: <span className="font-semibold text-neutral-950">{movementQuantity > 0 ? movementQuantity : labels.notSpecified}</span>
+                      </p>
+                      <p className="text-sm text-neutral-700">
+                        Tahmini toplam: <span className="font-semibold text-neutral-950">{estimatedPurchaseLineTotal === null ? labels.notSpecified : formatCurrency(estimatedPurchaseLineTotal, locale)}</span>
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

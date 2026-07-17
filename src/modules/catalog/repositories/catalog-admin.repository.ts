@@ -10,6 +10,7 @@ import type {
   AdminUpdateBrandInput,
   AdminUpdateCategoryInput,
   AdminUpdateProductAttributeDefinitionInput,
+  AdminUpsertProductAttributeValueMarketplaceMappingInput,
   AdminUpdateSupplierInput,
 } from "@/modules/catalog/contracts/catalog-admin.contract";
 
@@ -685,6 +686,7 @@ export class CatalogAdminRepository {
       data: {
         slug: input.slug,
         name: input.name,
+        trendyolBrandId: input.trendyolBrandId ?? null,
         isActive: input.isActive ?? true,
       },
       include: {
@@ -709,6 +711,7 @@ export class CatalogAdminRepository {
       data: {
         ...(input.slug !== undefined ? { slug: input.slug } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.trendyolBrandId !== undefined ? { trendyolBrandId: input.trendyolBrandId } : {}),
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       },
       include: {
@@ -801,6 +804,7 @@ export class CatalogAdminRepository {
         slug: input.slug,
         name: input.name,
         displayType: input.displayType ?? "TEXT",
+        trendyolAttributeId: input.trendyolAttributeId ?? null,
         sortOrder: input.sortOrder ?? 0,
         isActive: input.isActive ?? true,
       },
@@ -823,6 +827,7 @@ export class CatalogAdminRepository {
         ...(input.slug !== undefined ? { slug: input.slug } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.displayType !== undefined ? { displayType: input.displayType } : {}),
+        ...(input.trendyolAttributeId !== undefined ? { trendyolAttributeId: input.trendyolAttributeId } : {}),
         ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       },
@@ -886,6 +891,99 @@ export class CatalogAdminRepository {
       },
       select: {
         id: true,
+      },
+    });
+  }
+
+  async listAttributeValueMarketplaceMappings(channel: "TRENDYOL" | "N11" | "EDOCS_MOCK") {
+    return prisma.productAttributeValueMarketplaceMapping.findMany({
+      where: {
+        channel,
+        deleted: false,
+      },
+      orderBy: [
+        { attributeDefinition: { name: "asc" } },
+        { localValue: "asc" },
+      ],
+      include: {
+        attributeDefinition: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+  }
+
+  async listDistinctVariantAttributeValues() {
+    const rows = await prisma.productVariantAttributeValue.findMany({
+      where: {
+        productVariant: {
+          deleted: false,
+          product: {
+            deleted: false,
+          },
+        },
+        attributeDefinition: {
+          deleted: false,
+          isActive: true,
+        },
+      },
+      select: {
+        attributeDefinitionId: true,
+        value: true,
+        attributeDefinition: {
+          select: {
+            id: true,
+            name: true,
+            trendyolAttributeId: true,
+          },
+        },
+      },
+      orderBy: [
+        { attributeDefinition: { name: "asc" } },
+        { value: "asc" },
+      ],
+    });
+
+    return rows;
+  }
+
+  async upsertAttributeValueMarketplaceMapping(input: AdminUpsertProductAttributeValueMarketplaceMappingInput) {
+    return prisma.productAttributeValueMarketplaceMapping.upsert({
+      where: {
+        attributeDefinitionId_channel_localValue: {
+          attributeDefinitionId: input.attributeDefinitionId,
+          channel: input.channel ?? "TRENDYOL",
+          localValue: input.localValue,
+        },
+      },
+      update: {
+        externalAttributeValueId: input.externalAttributeValueId ?? null,
+        externalAttributeValueName: input.externalAttributeValueName ?? null,
+        customAttributeValue: input.customAttributeValue ?? null,
+        isActive: input.isActive ?? true,
+        deleted: false,
+        deletedDate: null,
+        deletedUserId: null,
+      },
+      create: {
+        attributeDefinitionId: input.attributeDefinitionId,
+        channel: input.channel ?? "TRENDYOL",
+        localValue: input.localValue,
+        externalAttributeValueId: input.externalAttributeValueId ?? null,
+        externalAttributeValueName: input.externalAttributeValueName ?? null,
+        customAttributeValue: input.customAttributeValue ?? null,
+        isActive: input.isActive ?? true,
+      },
+      include: {
+        attributeDefinition: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
   }
@@ -1064,6 +1162,7 @@ export class CatalogAdminRepository {
         id: true,
         slug: true,
         name: true,
+        trendyolCategoryId: true,
         parentId: true,
         _count: {
           select: {
@@ -1127,17 +1226,19 @@ export class CatalogAdminRepository {
     });
   }
 
-  async createCategory(input: { slug: string; name: string; parentId?: string | null }) {
+  async createCategory(input: { slug: string; name: string; trendyolCategoryId?: number | null; parentId?: string | null }) {
     return prisma.category.create({
       data: {
         slug: input.slug,
         name: input.name,
+        trendyolCategoryId: input.trendyolCategoryId ?? null,
         parentId: input.parentId ?? null,
       },
       select: {
         id: true,
         slug: true,
         name: true,
+        trendyolCategoryId: true,
         parentId: true,
         _count: {
           select: {
@@ -1160,12 +1261,14 @@ export class CatalogAdminRepository {
       data: {
         ...(input.slug !== undefined ? { slug: input.slug } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.trendyolCategoryId !== undefined ? { trendyolCategoryId: input.trendyolCategoryId } : {}),
         ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
       },
       select: {
         id: true,
         slug: true,
         name: true,
+        trendyolCategoryId: true,
         parentId: true,
         _count: {
           select: {
