@@ -10,6 +10,8 @@ This is intentional. In this repository, Turbopack production build was hanging 
 
 The root layout also avoids remote Google Font fetching so production builds are not coupled to external font downloads.
 
+Database migrations are intentionally not executed inside `npm run build`. Run `npm run db:migrate` against the target database before deploying or as a separate release step. This keeps Vercel artifact builds independent from database connectivity and prevents transient Prisma schema-engine failures from blocking the build phase.
+
 ## Required environment variables
 
 - `DATABASE_URL`: required for Prisma and all catalog/admin/server flows.
