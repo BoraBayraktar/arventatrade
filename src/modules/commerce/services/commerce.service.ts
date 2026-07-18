@@ -553,7 +553,7 @@ export class CommerceService {
     }
 
     await invalidateCatalogCache();
-    await Promise.all((["TRENDYOL", "N11"] as const).map((channel) => integrationService.dispatchJobs({
+    await Promise.all((["TRENDYOL", "N11", "HEPSIBURADA"] as const).map((channel) => integrationService.dispatchJobs({
       channel,
       jobType: "STOCK_SYNC",
       entityType: "PRODUCT",

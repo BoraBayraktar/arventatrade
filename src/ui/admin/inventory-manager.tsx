@@ -192,6 +192,9 @@ type Labels = {
   syncSuccess: string;
   syncRecentJobs: string;
   syncLastError: string;
+  channelTrendyol: string;
+  channelN11: string;
+  channelHepsiburada: string;
   totalOnHandUnits: string;
   totalCostValue: string;
   totalSalesValue: string;
@@ -519,9 +522,14 @@ type Props = {
     failedCount: number;
     deadLetterCount: number;
     successCount: number;
+    channelCounts: {
+      trendyol: number;
+      n11: number;
+      hepsiburada: number;
+    };
     recentJobs: Array<{
       id: string;
-      channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+      channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
       status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
       entityId: string;
       createdAt: string;

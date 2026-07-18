@@ -25,7 +25,7 @@ export default async function AdminTrendyolIntegrationPage({
   }
 
   const [dashboard, productResult] = await Promise.all([
-    marketplaceIntegrationService.getDashboard(),
+    marketplaceIntegrationService.getDashboard({ channel: "TRENDYOL" }),
     catalogAdminService.listProducts({ page: 1, pageSize: 50, status: "ACTIVE" }),
   ]);
   const productOptions = productResult.items.flatMap((product) => {
@@ -53,6 +53,7 @@ export default async function AdminTrendyolIntegrationPage({
       canManage={user.role === "ADMIN"}
       initialConfigs={dashboard.configs}
       initialPackages={dashboard.packages}
+      capabilities={dashboard.capabilities}
       productOptions={productOptions}
       summary={dashboard.summary}
       labels={{
@@ -95,6 +96,12 @@ export default async function AdminTrendyolIntegrationPage({
         createProductFromLine: dictionary.admin.integrationMarketplaceCreateProductFromLine,
         ignoreLine: dictionary.admin.integrationMarketplaceIgnoreLine,
         lineIgnored: dictionary.admin.integrationMarketplaceLineIgnored,
+        splitPackage: dictionary.admin.integrationMarketplaceSplitPackage,
+        splitPackageTitle: dictionary.admin.integrationMarketplaceSplitPackageTitle,
+        splitPackageHint: dictionary.admin.integrationMarketplaceSplitPackageHint,
+        splitPackageQuantity: dictionary.admin.integrationMarketplaceSplitPackageQuantity,
+        splitPackageSuccess: dictionary.admin.integrationMarketplaceSplitPackageSuccess,
+        splitPackageInvalid: dictionary.admin.integrationMarketplaceSplitPackageInvalid,
         createOrder: dictionary.admin.integrationMarketplaceCreateOrder,
         orderCreated: dictionary.admin.integrationMarketplaceOrderCreated,
         notifyPicking: dictionary.admin.integrationMarketplaceNotifyPicking,
@@ -105,9 +112,29 @@ export default async function AdminTrendyolIntegrationPage({
         noStatusHistory: dictionary.admin.integrationMarketplaceNoStatusHistory,
         targetStatus: dictionary.admin.integrationMarketplaceTargetStatus,
         attempts: dictionary.admin.integrationMarketplaceAttempts,
+        packageStatusLabel: dictionary.admin.integrationMarketplacePackageStatusLabel,
+        cargoLabel: dictionary.admin.integrationMarketplaceCargoLabel,
+        externalReferenceShort: dictionary.admin.integrationMarketplaceExternalReferenceShort,
+        deadLetterResolved: dictionary.admin.integrationMarketplaceDeadLetterResolved,
+        closeLabel: dictionary.admin.close,
         retryStatusJob: dictionary.admin.integrationMarketplaceRetryStatusJob,
         testConnection: dictionary.admin.integrationMarketplaceTestConnection,
         connectionTested: dictionary.admin.integrationMarketplaceConnectionTested,
+        capabilitiesTitle: dictionary.admin.integrationMarketplaceCapabilitiesTitle,
+        capabilitiesHint: dictionary.admin.integrationMarketplaceCapabilitiesHint,
+        capabilityAvailable: dictionary.admin.integrationMarketplaceCapabilityAvailable,
+        capabilityLimited: dictionary.admin.integrationMarketplaceCapabilityLimited,
+        capabilityOrderImport: dictionary.admin.integrationMarketplaceCapabilityOrderImport,
+        capabilityProductSync: dictionary.admin.integrationMarketplaceCapabilityProductSync,
+        capabilityPriceSync: dictionary.admin.integrationMarketplaceCapabilityPriceSync,
+        capabilityStockSync: dictionary.admin.integrationMarketplaceCapabilityStockSync,
+        capabilityPickingStatus: dictionary.admin.integrationMarketplaceCapabilityPickingStatus,
+        capabilityInvoicedStatus: dictionary.admin.integrationMarketplaceCapabilityInvoicedStatus,
+        capabilityPackageSplit: dictionary.admin.integrationMarketplaceCapabilityPackageSplit,
+        capabilityBrandMapping: dictionary.admin.integrationMarketplaceCapabilityBrandMapping,
+        capabilityCategoryMapping: dictionary.admin.integrationMarketplaceCapabilityCategoryMapping,
+        capabilityAttributeMapping: dictionary.admin.integrationMarketplaceCapabilityAttributeMapping,
+        capabilityAdvancedPreflight: dictionary.admin.integrationMarketplaceCapabilityAdvancedPreflight,
         queued: dictionary.admin.integrationMarketplaceQueued,
         operationFailed: dictionary.admin.operationFailed,
         loading: dictionary.common.loading,

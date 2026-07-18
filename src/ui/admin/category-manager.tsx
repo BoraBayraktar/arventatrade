@@ -28,6 +28,7 @@ type ParentCategoryOption = {
 
 type Labels = {
   title: string;
+  marketplaceNote: string;
   createTitle: string;
   listTitle: string;
   search: string;
@@ -546,6 +547,7 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.title}</p>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-950">{labels.listTitle}</h2>
           <p className="mt-1 text-sm text-neutral-500">{result.total} kategori listeleniyor</p>
+          <p className="mt-3 rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">{labels.marketplaceNote}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <input

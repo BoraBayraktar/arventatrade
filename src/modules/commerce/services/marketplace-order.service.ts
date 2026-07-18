@@ -1,6 +1,7 @@
 import { redisCache } from "@/lib/redis";
 import type { CommerceLineQuote } from "@/modules/commerce/contracts/commerce.contract";
 import { CommerceRepository } from "@/modules/commerce/repositories/commerce.repository";
+import { customerAccountService } from "@/modules/customers/services/customer-account.service";
 
 export type MarketplaceOrderLineInput = {
   productId: string;
@@ -11,8 +12,10 @@ export type MarketplaceOrderLineInput = {
 };
 
 export type CreateMarketplaceOrderInput = {
-  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
   externalOrderNumber: string;
+  customerName?: string | null;
+  customerEmail?: string | null;
   lines: MarketplaceOrderLineInput[];
 };
 
@@ -92,6 +95,12 @@ export class MarketplaceOrderService {
     });
 
     const subtotal = quoteLines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const customerAccount = input.customerName?.trim()
+      ? await customerAccountService.ensureCustomerAccountFromContact({
+          name: input.customerName,
+          email: input.customerEmail ?? null,
+        })
+      : null;
 
     try {
       const created = await this.repository.createOrderAndCommitInventory({
@@ -102,7 +111,7 @@ export class MarketplaceOrderService {
         total: subtotal,
         promotionCode: null,
         currency: quoteLines[0]?.currency ?? "TRY",
-        customerAccountId: null,
+        customerAccountId: customerAccount?.id ?? null,
       });
       await invalidateCatalogCache();
       return created;

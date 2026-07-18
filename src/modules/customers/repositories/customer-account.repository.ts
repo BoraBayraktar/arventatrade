@@ -198,6 +198,43 @@ export class CustomerAccountRepository {
 
     return rows[0] ?? null;
   }
+
+  async findCustomerAccountByName(name: string) {
+    if (this.delegate) {
+      return this.delegate.findFirst({
+        where: {
+          deleted: false,
+          name: {
+            equals: name,
+            mode: "insensitive",
+          },
+        },
+      });
+    }
+
+    const rows = await prisma.$queryRaw<CustomerAccountRow[]>(Prisma.sql`
+      SELECT
+        "id",
+        "slug",
+        "name",
+        "email",
+        "phone",
+        "taxNumber",
+        "address",
+        "note",
+        "isActive",
+        "createdAt",
+        "updatedAt",
+        "deleted",
+        "deletedDate",
+        "deletedUserId"
+      FROM "CustomerAccount"
+      WHERE LOWER("name") = LOWER(${name}) AND "deleted" = false
+      LIMIT 1
+    `);
+
+    return rows[0] ?? null;
+  }
 }
 
 export const customerAccountRepository = new CustomerAccountRepository();

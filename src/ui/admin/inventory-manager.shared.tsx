@@ -136,6 +136,9 @@ export type Labels = {
   syncSuccess: string;
   syncRecentJobs: string;
   syncLastError: string;
+  channelTrendyol: string;
+  channelN11: string;
+  channelHepsiburada: string;
   totalOnHandUnits: string;
   totalCostValue: string;
   totalSalesValue: string;

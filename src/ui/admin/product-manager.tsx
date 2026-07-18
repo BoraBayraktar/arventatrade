@@ -114,6 +114,8 @@ type Product = {
   features: ProductFeature[];
   categoryId: string | null;
   categoryName: string | null;
+  variantCount: number;
+  variantAxisCount: number;
   orderCount: number;
   soldQuantity: number;
   grossRevenue: number;
@@ -248,6 +250,28 @@ type Labels = {
   trendyolPreflightIssues: string;
   trendyolDraftPayload: string;
   trendyolQueueProductSync: string;
+  n11Preflight: string;
+  n11PreflightReady: string;
+  n11PreflightBlocked: string;
+  n11PreflightWarnings: string;
+  n11PreflightIssues: string;
+  n11DraftPayload: string;
+  n11QueueProductSync: string;
+  n11ProductSyncQueued: string;
+  n11ProductSyncTracking: string;
+  n11ProductSyncJobStatus: string;
+  n11ProductSyncCheckAgain: string;
+  hepsiburadaPreflight: string;
+  hepsiburadaPreflightReady: string;
+  hepsiburadaPreflightBlocked: string;
+  hepsiburadaPreflightWarnings: string;
+  hepsiburadaPreflightIssues: string;
+  hepsiburadaDraftPayload: string;
+  hepsiburadaQueueProductSync: string;
+  hepsiburadaProductSyncQueued: string;
+  hepsiburadaProductSyncTracking: string;
+  hepsiburadaProductSyncJobStatus: string;
+  hepsiburadaProductSyncCheckAgain: string;
   trendyolProductSyncQueued: string;
   trendyolProductSyncTracking: string;
   trendyolProductSyncJobStatus: string;
@@ -365,7 +389,7 @@ type ProductForm = {
   variants: ProductVariant[];
 };
 
-type DrawerMode = "create" | "edit";
+type DrawerMode = "create" | "edit" | "variants";
 
 type TrendyolPreflightResult = {
   productId: string;
@@ -379,12 +403,111 @@ type TrendyolPreflightResult = {
   productV2DraftPayload: { items: unknown[] } | null;
 };
 
+type N11PreflightResult = {
+  productId: string;
+  sku: string;
+  status: string;
+  salesEnabled: boolean;
+  descriptionLength: number;
+  vatRate: number;
+  derivedProductMainId: string;
+  maxPurchaseQuantity: number;
+  blockingIssues: string[];
+  warnings: string[];
+  readyForN11ProductUpdate: boolean;
+  draftPayload: { payload: { skus: unknown[] } } | null;
+};
+
+type HepsiburadaPreflightResult = {
+  productId: string;
+  hbSku: string;
+  sku: string;
+  barcode: string | null;
+  status: string;
+  salesEnabled: boolean;
+  descriptionLength: number;
+  imageCount: number;
+  blockingIssues: string[];
+  warnings: string[];
+  readyForHepsiburadaProductUpdate: boolean;
+  draftPayload: { merchantId: string | null; items: unknown[] } | null;
+};
+
 type TrendyolProductSyncTracking = {
   productId: string;
   productTitle: string;
   sku: string;
   jobId: string | null;
   status: string;
+};
+
+type N11ProductSyncTracking = {
+  productId: string;
+  sku: string;
+  jobId: string | null;
+  status: string;
+  taskId: string | null;
+  detailStatus: string | null;
+  recommendedAction: string | null;
+  lastCheckedAt: string | null;
+};
+
+type HepsiburadaProductSyncTracking = {
+  productId: string;
+  hbSku: string;
+  jobId: string | null;
+  status: string;
+};
+
+type SyncTrackingCardData = {
+  tone: "cyan" | "amber";
+  label: string;
+  title: string;
+  sku: string;
+  statusLabel: string;
+  status: string;
+  jobId: string | null;
+  detailStatus: string | null;
+  recommendedAction: string | null;
+  lastCheckedAt: string | null;
+  productId: string;
+  busy: boolean;
+  refreshLabel: string;
+  onRefresh: () => void;
+  onClose: () => void;
+};
+
+type PreflightCardData = {
+  label: string;
+  title: string;
+  summary: string;
+  ready: boolean;
+  issuesLabel: string;
+  warningsLabel: string;
+  draftLabel: string;
+  issues: string[];
+  warnings: string[];
+  draftPayload: unknown | null;
+  canQueue: boolean;
+  queueBusy: boolean;
+  queueLabel: string;
+  onQueue: () => void;
+  onClose: () => void;
+};
+
+type ProductSyncJobResponse = {
+  jobs?: Array<{ id: string; status: string }>;
+};
+
+type ProductSyncJobItem = {
+  id: string;
+  status: string;
+};
+
+type N11TaskResultResponse = {
+  jobId: string;
+  batchRequestId: string;
+  result: Record<string, unknown>;
 };
 
 type VariantGenerationState = Record<string, string>;
@@ -404,6 +527,148 @@ const PRODUCT_STATUS_OPTIONS = [
   { value: "ACTIVE", labelKey: "statusActive" },
   { value: "ARCHIVED", labelKey: "statusArchived" },
 ] as const;
+
+function renderSyncTrackingCard(data: SyncTrackingCardData, loadingLabel: string, cancelLabel: string) {
+  const toneClass = data.tone === "cyan"
+    ? "border-cyan-200 bg-cyan-50"
+    : "border-amber-200 bg-amber-50";
+  const labelClass = data.tone === "cyan"
+    ? "text-cyan-700"
+    : "text-amber-700";
+
+  return (
+    <div className={`mb-4 rounded-2xl border p-4 ${toneClass}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className={`text-xs font-semibold uppercase tracking-wide ${labelClass}`}>{data.label}</p>
+          <h3 className="mt-1 text-base font-semibold text-neutral-950">{data.title}</h3>
+          <p className="mt-1 text-sm text-neutral-700">
+            SKU: {data.sku} • {data.statusLabel}: {data.status}
+            {data.jobId ? ` • Job: ${data.jobId}` : ""}
+          </p>
+          {data.detailStatus || data.recommendedAction || data.lastCheckedAt ? (
+            <div className="mt-2 space-y-1 text-xs text-neutral-700">
+              {data.detailStatus ? <p>Task durumu: {data.detailStatus}</p> : null}
+              {data.recommendedAction ? <p>Önerilen aksiyon: {data.recommendedAction}</p> : null}
+              {data.lastCheckedAt ? <p>Son kontrol: {data.lastCheckedAt}</p> : null}
+            </div>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="secondary" disabled={data.busy} onClick={data.onRefresh}>
+            {data.busy ? loadingLabel : data.refreshLabel}
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={data.onClose}>
+            {cancelLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderPreflightCard(data: PreflightCardData, loadingLabel: string, cancelLabel: string) {
+  return (
+    <div className={`mb-4 rounded-2xl border p-4 ${data.ready ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{data.label}</p>
+          <h3 className="mt-1 text-base font-semibold text-neutral-950">{data.title}</h3>
+          <p className="mt-1 text-sm text-neutral-600">{data.summary}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {data.canQueue ? (
+            <Button type="button" size="sm" onClick={data.onQueue} disabled={data.queueBusy}>
+              {data.queueBusy ? loadingLabel : data.queueLabel}
+            </Button>
+          ) : null}
+          <Button type="button" variant="ghost" size="sm" onClick={data.onClose}>
+            {cancelLabel}
+          </Button>
+        </div>
+      </div>
+      {data.issues.length > 0 ? (
+        <div className="mt-3">
+          <p className="text-sm font-semibold text-amber-900">{data.issuesLabel}</p>
+          <ul className="mt-2 grid gap-1 text-sm text-amber-900">
+            {data.issues.map((item) => (
+              <li key={item}>- {item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {data.warnings.length > 0 ? (
+        <div className="mt-3">
+          <p className="text-sm font-semibold text-neutral-800">{data.warningsLabel}</p>
+          <ul className="mt-2 grid gap-1 text-sm text-neutral-700">
+            {data.warnings.map((item) => (
+              <li key={item}>- {item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {data.draftPayload ? (
+        <details className="mt-3 rounded-xl border border-neutral-200 bg-white/80 p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-neutral-800">{data.draftLabel}</summary>
+          <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-neutral-950 p-3 text-xs text-neutral-50">
+            {JSON.stringify(data.draftPayload, null, 2)}
+          </pre>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function readReason(value: unknown) {
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => readString(item))
+      .filter((item): item is string => Boolean(item));
+    return parts.length > 0 ? parts.join(" | ") : null;
+  }
+
+  return null;
+}
+
+function normalizeN11ActionHint(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  if (value.includes("CONFIG_NOT_FOUND") || value.includes("CONFIG_INCOMPLETE")) {
+    return "N11 bağlantı ayarlarını kontrol edin.";
+  }
+
+  if (value.includes("PRODUCT_NOT_FOUND")) {
+    return "Ürün kaydını kontrol edin.";
+  }
+
+  if (value.includes("STOCK_CODE_REQUIRED")) {
+    return "Stok kodunu tamamlayın.";
+  }
+
+  if (value.includes("TASK_ID_NOT_FOUND")) {
+    return "N11 task referansı oluşmadı; işi yeniden kuyruğa alın.";
+  }
+
+  if (value.toUpperCase().includes("FAIL")) {
+    return "N11 task sonucundaki hata nedenini inceleyin ve ürünü tekrar gönderin.";
+  }
+
+  return value;
+}
+
+async function readJsonSafely<T>(response: Response) {
+  return (await response.json().catch(() => null)) as T | null;
+}
 
 const UNIT_TYPE_OPTIONS = [
   { value: "PIECE", tr: "Adet", en: "Piece" },
@@ -434,7 +699,7 @@ function isVariantRowEmpty(variant: ProductVariant) {
   ].some((value) => value.trim());
 }
 
-function toPayload(form: ProductForm) {
+function toPayload(form: ProductForm, options: { includeVariants?: boolean } = {}) {
   const stockTrackingEnabled = form.productType === "SERVICE" ? false : form.stockTrackingEnabled;
   const compareAtPrice = form.compareAtPrice.trim() ? Number(form.compareAtPrice) : null;
   const mergedImages = Array.from(
@@ -520,8 +785,7 @@ function toPayload(form: ProductForm) {
     imageUrls,
     features,
     categoryId: form.categoryId || null,
-    attributeLinks,
-    variants,
+    ...(options.includeVariants ? { attributeLinks, variants } : {}),
   };
 }
 
@@ -724,6 +988,7 @@ export function ProductManager({
   const [loading, setLoading] = useState(false);
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [variantDrawerProduct, setVariantDrawerProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState(initialQuery.search);
   const [categoryFilter, setCategoryFilter] = useState(initialQuery.categoryId);
   const [statusFilter, setStatusFilter] = useState(initialQuery.status || "all");
@@ -738,17 +1003,27 @@ export function ProductManager({
   const [variantAxisQuery, setVariantAxisQuery] = useState("");
   const [variantGenerationValues, setVariantGenerationValues] = useState<VariantGenerationState>({});
   const [variantGenerationOpen, setVariantGenerationOpen] = useState(false);
+  const [openProductActionMenuId, setOpenProductActionMenuId] = useState<string | null>(null);
   const [importingCsv, setImportingCsv] = useState(false);
   const [importSummary, setImportSummary] = useState<string | null>(null);
   const [trendyolPreflightBusyId, setTrendyolPreflightBusyId] = useState<string | null>(null);
   const [trendyolPreflightResult, setTrendyolPreflightResult] = useState<TrendyolPreflightResult | null>(null);
   const [trendyolProductSyncBusyId, setTrendyolProductSyncBusyId] = useState<string | null>(null);
   const [trendyolProductSyncTracking, setTrendyolProductSyncTracking] = useState<TrendyolProductSyncTracking | null>(null);
+  const [n11PreflightBusyId, setN11PreflightBusyId] = useState<string | null>(null);
+  const [n11PreflightResult, setN11PreflightResult] = useState<N11PreflightResult | null>(null);
+  const [n11ProductSyncBusyId, setN11ProductSyncBusyId] = useState<string | null>(null);
+  const [n11ProductSyncTracking, setN11ProductSyncTracking] = useState<N11ProductSyncTracking | null>(null);
+  const [hepsiburadaPreflightBusyId, setHepsiburadaPreflightBusyId] = useState<string | null>(null);
+  const [hepsiburadaPreflightResult, setHepsiburadaPreflightResult] = useState<HepsiburadaPreflightResult | null>(null);
+  const [hepsiburadaProductSyncBusyId, setHepsiburadaProductSyncBusyId] = useState<string | null>(null);
+  const [hepsiburadaProductSyncTracking, setHepsiburadaProductSyncTracking] = useState<HepsiburadaProductSyncTracking | null>(null);
   const [brandOptions, setBrandOptions] = useState<Brand[]>(brands);
   const [supplierOptions, setSupplierOptions] = useState<Supplier[]>(suppliers);
   const [attributeDefinitionOptions, setAttributeDefinitionOptions] = useState<AttributeDefinition[]>(attributeDefinitions);
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
+  const productActionMenuRef = useRef<HTMLDivElement | null>(null);
   const variantActionMenuRef = useRef<HTMLDivElement | null>(null);
   const variantAxisPickerRef = useRef<HTMLDivElement | null>(null);
 
@@ -789,7 +1064,7 @@ export function ProductManager({
   const [createForm, setCreateForm] = useState<ProductForm>(emptyForm);
   const [editForm, setEditForm] = useState<ProductForm>(emptyForm);
 
-  const activeForm = drawerMode === "edit" ? editForm : createForm;
+  const activeForm = drawerMode === "edit" || drawerMode === "variants" || variantDrawerProduct ? editForm : createForm;
   const activeTitle = drawerMode === "edit" ? labels.edit : labels.createTitle;
   const activeSubmit = drawerMode === "edit" ? labels.save : labels.create;
   const isStockManaged = activeForm.stockTrackingEnabled && activeForm.productType !== "SERVICE";
@@ -832,6 +1107,23 @@ export function ProductManager({
     [editingId, initialResult.items],
   );
   const activeCurrency = currentEditingProduct?.currency ?? "TRY";
+
+  useEffect(() => {
+    if (!openProductActionMenuId) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!productActionMenuRef.current?.contains(event.target as Node)) {
+        setOpenProductActionMenuId(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [openProductActionMenuId]);
 
   useEffect(() => {
     if (openVariantActionMenuIndex === null) {
@@ -947,9 +1239,6 @@ export function ProductManager({
 
   function validateForm(form: ProductForm) {
     const requiresStock = form.stockTrackingEnabled && form.productType !== "SERVICE";
-    const activeVariantAxisIds = form.attributeLinks
-      .filter((link) => link.attributeDefinitionId && link.isVariantAxis)
-      .map((link) => link.attributeDefinitionId);
 
     if (!form.slug.trim() || !form.sku.trim() || !form.name.trim() || !form.description.trim() || !form.price.trim() || (requiresStock && !form.stock.trim()) || !form.vatRate.trim() || !form.imageUrl.trim()) {
       return labels.validationRequired;
@@ -989,6 +1278,14 @@ export function ProductManager({
       return labels.validationImageUrlsLimit;
     }
 
+    return null;
+  }
+
+  function validateVariantForm(form: ProductForm) {
+    const activeVariantAxisIds = form.attributeLinks
+      .filter((link) => link.attributeDefinitionId && link.isVariantAxis)
+      .map((link) => link.attributeDefinitionId);
+
     for (const variant of form.variants) {
       if (isVariantRowEmpty(variant)) {
         continue;
@@ -1015,7 +1312,7 @@ export function ProductManager({
   }
 
   function patchActiveForm(updater: (current: ProductForm) => ProductForm) {
-    if (drawerMode === "edit") {
+    if (drawerMode === "edit" || drawerMode === "variants" || variantDrawerProduct) {
       setEditForm((prev) => updater(prev));
       return;
     }
@@ -1068,11 +1365,8 @@ export function ProductManager({
     setDrawerMode("create");
   }
 
-  function openEditDrawer(product: Product) {
-    setError(null);
-    setImportSummary(null);
-    setEditingId(product.id);
-    setEditForm({
+  function buildProductForm(product: Product): ProductForm {
+    return {
       slug: product.slug,
       sku: product.sku,
       barcode: product.barcode ?? "",
@@ -1122,13 +1416,35 @@ export function ProductManager({
         sortOrder: String(variant.sortOrder ?? index),
         attributes: variant.attributes.map((attribute) => ({ ...attribute })),
       })) ?? [],
-    });
+    };
+  }
+
+  function openEditDrawer(product: Product) {
+    setError(null);
+    setImportSummary(null);
+    setEditingId(product.id);
+    setVariantDrawerProduct(null);
+    setEditForm(buildProductForm(product));
     setImageFiles([]);
     if (imageFileInputRef.current) {
       imageFileInputRef.current.value = "";
     }
     setDrawerFullscreen(false);
     setDrawerMode("edit");
+  }
+
+  function openVariantDrawer(product: Product) {
+    setError(null);
+    setImportSummary(null);
+    setEditingId(product.id);
+    setVariantDrawerProduct(product);
+    setEditForm(buildProductForm(product));
+    setVariantEditorIndex(null);
+    setVariantGenerationOpen(false);
+    setVariantAxisPickerOpen(false);
+    setOpenVariantActionMenuIndex(null);
+    setDrawerFullscreen(false);
+    setDrawerMode("variants");
   }
 
   function closeDrawer() {
@@ -1138,11 +1454,27 @@ export function ProductManager({
 
     setDrawerMode(null);
     setEditingId(null);
+    setVariantDrawerProduct(null);
     setImageFiles([]);
     if (imageFileInputRef.current) {
       imageFileInputRef.current.value = "";
     }
     setDrawerFullscreen(false);
+    setError(null);
+  }
+
+  function closeVariantDrawer(options: { force?: boolean } = {}) {
+    if (loading && !options.force) {
+      return;
+    }
+
+    setVariantDrawerProduct(null);
+    setEditingId(null);
+    setDrawerMode(null);
+    setVariantEditorIndex(null);
+    setVariantGenerationOpen(false);
+    setVariantAxisPickerOpen(false);
+    setOpenVariantActionMenuIndex(null);
     setError(null);
   }
 
@@ -1663,25 +1995,118 @@ export function ProductManager({
     }
   }
 
-  async function checkTrendyolPreflight(productId: string) {
-    setTrendyolPreflightBusyId(productId);
+  async function submitVariants(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const productId = variantDrawerProduct?.id ?? editingId;
+    const validationError = validateVariantForm(editForm);
+
+    if (!productId) {
+      setError(labels.opFailed);
+      return;
+    }
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/admin/integrations/marketplaces/products/${productId}/preflight`);
+      const payload = toPayload(editForm, { includeVariants: true });
+      const response = await fetch(`/api/admin/products/${productId}/variants`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          attributeLinks: payload.attributeLinks,
+          variants: payload.variants,
+        }),
+      });
 
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        const responsePayload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(responsePayload?.message ?? labels.opFailed);
+        return;
+      }
+
+      closeVariantDrawer({ force: true });
+      router.refresh();
+    } catch {
+      setError(labels.opFailed);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function checkTrendyolPreflight(productId: string) {
+    await runMarketplacePreflight({
+      productId,
+      channel: "TRENDYOL",
+      setBusyId: setTrendyolPreflightBusyId,
+      onSuccess: (payload) => setTrendyolPreflightResult(payload as TrendyolPreflightResult),
+    });
+  }
+
+  async function checkN11Preflight(productId: string) {
+    await runMarketplacePreflight({
+      productId,
+      channel: "N11",
+      setBusyId: setN11PreflightBusyId,
+      onSuccess: (payload) => setN11PreflightResult(payload as N11PreflightResult),
+    });
+  }
+
+  async function checkHepsiburadaPreflight(productId: string) {
+    await runMarketplacePreflight({
+      productId,
+      channel: "HEPSIBURADA",
+      setBusyId: setHepsiburadaPreflightBusyId,
+      onSuccess: (payload) => setHepsiburadaPreflightResult(payload as HepsiburadaPreflightResult),
+    });
+  }
+
+  async function refreshN11ProductSyncTracking(tracking: N11ProductSyncTracking) {
+    if (!tracking.jobId) {
+      await checkN11Preflight(tracking.productId);
+      return;
+    }
+
+    setN11PreflightBusyId(tracking.productId);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/integrations/jobs/${tracking.jobId}/n11-task`);
+
+      if (!response.ok) {
+        const payload = await readJsonSafely<{ message?: string }>(response);
         setError(payload?.message ?? labels.opFailed);
         return;
       }
 
-      const payload = await response.json() as TrendyolPreflightResult;
-      setTrendyolPreflightResult(payload);
+      const payload = await response.json() as N11TaskResultResponse;
+      const result = payload.result ?? {};
+      const detailStatus = readString(result.status);
+      const reason = readReason((result as { reasons?: unknown }).reasons)
+        ?? readReason((result as { reason?: unknown }).reason)
+        ?? readReason((result as { message?: unknown }).message);
+
+      setN11ProductSyncTracking((current) => current && current.productId === tracking.productId
+        ? {
+            ...current,
+            status: detailStatus?.toUpperCase().includes("FAIL") ? "FAILED" : current.status,
+            taskId: payload.batchRequestId,
+            detailStatus,
+            recommendedAction: normalizeN11ActionHint(reason ?? detailStatus),
+            lastCheckedAt: new Date().toLocaleString("tr-TR"),
+          }
+        : current);
     } catch {
       setError(labels.opFailed);
     } finally {
-      setTrendyolPreflightBusyId(null);
+      setN11PreflightBusyId(null);
     }
   }
 
@@ -1690,7 +2115,108 @@ export function ProductManager({
       return;
     }
 
-    setTrendyolProductSyncBusyId(result.productId);
+    await queueMarketplaceProductSync({
+      channel: "TRENDYOL",
+      productId: result.productId,
+      sku: result.sku,
+      setBusyId: setTrendyolProductSyncBusyId,
+      onSuccess: (job) => {
+        setTrendyolProductSyncTracking({
+          productId: result.productId,
+          productTitle: result.title,
+          sku: result.sku,
+          jobId: job?.id ?? null,
+          status: job?.status ?? "PENDING",
+        });
+        setImportSummary(labels.trendyolProductSyncQueued);
+      },
+    });
+  }
+
+  async function queueN11ProductSync(result: N11PreflightResult) {
+    if (!result.readyForN11ProductUpdate) {
+      return;
+    }
+
+    await queueMarketplaceProductSync({
+      channel: "N11",
+      productId: result.productId,
+      sku: result.sku,
+      setBusyId: setN11ProductSyncBusyId,
+      onSuccess: (job) => {
+        setN11ProductSyncTracking({
+          productId: result.productId,
+          sku: result.sku,
+          jobId: job?.id ?? null,
+          status: job?.status ?? "PENDING",
+          taskId: null,
+          detailStatus: null,
+          recommendedAction: null,
+          lastCheckedAt: null,
+        });
+        setImportSummary(labels.n11ProductSyncQueued);
+      },
+    });
+  }
+
+  async function queueHepsiburadaProductSync(result: HepsiburadaPreflightResult) {
+    if (!result.readyForHepsiburadaProductUpdate) {
+      return;
+    }
+
+    await queueMarketplaceProductSync({
+      channel: "HEPSIBURADA",
+      productId: result.productId,
+      sku: result.hbSku,
+      setBusyId: setHepsiburadaProductSyncBusyId,
+      onSuccess: (job) => {
+        setHepsiburadaProductSyncTracking({
+          productId: result.productId,
+          hbSku: result.hbSku,
+          jobId: job?.id ?? null,
+          status: job?.status ?? "PENDING",
+        });
+        setImportSummary(labels.hepsiburadaProductSyncQueued);
+      },
+    });
+  }
+
+  async function runMarketplacePreflight(args: {
+    productId: string;
+    channel: "TRENDYOL" | "N11" | "HEPSIBURADA";
+    setBusyId: (value: string | null) => void;
+    onSuccess: (payload: TrendyolPreflightResult | N11PreflightResult | HepsiburadaPreflightResult) => void;
+  }) {
+    args.setBusyId(args.productId);
+    setError(null);
+
+    try {
+      const query = args.channel === "TRENDYOL" ? "" : `?channel=${args.channel}`;
+      const response = await fetch(`/api/admin/integrations/marketplaces/products/${args.productId}/preflight${query}`);
+
+      if (!response.ok) {
+        const payload = await readJsonSafely<{ message?: string }>(response);
+        setError(payload?.message ?? labels.opFailed);
+        return;
+      }
+
+      const payload = await response.json() as TrendyolPreflightResult | N11PreflightResult | HepsiburadaPreflightResult;
+      args.onSuccess(payload);
+    } catch {
+      setError(labels.opFailed);
+    } finally {
+      args.setBusyId(null);
+    }
+  }
+
+  async function queueMarketplaceProductSync(args: {
+    channel: "TRENDYOL" | "N11" | "HEPSIBURADA";
+    productId: string;
+    sku: string;
+    setBusyId: (value: string | null) => void;
+    onSuccess: (job: ProductSyncJobItem | null) => void;
+  }) {
+    args.setBusyId(args.productId);
     setError(null);
     setImportSummary(null);
 
@@ -1701,39 +2227,31 @@ export function ProductManager({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          channel: "TRENDYOL",
+          channel: args.channel,
           jobType: "PRODUCT_SYNC",
           entityType: "PRODUCT",
-          entityIds: [result.productId],
+          entityIds: [args.productId],
           maxAttempts: 3,
-          idempotencySuffix: `${result.sku}:${new Date().toISOString()}`,
+          idempotencySuffix: `${args.sku}:${new Date().toISOString()}`,
           payload: {
             trigger: "PRODUCT_UPDATE",
-            reference: result.sku,
+            reference: args.sku,
           },
         }),
       });
 
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        const payload = await readJsonSafely<{ message?: string }>(response);
         setError(payload?.message ?? labels.opFailed);
         return;
       }
 
-      const payload = await response.json() as { jobs?: Array<{ id: string; status: string }> };
-      const job = payload.jobs?.[0] ?? null;
-      setTrendyolProductSyncTracking({
-        productId: result.productId,
-        productTitle: result.title,
-        sku: result.sku,
-        jobId: job?.id ?? null,
-        status: job?.status ?? "PENDING",
-      });
-      setImportSummary(labels.trendyolProductSyncQueued);
+      const payload = await response.json() as ProductSyncJobResponse;
+      args.onSuccess(payload.jobs?.[0] ?? null);
     } catch {
       setError(labels.opFailed);
     } finally {
-      setTrendyolProductSyncBusyId(null);
+      args.setBusyId(null);
     }
   }
 
@@ -1814,98 +2332,108 @@ export function ProductManager({
       <div className="p-5">
         {error ? <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p> : null}
         {importSummary ? <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">{importSummary}</p> : null}
-        {trendyolProductSyncTracking ? (
-          <div className="mb-4 rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">{labels.trendyolProductSyncTracking}</p>
-                <h3 className="mt-1 text-base font-semibold text-neutral-950">{trendyolProductSyncTracking.productTitle}</h3>
-                <p className="mt-1 text-sm text-neutral-700">
-                  SKU: {trendyolProductSyncTracking.sku} • {labels.trendyolProductSyncJobStatus}: {trendyolProductSyncTracking.status}
-                  {trendyolProductSyncTracking.jobId ? ` • Job: ${trendyolProductSyncTracking.jobId}` : ""}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={trendyolPreflightBusyId === trendyolProductSyncTracking.productId}
-                  onClick={() => void checkTrendyolPreflight(trendyolProductSyncTracking.productId)}
-                >
-                  {trendyolPreflightBusyId === trendyolProductSyncTracking.productId ? labels.loading : labels.trendyolProductSyncCheckAgain}
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setTrendyolProductSyncTracking(null)}>
-                  {labels.cancel}
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-        {trendyolPreflightResult ? (
-          <div className={`mb-4 rounded-2xl border p-4 ${
-            trendyolPreflightResult.readyForTrendyolProductV2
-              ? "border-emerald-200 bg-emerald-50"
-              : "border-amber-200 bg-amber-50"
-          }`}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{labels.trendyolPreflight}</p>
-                <h3 className="mt-1 text-base font-semibold text-neutral-950">{trendyolPreflightResult.title}</h3>
-                <p className="mt-1 text-sm text-neutral-600">
-                  {trendyolPreflightResult.readyForTrendyolProductV2 ? labels.trendyolPreflightReady : labels.trendyolPreflightBlocked}
-                  {" "}SKU: {trendyolPreflightResult.sku} • Varyant: {trendyolPreflightResult.variantCount} • Mapping: {trendyolPreflightResult.mappedAttributeValueCount}
-                  {trendyolPreflightResult.productV2DraftPayload ? ` • Payload item: ${trendyolPreflightResult.productV2DraftPayload.items.length}` : ""}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {trendyolPreflightResult.readyForTrendyolProductV2 && canManageIntegrations ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => void queueTrendyolProductSync(trendyolPreflightResult)}
-                    disabled={trendyolProductSyncBusyId === trendyolPreflightResult.productId}
-                  >
-                    {trendyolProductSyncBusyId === trendyolPreflightResult.productId ? labels.loading : labels.trendyolQueueProductSync}
-                  </Button>
-                ) : null}
-                <Button type="button" variant="ghost" size="sm" onClick={() => setTrendyolPreflightResult(null)}>
-                  {labels.cancel}
-                </Button>
-              </div>
-            </div>
-            {trendyolPreflightResult.blockingIssues.length > 0 ? (
-              <div className="mt-3">
-                <p className="text-sm font-semibold text-amber-900">{labels.trendyolPreflightIssues}</p>
-                <ul className="mt-2 grid gap-1 text-sm text-amber-900">
-                  {trendyolPreflightResult.blockingIssues.map((item) => (
-                    <li key={item}>- {item}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {trendyolPreflightResult.warnings.length > 0 ? (
-              <div className="mt-3">
-                <p className="text-sm font-semibold text-neutral-800">{labels.trendyolPreflightWarnings}</p>
-                <ul className="mt-2 grid gap-1 text-sm text-neutral-700">
-                  {trendyolPreflightResult.warnings.map((item) => (
-                    <li key={item}>- {item}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {trendyolPreflightResult.productV2DraftPayload ? (
-              <details className="mt-3 rounded-xl border border-neutral-200 bg-white/80 p-3">
-                <summary className="cursor-pointer text-sm font-semibold text-neutral-800">
-                  {labels.trendyolDraftPayload}
-                </summary>
-                <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-neutral-950 p-3 text-xs text-neutral-50">
-                  {JSON.stringify(trendyolPreflightResult.productV2DraftPayload, null, 2)}
-                </pre>
-              </details>
-            ) : null}
-          </div>
-        ) : null}
+        {trendyolProductSyncTracking ? renderSyncTrackingCard({
+          tone: "cyan",
+          label: labels.trendyolProductSyncTracking,
+          title: trendyolProductSyncTracking.productTitle,
+          sku: trendyolProductSyncTracking.sku,
+          statusLabel: labels.trendyolProductSyncJobStatus,
+          status: trendyolProductSyncTracking.status,
+          jobId: trendyolProductSyncTracking.jobId,
+          detailStatus: null,
+          recommendedAction: null,
+          lastCheckedAt: null,
+          productId: trendyolProductSyncTracking.productId,
+          busy: trendyolPreflightBusyId === trendyolProductSyncTracking.productId,
+          refreshLabel: labels.trendyolProductSyncCheckAgain,
+          onRefresh: () => void checkTrendyolPreflight(trendyolProductSyncTracking.productId),
+          onClose: () => setTrendyolProductSyncTracking(null),
+        }, labels.loading, labels.cancel) : null}
+        {n11ProductSyncTracking ? renderSyncTrackingCard({
+          tone: "amber",
+          label: labels.n11ProductSyncTracking,
+          title: n11ProductSyncTracking.sku,
+          sku: n11ProductSyncTracking.sku,
+          statusLabel: labels.n11ProductSyncJobStatus,
+          status: n11ProductSyncTracking.status,
+          jobId: n11ProductSyncTracking.jobId,
+          detailStatus: n11ProductSyncTracking.detailStatus,
+          recommendedAction: n11ProductSyncTracking.recommendedAction,
+          lastCheckedAt: n11ProductSyncTracking.lastCheckedAt,
+          productId: n11ProductSyncTracking.productId,
+          busy: n11PreflightBusyId === n11ProductSyncTracking.productId,
+          refreshLabel: labels.n11ProductSyncCheckAgain,
+          onRefresh: () => void refreshN11ProductSyncTracking(n11ProductSyncTracking),
+          onClose: () => setN11ProductSyncTracking(null),
+        }, labels.loading, labels.cancel) : null}
+        {hepsiburadaProductSyncTracking ? renderSyncTrackingCard({
+          tone: "cyan",
+          label: labels.hepsiburadaProductSyncTracking,
+          title: hepsiburadaProductSyncTracking.hbSku,
+          sku: hepsiburadaProductSyncTracking.hbSku,
+          statusLabel: labels.hepsiburadaProductSyncJobStatus,
+          status: hepsiburadaProductSyncTracking.status,
+          jobId: hepsiburadaProductSyncTracking.jobId,
+          detailStatus: null,
+          recommendedAction: null,
+          lastCheckedAt: null,
+          productId: hepsiburadaProductSyncTracking.productId,
+          busy: hepsiburadaPreflightBusyId === hepsiburadaProductSyncTracking.productId,
+          refreshLabel: labels.hepsiburadaProductSyncCheckAgain,
+          onRefresh: () => void checkHepsiburadaPreflight(hepsiburadaProductSyncTracking.productId),
+          onClose: () => setHepsiburadaProductSyncTracking(null),
+        }, labels.loading, labels.cancel) : null}
+        {trendyolPreflightResult ? renderPreflightCard({
+          label: labels.trendyolPreflight,
+          title: trendyolPreflightResult.title,
+          summary: `${trendyolPreflightResult.readyForTrendyolProductV2 ? labels.trendyolPreflightReady : labels.trendyolPreflightBlocked} SKU: ${trendyolPreflightResult.sku} • Varyant: ${trendyolPreflightResult.variantCount} • Mapping: ${trendyolPreflightResult.mappedAttributeValueCount}${trendyolPreflightResult.productV2DraftPayload ? ` • Payload item: ${trendyolPreflightResult.productV2DraftPayload.items.length}` : ""}`,
+          ready: trendyolPreflightResult.readyForTrendyolProductV2,
+          issuesLabel: labels.trendyolPreflightIssues,
+          warningsLabel: labels.trendyolPreflightWarnings,
+          draftLabel: labels.trendyolDraftPayload,
+          issues: trendyolPreflightResult.blockingIssues,
+          warnings: trendyolPreflightResult.warnings,
+          draftPayload: trendyolPreflightResult.productV2DraftPayload,
+          canQueue: trendyolPreflightResult.readyForTrendyolProductV2 && canManageIntegrations,
+          queueBusy: trendyolProductSyncBusyId === trendyolPreflightResult.productId,
+          queueLabel: labels.trendyolQueueProductSync,
+          onQueue: () => void queueTrendyolProductSync(trendyolPreflightResult),
+          onClose: () => setTrendyolPreflightResult(null),
+        }, labels.loading, labels.cancel) : null}
+        {n11PreflightResult ? renderPreflightCard({
+          label: labels.n11Preflight,
+          title: n11PreflightResult.sku,
+          summary: `${n11PreflightResult.readyForN11ProductUpdate ? labels.n11PreflightReady : labels.n11PreflightBlocked} SKU: ${n11PreflightResult.sku} • KDV: %${n11PreflightResult.vatRate} • Açıklama: ${n11PreflightResult.descriptionLength} karakter${n11PreflightResult.draftPayload ? ` • Payload item: ${n11PreflightResult.draftPayload.payload.skus.length}` : ""}`,
+          ready: n11PreflightResult.readyForN11ProductUpdate,
+          issuesLabel: labels.n11PreflightIssues,
+          warningsLabel: labels.n11PreflightWarnings,
+          draftLabel: labels.n11DraftPayload,
+          issues: n11PreflightResult.blockingIssues,
+          warnings: n11PreflightResult.warnings,
+          draftPayload: n11PreflightResult.draftPayload,
+          canQueue: n11PreflightResult.readyForN11ProductUpdate && canManageIntegrations,
+          queueBusy: n11ProductSyncBusyId === n11PreflightResult.productId,
+          queueLabel: labels.n11QueueProductSync,
+          onQueue: () => void queueN11ProductSync(n11PreflightResult),
+          onClose: () => setN11PreflightResult(null),
+        }, labels.loading, labels.cancel) : null}
+        {hepsiburadaPreflightResult ? renderPreflightCard({
+          label: labels.hepsiburadaPreflight,
+          title: hepsiburadaPreflightResult.hbSku,
+          summary: `${hepsiburadaPreflightResult.readyForHepsiburadaProductUpdate ? labels.hepsiburadaPreflightReady : labels.hepsiburadaPreflightBlocked} hbSku: ${hepsiburadaPreflightResult.hbSku} • Görsel: ${hepsiburadaPreflightResult.imageCount} • Açıklama: ${hepsiburadaPreflightResult.descriptionLength} karakter${hepsiburadaPreflightResult.draftPayload ? ` • Payload item: ${hepsiburadaPreflightResult.draftPayload.items.length}` : ""}`,
+          ready: hepsiburadaPreflightResult.readyForHepsiburadaProductUpdate,
+          issuesLabel: labels.hepsiburadaPreflightIssues,
+          warningsLabel: labels.hepsiburadaPreflightWarnings,
+          draftLabel: labels.hepsiburadaDraftPayload,
+          issues: hepsiburadaPreflightResult.blockingIssues,
+          warnings: hepsiburadaPreflightResult.warnings,
+          draftPayload: hepsiburadaPreflightResult.draftPayload,
+          canQueue: hepsiburadaPreflightResult.readyForHepsiburadaProductUpdate && canManageIntegrations,
+          queueBusy: hepsiburadaProductSyncBusyId === hepsiburadaPreflightResult.productId,
+          queueLabel: labels.hepsiburadaQueueProductSync,
+          onQueue: () => void queueHepsiburadaProductSync(hepsiburadaPreflightResult),
+          onClose: () => setHepsiburadaPreflightResult(null),
+        }, labels.loading, labels.cancel) : null}
         <p className="mb-4 text-sm text-neutral-500">{labels.importHint}</p>
         <form className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_220px_220px_220px_220px_auto]" onSubmit={applyFilters}>
           <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={labels.search} />
@@ -1965,12 +2493,13 @@ export function ProductManager({
         </form>
 
         <div className="overflow-hidden rounded-xl border border-neutral-200">
-          <div className="hidden grid-cols-[80px_1.15fr_1fr_1fr_160px_180px_140px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+          <div className="hidden grid-cols-[80px_1.15fr_1fr_1fr_150px_160px_180px_140px_80px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
             <span>Görsel</span>
             <span>{labels.name}</span>
             <span>{labels.brand}</span>
             <span>{labels.category}</span>
             <span>{labels.price}</span>
+            <span>{labels.variantsTitle}</span>
             <span>{labels.statusLabel}</span>
             <span>{labels.stockStatus}</span>
             <span className="text-right">İşlem</span>
@@ -1981,7 +2510,7 @@ export function ProductManager({
           ) : (
             <div className="divide-y divide-neutral-200">
               {initialResult.items.map((product) => (
-                <article key={product.id} className="grid gap-4 p-4 lg:grid-cols-[80px_1.15fr_1fr_1fr_160px_180px_140px_190px] lg:items-center">
+                <article key={product.id} className="grid gap-4 p-4 lg:grid-cols-[80px_1.15fr_1fr_1fr_150px_160px_180px_140px_80px] lg:items-center">
                   <div className="h-20 w-20 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
@@ -2002,6 +2531,22 @@ export function ProductManager({
                     {product.compareAtPrice ? (
                       <p className="text-xs text-neutral-500 line-through">{formatPrice(product.compareAtPrice, product.currency, locale)}</p>
                     ) : null}
+                  </div>
+                  <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm">
+                    <p className={`font-medium ${product.variantCount > 0 ? "text-neutral-950" : "text-amber-700"}`}>
+                      {product.variantCount > 0 ? `${product.variantCount} varyant` : "Varyant yok"}
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-500">{product.variantAxisCount} eksen</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={product.variantCount > 0 ? "secondary" : "outline"}
+                      disabled={loading}
+                      onClick={() => openVariantDrawer(product)}
+                      className="mt-2 w-full"
+                    >
+                      {product.variantCount > 0 ? "Yönet" : "Tanımla"}
+                    </Button>
                   </div>
                   <p className="text-sm font-medium text-neutral-700">
                     {product.status === "DRAFT" ? labels.statusDraft : product.status === "ARCHIVED" ? labels.statusArchived : labels.statusActive}
@@ -2030,23 +2575,89 @@ export function ProductManager({
                       {labels.lastOrderedAt}: {product.lastOrderedAt ? formatDate(product.lastOrderedAt, locale) : labels.notSpecified}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <div ref={openProductActionMenuId === product.id ? productActionMenuRef : null} className="relative flex justify-start lg:justify-end">
                     <Button
                       type="button"
-                      size="sm"
+                      size="icon"
                       variant="secondary"
-                      disabled={trendyolPreflightBusyId === product.id}
-                      onClick={() => void checkTrendyolPreflight(product.id)}
+                      disabled={loading && openProductActionMenuId !== product.id}
+                      onClick={() => setOpenProductActionMenuId((current) => current === product.id ? null : product.id)}
+                      aria-label="İşlemler"
+                      title="İşlemler"
                     >
-                      {trendyolPreflightBusyId === product.id ? labels.loading : labels.trendyolPreflight}
+                      <MoreHorizontal className="h-4 w-4" />
                     </Button>
-                    <Button type="button" size="sm" variant="secondary" disabled={loading} onClick={() => openEditDrawer(product)}>
-                      {labels.edit}
-                    </Button>
-                    {canDelete ? (
-                      <Button type="button" size="sm" variant="destructive" disabled={loading} onClick={() => deleteProduct(product.id)}>
-                        {labels.delete}
-                      </Button>
+                    {openProductActionMenuId === product.id ? (
+                      <div className="absolute right-auto top-11 z-10 min-w-48 rounded-xl border border-neutral-200 bg-white p-2 shadow-xl lg:right-0">
+                        <button
+                          type="button"
+                          disabled={trendyolPreflightBusyId === product.id}
+                          onClick={() => {
+                            setOpenProductActionMenuId(null);
+                            void checkTrendyolPreflight(product.id);
+                          }}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {trendyolPreflightBusyId === product.id ? labels.loading : labels.trendyolPreflight}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={n11PreflightBusyId === product.id}
+                          onClick={() => {
+                            setOpenProductActionMenuId(null);
+                            void checkN11Preflight(product.id);
+                          }}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {n11PreflightBusyId === product.id ? labels.loading : labels.n11Preflight}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={hepsiburadaPreflightBusyId === product.id}
+                          onClick={() => {
+                            setOpenProductActionMenuId(null);
+                            void checkHepsiburadaPreflight(product.id);
+                          }}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {hepsiburadaPreflightBusyId === product.id ? labels.loading : labels.hepsiburadaPreflight}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() => {
+                            setOpenProductActionMenuId(null);
+                            openEditDrawer(product);
+                          }}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {labels.edit}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() => {
+                            setOpenProductActionMenuId(null);
+                            openVariantDrawer(product);
+                          }}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {labels.variantsTitle}
+                        </button>
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => {
+                              setOpenProductActionMenuId(null);
+                              void deleteProduct(product.id);
+                            }}
+                            className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {labels.delete}
+                          </button>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 </article>
@@ -2071,6 +2682,7 @@ export function ProductManager({
       {drawerMode ? (
         <div className="fixed inset-0 z-50">
           <button type="button" aria-label={labels.cancel} className="absolute inset-0 bg-black/30" onClick={closeDrawer} />
+          {drawerMode !== "variants" ? (
           <aside className={`absolute right-0 top-0 flex h-full w-full flex-col overflow-y-auto border-l border-neutral-200 bg-white shadow-2xl ${drawerFullscreen ? "max-w-none" : "max-w-xl"}`}>
             <div className="flex items-start justify-between border-b border-neutral-200 p-5">
               <div>
@@ -2456,206 +3068,6 @@ export function ProductManager({
                 </div>
               </section>
 
-              <section className="grid gap-4 rounded-2xl border border-neutral-200 bg-white p-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Variant Master Data</p>
-                  <h4 className="mt-1 text-base font-semibold text-neutral-950">{labels.attributesTitle}</h4>
-                  <p className="mt-1 text-sm text-neutral-500">{labels.variantAxesHint}</p>
-                  <Link href={`/${locale}/admin/product-attributes`} className="mt-2 inline-flex text-sm font-medium text-neutral-700 underline underline-offset-4">
-                    {labels.manageAttributeDefinitions}
-                  </Link>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label>{labels.variantAxes}</Label>
-                  <div ref={variantAxisPickerRef} className="grid gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setVariantAxisPickerOpen((current) => !current)}
-                      className="flex min-h-11 w-full items-center justify-between rounded-2xl border border-neutral-300 bg-white px-3 py-2 text-left text-sm"
-                    >
-                      <span className={selectedVariantAxisDefinitions.length > 0 ? "text-neutral-950" : "text-neutral-400"}>
-                        {selectedVariantAxisDefinitions.length > 0
-                          ? `${selectedVariantAxisDefinitions.map((item) => item.name).join(", ")}`
-                          : labels.variantAxesHint}
-                      </span>
-                      <span className="text-xs font-medium text-neutral-500">
-                        {selectedVariantAxisDefinitions.length > 0 ? `${selectedVariantAxisDefinitions.length}` : "Sec"}
-                      </span>
-                    </button>
-
-                    {selectedVariantAxisDefinitions.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedVariantAxisDefinitions.map((definition) => (
-                          <button
-                            key={`selected-axis-${definition.id}`}
-                            type="button"
-                            onClick={() => toggleAttributeAxis(definition.id)}
-                            className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900"
-                          >
-                            <span>{definition.name}</span>
-                            <span aria-hidden="true">x</span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {variantAxisPickerOpen ? (
-                      <div className="rounded-2xl border border-neutral-200 bg-white p-3 shadow-xl">
-                        <Input
-                          value={variantAxisQuery}
-                          onChange={(event) => setVariantAxisQuery(event.target.value)}
-                          placeholder={labels.search}
-                          className="h-10"
-                        />
-                        <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
-                          {filteredVariantAxisOptions.length === 0 ? (
-                            <p className="px-2 py-3 text-sm text-neutral-500">{labels.empty}</p>
-                          ) : filteredVariantAxisOptions.map((definition) => {
-                            const active = activeForm.attributeLinks.some((item) => item.attributeDefinitionId === definition.id);
-                            return (
-                              <label
-                                key={definition.id}
-                                className={`flex items-start gap-3 rounded-xl border px-3 py-2 text-sm ${active ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-neutral-200 bg-neutral-50 text-neutral-700"}`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={active}
-                                  onChange={() => toggleAttributeAxis(definition.id)}
-                                  className={`${checkboxClassName} mt-0.5`}
-                                />
-                                <span className="min-w-0">
-                                  <span className="block font-medium">{definition.name}</span>
-                                  <span className="block text-xs text-neutral-500">{definition.slug}</span>
-                                </span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="grid gap-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <Label>{labels.variantsTitle}</Label>
-                      <p className="text-xs text-neutral-500">{labels.variantsHint}</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={openVariantGenerationModal}>
-                        {labels.generateVariants}
-                      </Button>
-                      <Button type="button" size="sm" variant="secondary" onClick={addVariantRow}>
-                        {labels.addVariant}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {activeForm.variants.length === 0 ? (
-                    <p className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-3 py-4 text-sm text-neutral-500">{labels.variantEmptyState}</p>
-                  ) : null}
-
-                  {activeForm.variants.length > 0 ? (
-                    <div className="overflow-x-auto rounded-2xl border border-neutral-200">
-                      <table className="min-w-full divide-y divide-neutral-200 bg-white text-sm">
-                        <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
-                          <tr>
-                            <th className="px-3 py-2 font-medium">{labels.variantTitle}</th>
-                            <th className="px-3 py-2 font-medium">{labels.sku}</th>
-                            <th className="px-3 py-2 font-medium">{labels.price}</th>
-                            <th className="px-3 py-2 font-medium">{labels.statusLabel}</th>
-                            <th className="px-3 py-2 text-right font-medium">
-                              <span className="sr-only">{labels.variantDetails}</span>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-neutral-200">
-                          {activeForm.variants.map((variant, index) => (
-                            <tr key={`variant-${index}`} className="align-top">
-                              <td className="px-3 py-3">
-                                <div className="space-y-1">
-                                  <p className="font-medium text-neutral-950">
-                                    {variant.title || `${labels.variantTitle} ${index + 1}`}
-                                  </p>
-                                  <p className="text-xs text-neutral-500">
-                                    {variant.optionSummary || labels.variantsHint}
-                                  </p>
-                                </div>
-                              </td>
-                              <td className="px-3 py-3 text-neutral-600">
-                                <div>{variant.sku || labels.sku}</div>
-                                <div className="text-xs text-neutral-400">{variant.slug || labels.slug}</div>
-                              </td>
-                              <td className="px-3 py-3 text-neutral-600">
-                                {variant.priceOverride.trim()
-                                  ? formatPrice(Number(variant.priceOverride), activeCurrency, locale)
-                                  : labels.notSpecified}
-                              </td>
-                              <td className="px-3 py-3">
-                                <div className="flex flex-wrap gap-2">
-                                  {variant.isDefault ? (
-                                    <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-900">{labels.variantDefault}</span>
-                                  ) : null}
-                                  {variant.stockOverride.trim() ? (
-                                    <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700">
-                                      {labels.stock}: {variant.stockOverride.trim()}
-                                    </span>
-                                  ) : null}
-                                  {!variant.salesEnabled ? (
-                                    <span className="rounded-full bg-neutral-200 px-2 py-1 text-xs font-medium text-neutral-700">{labels.outOfStock}</span>
-                                  ) : null}
-                                  {variant.salesEnabled && !variant.isDefault ? (
-                                    <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-700">{labels.statusActive}</span>
-                                  ) : null}
-                                </div>
-                              </td>
-                              <td className="px-3 py-3">
-                                <div ref={openVariantActionMenuIndex === index ? variantActionMenuRef : null} className="relative flex justify-end">
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="secondary"
-                                    onClick={() => setOpenVariantActionMenuIndex((current) => current === index ? null : index)}
-                                  >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                  {openVariantActionMenuIndex === index ? (
-                                    <div className="absolute right-0 top-11 z-10 min-w-40 rounded-xl border border-neutral-200 bg-white p-2 shadow-xl">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          openVariantEditor(index);
-                                          setOpenVariantActionMenuIndex(null);
-                                        }}
-                                        className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
-                                      >
-                                        {labels.variantDetails}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          removeVariantRow(index);
-                                          setOpenVariantActionMenuIndex(null);
-                                        }}
-                                        className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
-                                      >
-                                        {labels.delete}
-                                      </button>
-                                    </div>
-                                  ) : null}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : null}
-                </div>
-              </section>
-
               <div className="grid gap-2">
                 <Label>{labels.features}</Label>
                 <div className="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
@@ -2796,6 +3208,250 @@ export function ProductManager({
               </div>
             </form>
           </aside>
+          ) : (
+            <aside className={`absolute right-0 top-0 flex h-full w-full flex-col overflow-y-auto border-l border-neutral-200 bg-white shadow-2xl ${drawerFullscreen ? "max-w-none" : "max-w-5xl"}`}>
+              <div className="flex items-start justify-between border-b border-neutral-200 p-5">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.variantsTitle}</p>
+                  <h3 className="mt-1 text-xl font-semibold tracking-tight">{variantDrawerProduct?.name ?? labels.variantsTitle}</h3>
+                  <p className="mt-1 text-sm text-neutral-500">{labels.variantsHint}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setDrawerFullscreen((prev) => !prev)}
+                    disabled={loading}
+                    aria-label={drawerFullscreen ? "Daralt" : "Tam ekran"}
+                    title={drawerFullscreen ? "Daralt" : "Tam ekran"}
+                  >
+                    {drawerFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+                  </Button>
+                  <Button type="button" size="icon" variant="ghost" onClick={closeDrawer} disabled={loading}>
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+
+              <form className="grid gap-5 p-5" onSubmit={submitVariants}>
+                <section className="grid gap-4 rounded-2xl border border-neutral-200 bg-white p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Varyant Tanımı</p>
+                      <h4 className="mt-1 text-base font-semibold text-neutral-950">{labels.attributesTitle}</h4>
+                      <p className="mt-1 text-sm text-neutral-500">{labels.variantAxesHint}</p>
+                      <Link href={`/${locale}/admin/product-attributes`} className="mt-2 inline-flex text-sm font-medium text-neutral-700 underline underline-offset-4">
+                        {labels.manageAttributeDefinitions}
+                      </Link>
+                    </div>
+                    <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-600">
+                      <p className="font-semibold text-neutral-950">{variantDrawerProduct?.sku ?? activeForm.sku}</p>
+                      <p className="mt-1 text-xs">{activeForm.variants.length} varyant • {selectedVariantAxisDefinitions.length} eksen</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>{labels.variantAxes}</Label>
+                    <div ref={variantAxisPickerRef} className="grid gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setVariantAxisPickerOpen((current) => !current)}
+                        className="flex min-h-11 w-full items-center justify-between rounded-2xl border border-neutral-300 bg-white px-3 py-2 text-left text-sm"
+                      >
+                        <span className={selectedVariantAxisDefinitions.length > 0 ? "text-neutral-950" : "text-neutral-400"}>
+                          {selectedVariantAxisDefinitions.length > 0
+                            ? `${selectedVariantAxisDefinitions.map((item) => item.name).join(", ")}`
+                            : labels.variantAxesHint}
+                        </span>
+                        <span className="text-xs font-medium text-neutral-500">
+                          {selectedVariantAxisDefinitions.length > 0 ? `${selectedVariantAxisDefinitions.length}` : "Sec"}
+                        </span>
+                      </button>
+
+                      {selectedVariantAxisDefinitions.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {selectedVariantAxisDefinitions.map((definition) => (
+                            <button
+                              key={`selected-axis-${definition.id}`}
+                              type="button"
+                              onClick={() => toggleAttributeAxis(definition.id)}
+                              className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900"
+                            >
+                              <span>{definition.name}</span>
+                              <span aria-hidden="true">x</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {variantAxisPickerOpen ? (
+                        <div className="rounded-2xl border border-neutral-200 bg-white p-3 shadow-xl">
+                          <Input
+                            value={variantAxisQuery}
+                            onChange={(event) => setVariantAxisQuery(event.target.value)}
+                            placeholder={labels.search}
+                            className="h-10"
+                          />
+                          <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
+                            {filteredVariantAxisOptions.length === 0 ? (
+                              <p className="px-2 py-3 text-sm text-neutral-500">{labels.empty}</p>
+                            ) : filteredVariantAxisOptions.map((definition) => {
+                              const active = activeForm.attributeLinks.some((item) => item.attributeDefinitionId === definition.id);
+                              return (
+                                <label
+                                  key={definition.id}
+                                  className={`flex items-start gap-3 rounded-xl border px-3 py-2 text-sm ${active ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-neutral-200 bg-neutral-50 text-neutral-700"}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={active}
+                                    onChange={() => toggleAttributeAxis(definition.id)}
+                                    className={`${checkboxClassName} mt-0.5`}
+                                  />
+                                  <span className="min-w-0">
+                                    <span className="block font-medium">{definition.name}</span>
+                                    <span className="block text-xs text-neutral-500">{definition.slug}</span>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <Label>{labels.variantsTitle}</Label>
+                        <p className="text-xs text-neutral-500">{labels.variantsHint}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={openVariantGenerationModal}>
+                          {labels.generateVariants}
+                        </Button>
+                        <Button type="button" size="sm" variant="secondary" onClick={addVariantRow}>
+                          {labels.addVariant}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {activeForm.variants.length === 0 ? (
+                      <p className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-3 py-4 text-sm text-neutral-500">{labels.variantEmptyState}</p>
+                    ) : null}
+
+                    {activeForm.variants.length > 0 ? (
+                      <div className={`rounded-2xl border border-neutral-200 ${openVariantActionMenuIndex === null ? "overflow-x-auto" : "overflow-visible"}`}>
+                        <table className="min-w-full divide-y divide-neutral-200 bg-white text-sm">
+                          <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
+                            <tr>
+                              <th className="px-3 py-2 font-medium">{labels.variantTitle}</th>
+                              <th className="px-3 py-2 font-medium">{labels.sku}</th>
+                              <th className="px-3 py-2 font-medium">{labels.price}</th>
+                              <th className="px-3 py-2 font-medium">{labels.statusLabel}</th>
+                              <th className="px-3 py-2 text-right font-medium">
+                                <span className="sr-only">{labels.variantDetails}</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-neutral-200">
+                            {activeForm.variants.map((variant, index) => (
+                              <tr key={`variant-${index}`} className="align-top">
+                                <td className="px-3 py-3">
+                                  <div className="space-y-1">
+                                    <p className="font-medium text-neutral-950">
+                                      {variant.title || `${labels.variantTitle} ${index + 1}`}
+                                    </p>
+                                    <p className="text-xs text-neutral-500">
+                                      {variant.optionSummary || labels.variantsHint}
+                                    </p>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3 text-neutral-600">
+                                  <div>{variant.sku || labels.sku}</div>
+                                  <div className="text-xs text-neutral-400">{variant.slug || labels.slug}</div>
+                                </td>
+                                <td className="px-3 py-3 text-neutral-600">
+                                  {variant.priceOverride.trim()
+                                    ? formatPrice(Number(variant.priceOverride), activeCurrency, locale)
+                                    : labels.notSpecified}
+                                </td>
+                                <td className="px-3 py-3">
+                                  <div className="flex flex-wrap gap-2">
+                                    {variant.isDefault ? (
+                                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-900">{labels.variantDefault}</span>
+                                    ) : null}
+                                    {variant.stockOverride.trim() ? (
+                                      <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700">
+                                        {labels.stock}: {variant.stockOverride.trim()}
+                                      </span>
+                                    ) : null}
+                                    {!variant.salesEnabled ? (
+                                      <span className="rounded-full bg-neutral-200 px-2 py-1 text-xs font-medium text-neutral-700">{labels.outOfStock}</span>
+                                    ) : null}
+                                    {variant.salesEnabled && !variant.isDefault ? (
+                                      <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-700">{labels.statusActive}</span>
+                                    ) : null}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3">
+                                  <div ref={openVariantActionMenuIndex === index ? variantActionMenuRef : null} className="relative flex justify-end">
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="secondary"
+                                      onClick={() => setOpenVariantActionMenuIndex((current) => current === index ? null : index)}
+                                    >
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                    {openVariantActionMenuIndex === index ? (
+                                      <div className="absolute right-0 top-11 z-50 min-w-40 rounded-xl border border-neutral-200 bg-white p-2 shadow-xl">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            openVariantEditor(index);
+                                            setOpenVariantActionMenuIndex(null);
+                                          }}
+                                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
+                                        >
+                                          {labels.variantDetails}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            removeVariantRow(index);
+                                            setOpenVariantActionMenuIndex(null);
+                                          }}
+                                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
+                                        >
+                                          {labels.delete}
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
+                  </div>
+                </section>
+
+                <div className="mt-2 flex justify-end gap-2 border-t border-neutral-200 pt-5">
+                  <Button type="button" variant="secondary" onClick={closeDrawer} disabled={loading}>
+                    {labels.cancel}
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? labels.loading : labels.save}
+                  </Button>
+                </div>
+              </form>
+            </aside>
+          )}
 
           {activeVariantEditor ? (
             <div className="absolute inset-0 z-10">

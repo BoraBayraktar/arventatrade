@@ -232,6 +232,74 @@ export class IntegrationRepository {
     return job;
   }
 
+  async markJobObservedFailure(args: {
+    id: string;
+    lastError: string;
+    retryDelayMinutes: number;
+    responsePayload?: Prisma.JsonValue | Record<string, unknown> | null;
+  }) {
+    const current = await prisma.integrationSyncJob.findUnique({
+      where: { id: args.id },
+    });
+
+    if (!current) {
+      return null;
+    }
+
+    const nextAttemptCount = current.attemptCount + 1;
+    const isDeadLetter = nextAttemptCount >= current.maxAttempts;
+    const now = new Date();
+
+    const job = await prisma.integrationSyncJob.update({
+      where: { id: args.id },
+      data: {
+        status: isDeadLetter ? "DEAD_LETTER" : "FAILED",
+        attemptCount: nextAttemptCount,
+        lastAttemptAt: now,
+        lastError: args.lastError,
+        nextAttemptAt: new Date(now.getTime() + args.retryDelayMinutes * 60000),
+        ...(args.responsePayload !== undefined ? { responsePayload: toJsonInput(args.responsePayload) } : {}),
+      },
+    });
+
+    if (isDeadLetter) {
+      await prisma.integrationDeadLetter.upsert({
+        where: {
+          jobId: job.id,
+        },
+        update: {
+          channel: job.channel,
+          jobType: job.jobType,
+          entityType: job.entityType,
+          entityId: job.entityId,
+          payload: toJsonInput(job.payload),
+          lastError: args.lastError,
+          attemptCount: job.attemptCount,
+          maxAttempts: job.maxAttempts,
+          resolved: false,
+          resolvedAt: null,
+          resolvedByUserId: null,
+          deleted: false,
+          deletedDate: null,
+          deletedUserId: null,
+        },
+        create: {
+          jobId: job.id,
+          channel: job.channel,
+          jobType: job.jobType,
+          entityType: job.entityType,
+          entityId: job.entityId,
+          payload: toJsonInput(job.payload),
+          lastError: args.lastError,
+          attemptCount: job.attemptCount,
+          maxAttempts: job.maxAttempts,
+        },
+      });
+    }
+
+    return job;
+  }
+
   async listDeadLetters() {
     return prisma.integrationDeadLetter.findMany({
       where: {
@@ -349,6 +417,74 @@ export class IntegrationRepository {
     });
   }
 
+  async listPendingN11TaskCheckJobs(args: { limit: number; staleBefore: Date }) {
+    return prisma.integrationSyncJob.findMany({
+      where: {
+        deleted: false,
+        channel: "N11",
+        jobType: {
+          in: ["PRODUCT_SYNC", "STOCK_SYNC", "PRICE_SYNC"],
+        },
+        status: "SUCCESS",
+        externalReference: {
+          not: null,
+        },
+        OR: [
+          {
+            responsePayload: {
+              path: ["batchCheckedAt"],
+              equals: Prisma.JsonNull,
+            },
+          },
+          {
+            responsePayload: {
+              path: ["batchCheckedAt"],
+              lt: args.staleBefore.toISOString(),
+            },
+          },
+        ],
+      },
+      orderBy: {
+        processedAt: "asc",
+      },
+      take: args.limit,
+    });
+  }
+
+  async listPendingHepsiburadaUploadCheckJobs(args: { limit: number; staleBefore: Date }) {
+    return prisma.integrationSyncJob.findMany({
+      where: {
+        deleted: false,
+        channel: "HEPSIBURADA",
+        jobType: {
+          in: ["STOCK_SYNC", "PRICE_SYNC"],
+        },
+        status: "SUCCESS",
+        externalReference: {
+          not: null,
+        },
+        OR: [
+          {
+            responsePayload: {
+              path: ["batchCheckedAt"],
+              equals: Prisma.JsonNull,
+            },
+          },
+          {
+            responsePayload: {
+              path: ["batchCheckedAt"],
+              lt: args.staleBefore.toISOString(),
+            },
+          },
+        ],
+      },
+      orderBy: {
+        processedAt: "asc",
+      },
+      take: args.limit,
+    });
+  }
+
   async listRecentStockSyncJobs(limit: number) {
     return prisma.integrationSyncJob.findMany({
       where: {
@@ -375,5 +511,23 @@ export class IntegrationRepository {
     });
 
     return Object.fromEntries(grouped.map((item) => [item.status, item._count._all])) as Record<string, number>;
+  }
+
+  async countStockSyncJobsByChannel() {
+    const grouped = await prisma.integrationSyncJob.groupBy({
+      by: ["channel"],
+      where: {
+        deleted: false,
+        jobType: "STOCK_SYNC",
+        channel: {
+          in: ["TRENDYOL", "N11", "HEPSIBURADA"],
+        },
+      },
+      _count: {
+        _all: true,
+      },
+    });
+
+    return Object.fromEntries(grouped.map((item) => [item.channel, item._count._all])) as Record<string, number>;
   }
 }

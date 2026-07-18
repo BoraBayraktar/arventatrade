@@ -184,6 +184,55 @@ function buildQuestionOrderBy(args: AdminProductQuestionListQuery) {
 }
 
 export class CatalogAdminRepository {
+  async findSkuOwners(skus: string[]) {
+    const normalizedSkus = Array.from(new Set(skus.map((sku) => sku.trim()).filter(Boolean)));
+
+    if (normalizedSkus.length === 0) {
+      return {
+        products: [],
+        variants: [],
+      };
+    }
+
+    const skuFilters = normalizedSkus.map((sku) => ({
+      sku: {
+        equals: sku,
+        mode: "insensitive" as const,
+      },
+    }));
+
+    const [products, variants] = await Promise.all([
+      prisma.product.findMany({
+        where: {
+          OR: skuFilters,
+        },
+        select: {
+          id: true,
+          sku: true,
+          name: true,
+          deleted: true,
+        },
+      }),
+      prisma.productVariant.findMany({
+        where: {
+          OR: skuFilters,
+        },
+        select: {
+          id: true,
+          sku: true,
+          title: true,
+          productId: true,
+          deleted: true,
+        },
+      }),
+    ]);
+
+    return {
+      products,
+      variants,
+    };
+  }
+
   async listProducts(args: AdminProductListQuery) {
     return prisma.product.findMany({
       where: buildWhere(args),
@@ -555,6 +604,135 @@ export class CatalogAdminRepository {
     });
   }
 
+  async updateProductVariantDefinitions(input: Pick<AdminUpdateProductRecordInput, "id" | "attributeLinks" | "variants">) {
+    await prisma.$transaction(async (tx) => {
+      if (input.attributeLinks !== undefined) {
+        await tx.productAttributeLink.deleteMany({
+          where: {
+            productId: input.id,
+          },
+        });
+
+        if (input.attributeLinks.length > 0) {
+          await tx.productAttributeLink.createMany({
+            data: input.attributeLinks.map((link, index) => ({
+              productId: input.id,
+              attributeDefinitionId: link.attributeDefinitionId,
+              isVariantAxis: link.isVariantAxis,
+              sortOrder: link.sortOrder ?? index,
+            })),
+          });
+        }
+      }
+
+      if (input.variants !== undefined) {
+        const existingVariants = await tx.productVariant.findMany({
+          where: {
+            productId: input.id,
+            deleted: false,
+          },
+          select: {
+            id: true,
+          },
+        });
+        const submittedExistingIds = new Set(input.variants.map((variant) => variant.id).filter((id): id is string => Boolean(id)));
+        const removedIds = existingVariants
+          .map((variant) => variant.id)
+          .filter((id) => !submittedExistingIds.has(id));
+
+        if (removedIds.length > 0) {
+          await tx.productVariant.updateMany({
+            where: {
+              id: {
+                in: removedIds,
+              },
+            },
+            data: {
+              deleted: true,
+              deletedDate: new Date(),
+            },
+          });
+        }
+
+        for (const [index, variant] of input.variants.entries()) {
+          if (variant.id) {
+            await tx.productVariant.update({
+              where: {
+                id: variant.id,
+              },
+              data: {
+                slug: variant.slug,
+                sku: variant.sku,
+                barcode: variant.barcode ?? null,
+                title: variant.title,
+                optionSummary: variant.optionSummary,
+                priceOverride: variant.priceOverride ?? null,
+                purchasePriceOverride: variant.purchasePriceOverride ?? null,
+                compareAtPriceOverride: variant.compareAtPriceOverride ?? null,
+                imageUrl: variant.imageUrl ?? null,
+                imageUrls: variant.imageUrls ?? [],
+                stockOverride: variant.stockOverride ?? null,
+                salesEnabled: variant.salesEnabled ?? true,
+                isDefault: variant.isDefault ?? index === 0,
+                sortOrder: variant.sortOrder ?? index,
+                deleted: false,
+                deletedDate: null,
+              },
+            });
+            await tx.productVariantAttributeValue.deleteMany({
+              where: {
+                productVariantId: variant.id,
+              },
+            });
+            if (variant.attributes.length > 0) {
+              await tx.productVariantAttributeValue.createMany({
+                data: variant.attributes.map((attribute) => ({
+                  productVariantId: variant.id!,
+                  attributeDefinitionId: attribute.attributeDefinitionId,
+                  value: attribute.value,
+                })),
+              });
+            }
+            continue;
+          }
+
+          await tx.productVariant.create({
+            data: {
+              productId: input.id,
+              slug: variant.slug,
+              sku: variant.sku,
+              barcode: variant.barcode ?? null,
+              title: variant.title,
+              optionSummary: variant.optionSummary,
+              priceOverride: variant.priceOverride ?? null,
+              purchasePriceOverride: variant.purchasePriceOverride ?? null,
+              compareAtPriceOverride: variant.compareAtPriceOverride ?? null,
+              imageUrl: variant.imageUrl ?? null,
+              imageUrls: variant.imageUrls ?? [],
+              stockOverride: variant.stockOverride ?? null,
+              salesEnabled: variant.salesEnabled ?? true,
+              isDefault: variant.isDefault ?? index === 0,
+              sortOrder: variant.sortOrder ?? index,
+              attributeValues: {
+                create: variant.attributes.map((attribute) => ({
+                  attributeDefinitionId: attribute.attributeDefinitionId,
+                  value: attribute.value,
+                })),
+              },
+            },
+          });
+        }
+      }
+    });
+
+    const product = await this.findActiveProductForAdminById(input.id);
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
+    return product;
+  }
+
   async findActiveProductForAdminById(id: string) {
     return prisma.product.findFirst({
       where: {
@@ -895,7 +1073,7 @@ export class CatalogAdminRepository {
     });
   }
 
-  async listAttributeValueMarketplaceMappings(channel: "TRENDYOL" | "N11" | "EDOCS_MOCK") {
+  async listAttributeValueMarketplaceMappings(channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK") {
     return prisma.productAttributeValueMarketplaceMapping.findMany({
       where: {
         channel,

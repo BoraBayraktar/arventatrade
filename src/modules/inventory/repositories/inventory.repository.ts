@@ -51,7 +51,7 @@ type RecordInventoryMovementArgs = {
 };
 
 type UpsertInventoryIntegrationMappingArgs = {
-  channel: "TRENDYOL" | "N11";
+  channel: "TRENDYOL" | "N11" | "HEPSIBURADA";
   externalProductId?: string | null;
   externalSku?: string | null;
   externalWarehouseCode?: string | null;
@@ -61,7 +61,7 @@ type UpsertInventoryIntegrationMappingArgs = {
 };
 
 type CreateExternalStockEventArgs = {
-  channel: "TRENDYOL" | "N11";
+  channel: "TRENDYOL" | "N11" | "HEPSIBURADA";
   eventKey: string;
   eventType: "SNAPSHOT_ON_HAND" | "SNAPSHOT_AVAILABLE";
   externalProductId?: string | null;
@@ -1039,7 +1039,7 @@ export class InventoryRepository {
   }
 
   async findInventoryIntegrationMapping(args: {
-    channel: "TRENDYOL" | "N11";
+    channel: "TRENDYOL" | "N11" | "HEPSIBURADA";
     externalProductId?: string | null;
     externalSku?: string | null;
     externalWarehouseCode?: string | null;

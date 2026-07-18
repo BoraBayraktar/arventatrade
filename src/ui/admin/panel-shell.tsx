@@ -64,6 +64,7 @@ const adminMenuIcons: Array<{ route: string; icon: LucideIcon }> = [
   { route: "/admin/inventory/exports", icon: FileOutput },
   { route: "/admin/inventory/external-events", icon: DatabaseZap },
   { route: "/admin/integrations/trendyol", icon: Store },
+  { route: "/admin/integrations/n11", icon: Store },
   { route: "/admin/inventory", icon: Boxes },
   { route: "/admin/product-questions", icon: ClipboardList },
   { route: "/admin/categories", icon: FolderTree },

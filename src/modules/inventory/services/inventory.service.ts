@@ -67,7 +67,7 @@ const syncProductInventorySchema = z.object({
 });
 
 const upsertInventoryIntegrationMappingSchema = z.object({
-  channel: z.enum(["TRENDYOL", "N11"]),
+  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]),
   externalProductId: z.string().trim().min(1).max(120).optional().nullable(),
   externalSku: z.string().trim().min(1).max(120).optional().nullable(),
   externalWarehouseCode: z.string().trim().min(1).max(120).optional().nullable(),
@@ -79,7 +79,7 @@ const upsertInventoryIntegrationMappingSchema = z.object({
 });
 
 const receiveExternalStockEventSchema = z.object({
-  channel: z.enum(["TRENDYOL", "N11"]),
+  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]),
   eventKey: z.string().trim().min(3).max(160),
   eventType: z.enum(["SNAPSHOT_ON_HAND", "SNAPSHOT_AVAILABLE"]),
   externalProductId: z.string().trim().min(1).max(120).optional().nullable(),
@@ -793,7 +793,7 @@ function mapWarehouse(warehouse: {
 
 function mapInventoryIntegrationMapping(item: {
   id: string;
-  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
   externalProductId: string | null;
   externalSku: string | null;
   externalWarehouseCode: string | null;
@@ -835,7 +835,7 @@ function mapInventoryIntegrationMapping(item: {
 
 function mapExternalStockEvent(item: {
   id: string;
-  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
   eventKey: string;
   eventType: "SNAPSHOT_ON_HAND" | "SNAPSHOT_AVAILABLE";
   direction: "INBOUND" | "OUTBOUND";
@@ -1155,7 +1155,7 @@ async function queueInventoryStockSync(args: {
     return;
   }
 
-  const channels: Array<"TRENDYOL" | "N11"> = ["TRENDYOL", "N11"];
+  const channels: Array<"TRENDYOL" | "N11" | "HEPSIBURADA"> = ["TRENDYOL", "N11", "HEPSIBURADA"];
 
   await Promise.all(channels.map((channel) => integrationService.dispatchJobs({
     channel,
@@ -2162,6 +2162,7 @@ export class InventoryService {
       failedCount: dashboard.failedCount,
       deadLetterCount: dashboard.deadLetterCount,
       successCount: dashboard.successCount,
+      channelCounts: dashboard.channelCounts,
       recentJobs: dashboard.recentJobs.map((job) => ({
         id: job.id,
         channel: job.channel,

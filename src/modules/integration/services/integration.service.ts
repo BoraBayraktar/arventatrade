@@ -17,12 +17,13 @@ import type {
 } from "@/modules/integration/contracts/integration.contract";
 import type { ChannelConnector } from "@/modules/integration/connectors/channel.connector";
 import { EDocsMockConnector } from "@/modules/integration/connectors/edocs-mock.connector";
+import { HepsiburadaConnector } from "@/modules/integration/connectors/hepsiburada.connector";
 import { N11Connector } from "@/modules/integration/connectors/n11.connector";
 import { TrendyolConnector } from "@/modules/integration/connectors/trendyol.connector";
 import { IntegrationRepository } from "@/modules/integration/repositories/integration.repository";
 
 const listQuerySchema = z.object({
-  channel: z.enum(["TRENDYOL", "N11", "EDOCS_MOCK"]).optional(),
+  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA", "EDOCS_MOCK"]).optional(),
   jobType: z.enum(["PRODUCT_SYNC", "PRICE_SYNC", "STOCK_SYNC", "ORDER_IMPORT", "ORDER_STATUS_SYNC", "DOCUMENT_OUTBOUND", "DOCUMENT_STATUS_SYNC"]).optional(),
   status: z.enum(["PENDING", "PROCESSING", "SUCCESS", "FAILED", "DEAD_LETTER"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -30,7 +31,7 @@ const listQuerySchema = z.object({
 });
 
 const dispatchSchema = z.object({
-  channel: z.enum(["TRENDYOL", "N11", "EDOCS_MOCK"]),
+  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA", "EDOCS_MOCK"]),
   jobType: z.enum(["PRODUCT_SYNC", "PRICE_SYNC", "STOCK_SYNC", "ORDER_IMPORT", "ORDER_STATUS_SYNC", "DOCUMENT_OUTBOUND", "DOCUMENT_STATUS_SYNC"]),
   entityType: z.enum(["PRODUCT", "MARKETPLACE_ACCOUNT", "MARKETPLACE_PACKAGE", "ORDER", "BUSINESS_DOCUMENT"]),
   entityIds: z.array(z.string().trim().min(1)).min(1).max(100),
@@ -48,9 +49,10 @@ const retrySchema = z.object({
   resolvedByUserId: z.string().trim().min(1),
 });
 
-const connectors: Record<"TRENDYOL" | "N11" | "EDOCS_MOCK", ChannelConnector> = {
+const connectors: Record<"TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK", ChannelConnector> = {
   TRENDYOL: new TrendyolConnector(),
   N11: new N11Connector(),
+  HEPSIBURADA: new HepsiburadaConnector(),
   EDOCS_MOCK: new EDocsMockConnector(),
 };
 
@@ -61,7 +63,7 @@ async function invalidateIntegrationCache() {
 function mapJob(item: {
   id: string;
   idempotencyKey: string;
-  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
   jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_IMPORT" | "ORDER_STATUS_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
   entityType: "PRODUCT" | "MARKETPLACE_ACCOUNT" | "MARKETPLACE_PACKAGE" | "ORDER" | "BUSINESS_DOCUMENT";
   entityId: string;
@@ -105,7 +107,7 @@ function mapJob(item: {
 function mapDeadLetter(item: {
   id: string;
   jobId: string;
-  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
   jobType: "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_IMPORT" | "ORDER_STATUS_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
   entityType: "PRODUCT" | "MARKETPLACE_ACCOUNT" | "MARKETPLACE_PACKAGE" | "ORDER" | "BUSINESS_DOCUMENT";
   entityId: string;
@@ -276,9 +278,10 @@ export class IntegrationService {
   }
 
   async getStockSyncDashboard(): Promise<StockSyncDashboardResult> {
-    const [recentJobs, counts] = await Promise.all([
+    const [recentJobs, counts, channelCounts] = await Promise.all([
       this.repository.listRecentStockSyncJobs(12),
       this.repository.countStockSyncJobsByStatus(),
+      this.repository.countStockSyncJobsByChannel(),
     ]);
 
     return {
@@ -287,6 +290,11 @@ export class IntegrationService {
       failedCount: counts.FAILED ?? 0,
       deadLetterCount: counts.DEAD_LETTER ?? 0,
       successCount: counts.SUCCESS ?? 0,
+      channelCounts: {
+        trendyol: channelCounts.TRENDYOL ?? 0,
+        n11: channelCounts.N11 ?? 0,
+        hepsiburada: channelCounts.HEPSIBURADA ?? 0,
+      },
       recentJobs: recentJobs.map(mapJob),
     };
   }

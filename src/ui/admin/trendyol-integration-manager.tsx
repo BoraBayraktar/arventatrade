@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import type { MarketplaceCapabilitySet } from "@/modules/integration/contracts/integration.contract";
 
 type MarketplaceConfig = {
   id: string;
@@ -76,6 +77,7 @@ type MarketplacePackageDetail = MarketplacePackage & {
     lastAttemptAt: string | null;
     processedAt: string | null;
     lastError: string | null;
+    externalReference: string | null;
     createdAt: string;
     deadLetter: {
       id: string;
@@ -133,6 +135,12 @@ type Labels = {
   createProductFromLine: string;
   ignoreLine: string;
   lineIgnored: string;
+  splitPackage: string;
+  splitPackageTitle: string;
+  splitPackageHint: string;
+  splitPackageQuantity: string;
+  splitPackageSuccess: string;
+  splitPackageInvalid: string;
   createOrder: string;
   orderCreated: string;
   notifyPicking: string;
@@ -143,9 +151,29 @@ type Labels = {
   noStatusHistory: string;
   targetStatus: string;
   attempts: string;
+  packageStatusLabel: string;
+  cargoLabel: string;
+  externalReferenceShort: string;
+  deadLetterResolved: string;
+  closeLabel: string;
   retryStatusJob: string;
   testConnection: string;
   connectionTested: string;
+  capabilitiesTitle: string;
+  capabilitiesHint: string;
+  capabilityAvailable: string;
+  capabilityLimited: string;
+  capabilityOrderImport: string;
+  capabilityProductSync: string;
+  capabilityPriceSync: string;
+  capabilityStockSync: string;
+  capabilityPickingStatus: string;
+  capabilityInvoicedStatus: string;
+  capabilityPackageSplit: string;
+  capabilityBrandMapping: string;
+  capabilityCategoryMapping: string;
+  capabilityAttributeMapping: string;
+  capabilityAdvancedPreflight: string;
   queued: string;
   operationFailed: string;
   loading: string;
@@ -196,12 +224,29 @@ function getAdminProductCreateUrl(locale: string, line: MarketplacePackageLine) 
   return `/${locale}/admin/products?${params.toString()}`;
 }
 
+function getCapabilityItems(capabilities: MarketplaceCapabilitySet, labels: Labels) {
+  return [
+    { label: labels.capabilityOrderImport, enabled: capabilities.supportsOrderImport },
+    { label: labels.capabilityProductSync, enabled: capabilities.supportsProductSync },
+    { label: labels.capabilityPriceSync, enabled: capabilities.supportsPriceSync },
+    { label: labels.capabilityStockSync, enabled: capabilities.supportsStockSync },
+    { label: labels.capabilityPickingStatus, enabled: capabilities.supportsStatusPicking },
+    { label: labels.capabilityInvoicedStatus, enabled: capabilities.supportsStatusInvoiced },
+    { label: labels.capabilityPackageSplit, enabled: capabilities.supportsPackageSplit },
+    { label: labels.capabilityBrandMapping, enabled: capabilities.requiresBrandMapping },
+    { label: labels.capabilityCategoryMapping, enabled: capabilities.requiresCategoryMapping },
+    { label: labels.capabilityAttributeMapping, enabled: capabilities.requiresAttributeMapping },
+    { label: labels.capabilityAdvancedPreflight, enabled: capabilities.preflightLevel === "ADVANCED" },
+  ];
+}
+
 export function TrendyolIntegrationManager({
   labels,
   locale,
   canManage,
   initialConfigs,
   initialPackages,
+  capabilities,
   productOptions,
   summary,
 }: {
@@ -210,6 +255,7 @@ export function TrendyolIntegrationManager({
   canManage: boolean;
   initialConfigs: MarketplaceConfig[];
   initialPackages: MarketplacePackage[];
+  capabilities: MarketplaceCapabilitySet;
   productOptions: ProductOption[];
   summary: {
     activeConfigCount: number;
@@ -241,10 +287,24 @@ export function TrendyolIntegrationManager({
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<MarketplacePackageDetail | null>(null);
   const [selectedTargets, setSelectedTargets] = useState<Record<string, string>>({});
+  const [splitLineIds, setSplitLineIds] = useState<string[]>([]);
+  const [splitQuantities, setSplitQuantities] = useState<Record<string, string>>({});
+  const capabilityItems = getCapabilityItems(capabilities, labels);
 
   const activeConfig = configs[0] ?? null;
   const canNotifyPicking = selectedPackage ? selectedPackage.packageStatus !== "Picking" && selectedPackage.packageStatus !== "Invoiced" : false;
   const canNotifyInvoiced = selectedPackage ? selectedPackage.packageStatus === "Picking" : false;
+  const canSplitSelectedPackage = Boolean(
+    selectedPackage
+      && capabilities.supportsPackageSplit
+      && selectedPackage.lines.length > 1
+      && selectedPackage.packageStatus !== "Invoiced"
+      && selectedPackage.packageStatus !== "Shipped"
+      && selectedPackage.packageStatus !== "Delivered",
+  );
+  const splitSelectsWholePackage = Boolean(selectedPackage && selectedPackage.lines.every((line) => (
+    splitLineIds.includes(line.id) && Number(splitQuantities[line.id] ?? "1") >= line.quantity
+  )));
 
   async function saveConfig() {
     setBusy(true);
@@ -411,6 +471,65 @@ export function TrendyolIntegrationManager({
         line.id,
         line.productId ? `${line.productId}:${line.productVariantId ?? ""}` : "",
       ])));
+      setSplitLineIds([]);
+      setSplitQuantities(Object.fromEntries(result.lines.map((line) => [line.id, String(Math.min(line.quantity, 1))])));
+    } catch {
+      setError(labels.operationFailed);
+    } finally {
+      setDetailBusy(false);
+    }
+  }
+
+  function toggleSplitLine(line: MarketplacePackageLine) {
+    setSplitLineIds((current) => (
+      current.includes(line.id)
+        ? current.filter((item) => item !== line.id)
+        : [...current, line.id]
+    ));
+    setSplitQuantities((current) => ({
+      ...current,
+      [line.id]: current[line.id] ?? String(Math.min(line.quantity, 1)),
+    }));
+  }
+
+  async function splitPackage() {
+    if (!selectedPackage || splitLineIds.length === 0 || splitSelectsWholePackage) {
+      setError(labels.splitPackageInvalid);
+      return;
+    }
+
+    const splits = splitLineIds.map((lineId) => ({
+      lineId,
+      quantity: Number(splitQuantities[lineId] ?? "1"),
+    }));
+
+    if (splits.some((item) => !Number.isInteger(item.quantity) || item.quantity <= 0)) {
+      setError(labels.splitPackageInvalid);
+      return;
+    }
+
+    setDetailBusy(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch(`/api/admin/integrations/marketplaces/packages/${selectedPackage.id}/split`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ splits }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { message?: string } | null;
+        setError(payload?.message ?? labels.operationFailed);
+        return;
+      }
+
+      await openPackageDetail(selectedPackage.id);
+      await refreshDashboard();
+      setNotice(labels.splitPackageSuccess);
     } catch {
       setError(labels.operationFailed);
     } finally {
@@ -643,6 +762,23 @@ export function TrendyolIntegrationManager({
           </article>
         </div>
 
+        <div className="mt-5 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-sm font-semibold text-neutral-950">{labels.capabilitiesTitle}</h3>
+            <p className="text-sm text-neutral-500">{labels.capabilitiesHint}</p>
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {capabilityItems.map((item) => (
+              <div key={item.label} className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm">
+                <span className="text-neutral-700">{item.label}</span>
+                <Badge className={item.enabled ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}>
+                  {item.enabled ? labels.capabilityAvailable : labels.capabilityLimited}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={labels.displayName} disabled={!canManage || busy} />
           <Input value={sellerId} onChange={(event) => setSellerId(event.target.value)} placeholder={labels.sellerId} disabled={!canManage || busy} />
@@ -706,7 +842,10 @@ export function TrendyolIntegrationManager({
               </div>
               <p className="text-sm text-neutral-600">{item.packageStatus}</p>
               <p className="text-sm text-neutral-600">{item.cargoProviderName ?? "-"} {item.cargoTrackingNumber ? `- ${item.cargoTrackingNumber}` : ""}</p>
-              <p className="text-sm text-neutral-600">{item.matchedLineCount}/{item.lineCount} {labels.matchedLines}</p>
+              <div className="text-sm text-neutral-600">
+                <p>{item.matchedLineCount}/{item.lineCount} {labels.matchedLines}</p>
+                <p className="mt-1 text-xs text-amber-700">{item.needsReviewLineCount} {labels.needsReview}</p>
+              </div>
               <Button type="button" variant="secondary" size="sm" onClick={() => openPackageDetail(item.id)} disabled={detailBusy}>
                 <Eye className="h-4 w-4" />
                 {labels.packageDetail}
@@ -748,7 +887,7 @@ export function TrendyolIntegrationManager({
                   type="button"
                   onClick={() => setSelectedPackage(null)}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-neutral-200 text-neutral-700 transition hover:bg-neutral-100"
-                  aria-label="Kapat"
+                  aria-label={labels.closeLabel}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -756,6 +895,90 @@ export function TrendyolIntegrationManager({
             </div>
 
             <div className="grid gap-4 p-5">
+              <div className="grid gap-3 md:grid-cols-3">
+                <article className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.packageStatusLabel}</p>
+                  <p className="mt-2 text-sm font-semibold text-neutral-950">{selectedPackage.packageStatus}</p>
+                  <p className="mt-1 text-xs text-neutral-500">{selectedPackage.externalPackageId}</p>
+                </article>
+                <article className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.cargoLabel}</p>
+                  <p className="mt-2 text-sm font-semibold text-neutral-950">{selectedPackage.cargoProviderName ?? "-"}</p>
+                  <p className="mt-1 text-xs text-neutral-500">{selectedPackage.cargoTrackingNumber ?? "-"}</p>
+                </article>
+                <article className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.lastSync}</p>
+                  <p className="mt-2 text-sm font-semibold text-neutral-950">{formatDate(selectedPackage.updatedAt)}</p>
+                  <p className="mt-1 text-xs text-neutral-500">{selectedPackage.importStatus}</p>
+                </article>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <article className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.packages}</p>
+                  <p className="mt-2 text-xl font-semibold text-neutral-950">{selectedPackage.lineCount}</p>
+                </article>
+                <article className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{labels.matchedLines}</p>
+                  <p className="mt-2 text-xl font-semibold text-emerald-800">{selectedPackage.matchedLineCount}</p>
+                </article>
+                <article className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">{labels.needsReview}</p>
+                  <p className="mt-2 text-xl font-semibold text-amber-800">{selectedPackage.needsReviewLineCount}</p>
+                </article>
+              </div>
+
+              {capabilities.supportsPackageSplit ? (
+                <div className="rounded-lg border border-cyan-200 bg-cyan-50/60 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h4 className="text-sm font-semibold text-neutral-950">{labels.splitPackageTitle}</h4>
+                      <p className="mt-1 text-sm text-neutral-600">{labels.splitPackageHint}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={!canManage || detailBusy || !canSplitSelectedPackage || splitLineIds.length === 0 || splitSelectsWholePackage}
+                      onClick={() => void splitPackage()}
+                    >
+                      {labels.splitPackage}
+                    </Button>
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {selectedPackage.lines.map((line) => {
+                      const checked = splitLineIds.includes(line.id);
+
+                      return (
+                        <label key={line.id} className="grid gap-2 rounded-lg border border-cyan-100 bg-white px-3 py-2 text-sm sm:grid-cols-[1fr_120px] sm:items-center">
+                          <span className="flex items-start gap-2">
+                            <input
+                              type="checkbox"
+                              className="mt-1"
+                              checked={checked}
+                              disabled={!canManage || detailBusy || !canSplitSelectedPackage}
+                              onChange={() => toggleSplitLine(line)}
+                            />
+                            <span>
+                              <span className="block font-medium text-neutral-900">{line.productName}</span>
+                              <span className="block text-xs text-neutral-500">{line.quantity} adet - {line.externalLineId}</span>
+                            </span>
+                          </span>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={line.quantity}
+                            value={splitQuantities[line.id] ?? "1"}
+                            onChange={(event) => setSplitQuantities((current) => ({ ...current, [line.id]: event.target.value }))}
+                            placeholder={labels.splitPackageQuantity}
+                            disabled={!checked || !canManage || detailBusy || !canSplitSelectedPackage}
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="grid gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 md:grid-cols-[1fr_auto] md:items-center">
                 <Input
                   value={invoiceNumber}
@@ -792,7 +1015,13 @@ export function TrendyolIntegrationManager({
                         {labels.attempts}: {item.attemptCount}/{item.maxAttempts}
                         {item.invoiceNumber ? ` - ${labels.invoiceNumber}: ${item.invoiceNumber}` : ""}
                       </p>
+                      {item.externalReference ? (
+                        <p className="mt-1 break-all text-xs text-neutral-500">{labels.externalReferenceShort}: {item.externalReference}</p>
+                      ) : null}
                       {item.lastError ? <p className="mt-1 break-all text-xs text-rose-700">{item.lastError}</p> : null}
+                      {item.deadLetter?.resolved && item.deadLetter.resolvedAt ? (
+                        <p className="mt-1 text-xs text-emerald-700">{labels.deadLetterResolved}: {formatDate(item.deadLetter.resolvedAt)}</p>
+                      ) : null}
                       {item.status === "DEAD_LETTER" && item.deadLetter && !item.deadLetter.resolved ? (
                         <div className="mt-2">
                           <Button type="button" size="sm" variant="secondary" onClick={() => retryStatusJob(item.id)} disabled={!canManage || detailBusy}>

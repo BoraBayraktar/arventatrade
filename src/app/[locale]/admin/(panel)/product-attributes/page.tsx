@@ -65,10 +65,14 @@ export default async function AdminProductAttributesPage({
         selectedCount: dictionary.admin.selectedCount,
         valueMappingsTitle: dictionary.admin.attributeValueMappingsTitle,
         valueMappingsDescription: dictionary.admin.attributeValueMappingsDescription,
+        valueMappingsChannel: dictionary.admin.attributeValueMappingsChannel,
+        valueMappingsManualHint: dictionary.admin.attributeValueMappingsManualHint,
         localValue: dictionary.admin.localValue,
         externalValueId: dictionary.admin.externalValueId,
         externalValueName: dictionary.admin.externalValueName,
         customValue: dictionary.admin.customValue,
+        channelTrendyol: dictionary.admin.integrationChannelTrendyol,
+        channelN11: dictionary.admin.integrationChannelN11,
       }}
     />
   );

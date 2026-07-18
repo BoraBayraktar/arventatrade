@@ -194,6 +194,11 @@ export async function loadInventoryRouteContext(
         failedCount: 0,
         deadLetterCount: 0,
         successCount: 0,
+        channelCounts: {
+          trendyol: 0,
+          n11: 0,
+          hepsiburada: 0,
+        },
         recentJobs: [],
       }),
     pageVariant === "overview" || pageVariant === "transactions"
@@ -416,6 +421,9 @@ export async function loadInventoryRouteContext(
       syncSuccess: dictionary.admin.inventorySyncSuccess,
       syncRecentJobs: dictionary.admin.inventorySyncRecentJobs,
       syncLastError: dictionary.admin.inventorySyncLastError,
+      channelTrendyol: dictionary.admin.integrationChannelTrendyol,
+      channelN11: dictionary.admin.integrationChannelN11,
+      channelHepsiburada: dictionary.admin.integrationChannelHepsiburada,
       totalOnHandUnits: dictionary.admin.inventoryTotalOnHandUnits,
       totalCostValue: dictionary.admin.inventoryTotalCostValue,
       totalSalesValue: dictionary.admin.inventoryTotalSalesValue,

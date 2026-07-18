@@ -14,6 +14,7 @@
     "db:migrate:manual": "bash scripts/db-manual-migrate.sh",
     "db:seed": "prisma db seed",
     "db:backfill:business-document-master-data": "tsx --tsconfig tsconfig.json scripts/backfill-business-document-master-data.ts",
+    "db:repair:duplicate-skus": "node scripts/repair-duplicate-skus.mjs",
     "verify:rbac": "node scripts/verify-rbac.mjs",
     "verify:crud": "node scripts/verify-product-crud.mjs",
     "verify:storefront": "node scripts/verify-storefront.mjs",

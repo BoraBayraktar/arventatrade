@@ -93,6 +93,9 @@ type ExportsLabels = Pick<Labels, "notSpecified">;
 type SyncLabels = Pick<
   Labels,
   | "empty"
+  | "channelHepsiburada"
+  | "channelN11"
+  | "channelTrendyol"
   | "integrationDescription"
   | "integrationTitle"
   | "notSpecified"
@@ -812,9 +815,14 @@ type InventorySyncPanelProps = {
     failedCount: number;
     deadLetterCount: number;
     successCount: number;
+    channelCounts: {
+      trendyol: number;
+      n11: number;
+      hepsiburada: number;
+    };
     recentJobs: Array<{
       id: string;
-      channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+      channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
       status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
       entityId: string;
       createdAt: string;
@@ -911,6 +919,22 @@ export function InventorySyncPanel({
     }
   };
 
+  const formatChannelLabel = (value: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK"): string => {
+    if (value === "TRENDYOL") {
+      return labels.channelTrendyol;
+    }
+
+    if (value === "N11") {
+      return labels.channelN11;
+    }
+
+    if (value === "HEPSIBURADA") {
+      return labels.channelHepsiburada;
+    }
+
+    return value;
+  };
+
   return (
     <>
       <div className="flex flex-col gap-2">
@@ -931,6 +955,18 @@ export function InventorySyncPanel({
             <article className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.syncSuccess}</p><p className="mt-2 text-lg font-semibold text-emerald-700">{integrationSummary.successCount}</p><p className="mt-1 text-xs text-neutral-500">Sorunsuz tamamlanan</p></article>
             <article className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.syncFailed}</p><p className="mt-2 text-lg font-semibold text-amber-700">{integrationSummary.failedCount}</p><p className="mt-1 text-xs text-neutral-500">Yeniden denenecek</p></article>
             <article className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.syncDeadLetter}</p><p className="mt-2 text-lg font-semibold text-rose-700">{integrationSummary.deadLetterCount}</p><p className="mt-1 text-xs text-neutral-500">Manuel müdahale gerek</p></article>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <article className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">{labels.channelTrendyol}</p>
+              <p className="mt-2 text-lg font-semibold text-cyan-900">{integrationSummary.channelCounts.trendyol}</p>
+              <p className="mt-1 text-xs text-cyan-800">Toplam stok sync işi</p>
+            </article>
+            <article className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">{labels.channelN11}</p>
+              <p className="mt-2 text-lg font-semibold text-amber-900">{integrationSummary.channelCounts.n11}</p>
+              <p className="mt-1 text-xs text-amber-800">Toplam stok sync işi</p>
+            </article>
           </div>
         </section>
 
@@ -967,7 +1003,12 @@ export function InventorySyncPanel({
               <article key={job.id} className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-neutral-950">{job.channel} • {job.entityId}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${job.channel === "TRENDYOL" ? "bg-cyan-100 text-cyan-700" : job.channel === "N11" ? "bg-amber-100 text-amber-700" : "bg-neutral-100 text-neutral-700"}`}>
+                        {formatChannelLabel(job.channel)}
+                      </span>
+                      <p className="text-sm font-semibold text-neutral-950">{job.entityId}</p>
+                    </div>
                     <p className="mt-1 text-xs text-neutral-500">{formatDate(job.createdAt, locale, labels.notSpecified)}</p>
                   </div>
                   <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${job.status === "SUCCESS" ? "bg-emerald-100 text-emerald-700" : job.status === "DEAD_LETTER" ? "bg-rose-100 text-rose-700" : job.status === "FAILED" ? "bg-amber-100 text-amber-700" : job.status === "PROCESSING" ? "bg-sky-100 text-sky-700" : "bg-neutral-100 text-neutral-700"}`}>{job.status}</span>
@@ -1057,7 +1098,12 @@ export function InventorySyncPanel({
               <article key={item.id} className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-neutral-950">{item.channel} • {item.productSku ?? item.externalSku ?? "Eşleşmemiş kayıt"}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${item.channel === "TRENDYOL" ? "bg-cyan-100 text-cyan-700" : item.channel === "N11" ? "bg-amber-100 text-amber-700" : "bg-neutral-100 text-neutral-700"}`}>
+                        {formatChannelLabel(item.channel)}
+                      </span>
+                      <p className="text-sm font-semibold text-neutral-950">{item.productSku ?? item.externalSku ?? "Eşleşmemiş kayıt"}</p>
+                    </div>
                     <p className="mt-1 text-xs text-neutral-500">{formatDate(item.createdAt, locale, labels.notSpecified)}</p>
                     <p className="mt-2 text-xs text-neutral-600">Depo: {item.warehouseCode ?? item.externalWarehouseCode ?? labels.notSpecified} • Miktar: {item.quantity}</p>
                   </div>

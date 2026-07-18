@@ -31,6 +31,7 @@ import type {
   AdminUpdateBrandInput,
   AdminUpdateCategoryInput,
   AdminUpdateProductInput,
+  AdminUpdateProductVariantsInput,
   AdminUpsertProductAttributeValueMarketplaceMappingInput,
   AdminUpdateSupplierInput,
 } from "@/modules/catalog/contracts/catalog-admin.contract";
@@ -152,6 +153,12 @@ const updateProductSchema = z.object({
   categoryId: z.string().trim().optional().nullable(),
   attributeLinks: z.array(productAttributeLinkSchema).max(20).optional(),
   variants: z.array(productVariantSchema).max(100).optional(),
+});
+
+const updateProductVariantsSchema = z.object({
+  productId: z.string().trim().min(1),
+  attributeLinks: z.array(productAttributeLinkSchema).max(20).default([]),
+  variants: z.array(productVariantSchema).max(100).default([]),
 });
 
 const createBrandSchema = z.object({
@@ -358,7 +365,7 @@ function mapAttributeDefinition(item: {
 function mapAttributeValueMarketplaceMapping(item: {
   id: string;
   attributeDefinitionId: string;
-  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
   localValue: string;
   externalAttributeValueId: number | null;
   externalAttributeValueName: string | null;
@@ -778,6 +785,69 @@ export class CatalogAdminService {
     }
   }
 
+  private normalizeSku(sku: string) {
+    return sku.trim().toLocaleUpperCase("tr-TR");
+  }
+
+  private async assertUniqueSkuPool(args: {
+    productId?: string;
+    productSku?: string;
+    variants?: AdminProductVariantInput[];
+    replaceProductVariants?: boolean;
+  }) {
+    const candidates = [
+      ...(args.productSku ? [{ kind: "product" as const, sku: args.productSku }] : []),
+      ...(args.variants ?? []).map((variant) => ({ kind: "variant" as const, id: variant.id, sku: variant.sku })),
+    ];
+
+    const seen = new Map<string, typeof candidates[number]>();
+    for (const candidate of candidates) {
+      const normalizedSku = this.normalizeSku(candidate.sku);
+      const existing = seen.get(normalizedSku);
+      if (existing) {
+        throw new z.ZodError([{
+          code: "custom",
+          path: [candidate.kind === "product" ? "sku" : "variants"],
+          message: `Mükerrer SKU kullanılamaz: ${candidate.sku}`,
+        }]);
+      }
+      seen.set(normalizedSku, candidate);
+    }
+
+    const owners = await this.repository.findSkuOwners(candidates.map((candidate) => candidate.sku));
+    const candidateSkus = new Set(candidates.map((candidate) => this.normalizeSku(candidate.sku)));
+
+    for (const product of owners.products) {
+      if (args.productId && product.id === args.productId && args.productSku) {
+        continue;
+      }
+
+      const normalizedSku = this.normalizeSku(product.sku);
+      if (candidateSkus.has(normalizedSku)) {
+        throw new z.ZodError([{
+          code: "custom",
+          path: ["sku"],
+          message: `Mükerrer SKU kullanılamaz: ${product.sku}`,
+        }]);
+      }
+    }
+
+    for (const variant of owners.variants) {
+      if (args.replaceProductVariants && args.productId && variant.productId === args.productId) {
+        continue;
+      }
+
+      const normalizedSku = this.normalizeSku(variant.sku);
+      if (candidateSkus.has(normalizedSku)) {
+        throw new z.ZodError([{
+          code: "custom",
+          path: ["variants"],
+          message: `Mükerrer SKU kullanılamaz: ${variant.sku}`,
+        }]);
+      }
+    }
+  }
+
   private async assertValidParentAssignment(categoryId: string | null, parentId: string | null | undefined) {
     if (parentId == null) {
       return;
@@ -884,6 +954,10 @@ export class CatalogAdminService {
       attributeLinks: parsed.attributeLinks,
       variants: parsed.variants,
     });
+    await this.assertUniqueSkuPool({
+      productSku: parsed.sku,
+      variants: parsed.variants,
+    });
     const created = await this.repository.createProduct({
       description: encodeProductDescriptionWithFeatures(parsed.description, sanitizeFeatures(parsed.features ?? [])),
       slug: parsed.slug,
@@ -960,6 +1034,14 @@ export class CatalogAdminService {
       attributeLinks: parsed.attributeLinks,
       variants: parsed.variants,
     });
+    if (parsed.sku !== undefined || parsed.variants !== undefined) {
+      await this.assertUniqueSkuPool({
+        productId: parsed.id,
+        productSku: parsed.sku,
+        variants: parsed.variants,
+        replaceProductVariants: parsed.variants !== undefined,
+      });
+    }
 
     if (parsed.price !== undefined || parsed.compareAtPrice !== undefined) {
       if (!existingProduct) {
@@ -1054,6 +1136,45 @@ export class CatalogAdminService {
 
     await invalidateCatalogCache();
     return mapProduct(hydrated);
+  }
+
+  async updateProductVariants(input: AdminUpdateProductVariantsInput): Promise<AdminProductListItem> {
+    const parsed = updateProductVariantsSchema.parse(input);
+    const existing = await this.repository.findActiveProductById(parsed.productId);
+
+    if (!existing) {
+      throw new Error("Product not found");
+    }
+
+    await this.assertProductRelations({
+      brandId: null,
+      categoryId: null,
+      primarySupplierId: null,
+      attributeDefinitionIds: Array.from(new Set([
+        ...parsed.attributeLinks.map((item) => item.attributeDefinitionId),
+        ...parsed.variants.flatMap((item) => item.attributes.map((attribute) => attribute.attributeDefinitionId)),
+      ])),
+      skipMissingValues: true,
+    });
+    this.validateVariants({
+      basePrice: existing.price.toNumber(),
+      attributeLinks: parsed.attributeLinks,
+      variants: parsed.variants,
+    });
+    await this.assertUniqueSkuPool({
+      productId: parsed.productId,
+      variants: parsed.variants,
+      replaceProductVariants: true,
+    });
+
+    const updated = await this.repository.updateProductVariantDefinitions({
+      id: parsed.productId,
+      attributeLinks: parsed.attributeLinks,
+      variants: parsed.variants,
+    });
+
+    await invalidateCatalogCache();
+    return mapProduct(updated);
   }
 
   async softDeleteProduct(productId: string, deletedUserId: string) {
@@ -1169,7 +1290,7 @@ export class CatalogAdminService {
     return mapAttributeDefinition(updated);
   }
 
-  async listAttributeValueMarketplaceMappings(channel: "TRENDYOL" | "N11" | "EDOCS_MOCK" = "TRENDYOL"): Promise<AdminProductAttributeValueMarketplaceMappingItem[]> {
+  async listAttributeValueMarketplaceMappings(channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK" = "TRENDYOL"): Promise<AdminProductAttributeValueMarketplaceMappingItem[]> {
     const [mappings, localValues] = await Promise.all([
       this.repository.listAttributeValueMarketplaceMappings(channel),
       this.repository.listDistinctVariantAttributeValues(),

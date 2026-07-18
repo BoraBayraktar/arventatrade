@@ -50,25 +50,47 @@ export class CustomerAccountService {
     return item ? mapCustomerAccount(item) : null;
   }
 
-  async ensureCustomerAccountFromUserProfile(profile: {
-    email: string;
+  async ensureCustomerAccountFromContact(profile: {
+    email?: string | null;
     name: string;
   }): Promise<AdminCustomerAccountItem> {
-    const normalizedEmail = profile.email.trim().toLocaleLowerCase("tr-TR");
-    const existing = await customerAccountRepository.findCustomerAccountByEmail(normalizedEmail);
-    if (existing) {
-      return mapCustomerAccount(existing);
+    const normalizedName = profile.name.trim();
+    const normalizedEmail = profile.email?.trim()
+      ? profile.email.trim().toLocaleLowerCase("tr-TR")
+      : null;
+
+    if (normalizedEmail) {
+      const existingByEmail = await customerAccountRepository.findCustomerAccountByEmail(normalizedEmail);
+      if (existingByEmail) {
+        return mapCustomerAccount(existingByEmail);
+      }
     }
 
-    const slugBase = `${profile.name.trim().toLocaleLowerCase("tr-TR").replace(/\s+/g, "-")}-${normalizedEmail.split("@")[0]}`.replace(/[^a-z0-9-]/g, "");
+    const existingByName = await customerAccountRepository.findCustomerAccountByName(normalizedName);
+    if (existingByName) {
+      return mapCustomerAccount(existingByName);
+    }
+
+    const slugParts = [
+      normalizedName.toLocaleLowerCase("tr-TR").replace(/\s+/g, "-"),
+      normalizedEmail ? normalizedEmail.split("@")[0] : `customer-${Date.now()}`,
+    ];
+    const slugBase = slugParts.join("-").replace(/[^a-z0-9-]/g, "");
     const created = await customerAccountRepository.createCustomerAccount({
       slug: slugBase || `customer-${Date.now()}`,
-      name: profile.name.trim(),
+      name: normalizedName,
       email: normalizedEmail,
       isActive: true,
     });
 
     return mapCustomerAccount(created);
+  }
+
+  async ensureCustomerAccountFromUserProfile(profile: {
+    email: string;
+    name: string;
+  }): Promise<AdminCustomerAccountItem> {
+    return this.ensureCustomerAccountFromContact(profile);
   }
 }
 

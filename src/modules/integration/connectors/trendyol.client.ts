@@ -46,6 +46,14 @@ export type TrendyolUpdatePackageStatusInput = {
   invoiceNumber?: string | null;
 };
 
+export type TrendyolSplitShipmentPackageInput = {
+  packageId: string;
+  packageDetails: Array<{
+    orderLineId: string;
+    quantity: number;
+  }>;
+};
+
 export type TrendyolPriceAndInventoryItem = {
   barcode: string;
   quantity: number;
@@ -381,6 +389,41 @@ export class TrendyolClient {
     return {
       requestPayload: body,
       responsePayload: text ? { body: text } : { ok: true },
+    };
+  }
+
+  async splitShipmentPackage(input: TrendyolSplitShipmentPackageInput) {
+    const body = {
+      splitPackages: [
+        {
+          packageDetails: input.packageDetails.map((line) => ({
+            orderLineId: Number(line.orderLineId),
+            quantities: line.quantity,
+          })),
+        },
+      ],
+    };
+    const headers = {
+      ...this.buildHeaders(),
+      ...(this.args.storeFrontCode ? { storeFrontCode: this.args.storeFrontCode } : {}),
+    };
+
+    const response = await fetch(`${this.baseUrl}/integration/order/sellers/${this.args.sellerId}/shipment-packages/${input.packageId}/split-packages`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => "");
+      throw new Error(`TRENDYOL_SPLIT_SHIPMENT_PACKAGE_FAILED:${response.status}:${errorBody.slice(0, 240)}`);
+    }
+
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+    return {
+      requestPayload: body,
+      responsePayload: payload,
     };
   }
 

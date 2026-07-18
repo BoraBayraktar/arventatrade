@@ -1,0 +1,156 @@
+import { notFound, redirect } from "next/navigation";
+
+import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
+import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
+import { N11IntegrationManager } from "@/ui/admin/n11-integration-manager";
+
+export default async function AdminN11IntegrationPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  const dictionary = getDictionary(locale as Locale);
+  const user = await getCurrentUserFromContext();
+
+  if (!user) {
+    redirect(`/${locale}/admin/login`);
+  }
+
+  const [dashboard, productResult] = await Promise.all([
+    marketplaceIntegrationService.getDashboard({ channel: "N11" }),
+    catalogAdminService.listProducts({ page: 1, pageSize: 50, status: "ACTIVE" }),
+  ]);
+
+  const productOptions = productResult.items.flatMap((product) => {
+    const baseOption = {
+      value: `${product.id}:`,
+      label: `${product.name} - ${product.sku}`,
+      description: product.barcode ?? null,
+      productId: product.id,
+      productVariantId: null,
+    };
+    const variantOptions = product.variants.map((variant) => ({
+      value: `${product.id}:${variant.id}`,
+      label: `${product.name} / ${variant.title} - ${variant.sku}`,
+      description: variant.barcode ?? product.barcode ?? null,
+      productId: product.id,
+      productVariantId: variant.id,
+    }));
+
+    return [baseOption, ...variantOptions];
+  });
+
+  return (
+    <N11IntegrationManager
+      locale={locale}
+      canManage={user.role === "ADMIN"}
+      initialConfigs={dashboard.configs}
+      initialPackages={dashboard.packages}
+      capabilities={dashboard.capabilities}
+      productOptions={productOptions}
+      summary={dashboard.summary}
+      labels={{
+        title: dictionary.admin.integrationMarketplaceN11,
+        subtitle: dictionary.admin.integrationMarketplaceN11Subtitle,
+        connectionTitle: dictionary.admin.integrationMarketplaceN11Connection,
+        displayName: dictionary.admin.integrationMarketplaceDisplayName,
+        sellerId: dictionary.admin.integrationMarketplaceSellerId,
+        apiKey: dictionary.admin.integrationMarketplaceApiKey,
+        apiSecret: dictionary.admin.integrationMarketplaceApiSecret,
+        endpointUrl: dictionary.admin.integrationMarketplaceEndpointUrl,
+        syncWindowMinutes: dictionary.admin.integrationMarketplaceSyncWindow,
+        save: dictionary.admin.save,
+        manualSync: dictionary.admin.integrationMarketplaceManualSync,
+        packagesTitle: dictionary.admin.integrationMarketplacePackages,
+        emptyPackages: dictionary.admin.integrationMarketplaceN11EmptyPackages,
+        activeAccounts: dictionary.admin.integrationMarketplaceActiveAccounts,
+        packages: dictionary.admin.integrationMarketplacePackages,
+        readyForOrder: dictionary.admin.integrationMarketplaceReadyForOrder,
+        needsReview: dictionary.admin.integrationMarketplaceNeedsReview,
+        lastSync: dictionary.admin.integrationMarketplaceLastSync,
+        matchedLines: dictionary.admin.integrationMarketplaceMatchedLines,
+        matchLine: dictionary.admin.integrationMarketplaceMatchLine,
+        selectProduct: dictionary.admin.integrationMarketplaceSelectProduct,
+        searchProduct: dictionary.admin.integrationMarketplaceSearchProduct,
+        noProductResults: dictionary.admin.integrationMarketplaceNoProductResults,
+        packageDetail: dictionary.admin.integrationMarketplacePackageDetail,
+        lineMatchSaved: dictionary.admin.integrationMarketplaceLineMatchSaved,
+        lineNeedsReviewHint: dictionary.admin.integrationMarketplaceLineNeedsReviewHint,
+        lineSuggestedSearch: dictionary.admin.integrationMarketplaceLineSuggestedSearch,
+        createProductFromLine: dictionary.admin.integrationMarketplaceCreateProductFromLine,
+        ignoreLine: dictionary.admin.integrationMarketplaceIgnoreLine,
+        lineIgnored: dictionary.admin.integrationMarketplaceLineIgnored,
+        createOrder: dictionary.admin.integrationMarketplaceCreateOrder,
+        orderCreated: dictionary.admin.integrationMarketplaceOrderCreated,
+        notifyPicking: dictionary.admin.integrationMarketplaceNotifyPicking,
+        statusSyncQueued: dictionary.admin.integrationMarketplaceN11StatusSyncQueued,
+        statusHistory: dictionary.admin.integrationMarketplaceStatusHistory,
+        noStatusHistory: dictionary.admin.integrationMarketplaceN11NoStatusHistory,
+        targetStatus: dictionary.admin.integrationMarketplaceTargetStatus,
+        attempts: dictionary.admin.integrationMarketplaceAttempts,
+        packageStatusLabel: dictionary.admin.integrationMarketplacePackageStatusLabel,
+        cargoLabel: dictionary.admin.integrationMarketplaceCargoLabel,
+        externalReferenceShort: dictionary.admin.integrationMarketplaceExternalReferenceShort,
+        deadLetterResolved: dictionary.admin.integrationMarketplaceDeadLetterResolved,
+        statusLabelQueued: dictionary.admin.integrationMarketplaceStatusLabelQueued,
+        statusLabelSending: dictionary.admin.integrationMarketplaceStatusLabelSending,
+        statusLabelSent: dictionary.admin.integrationMarketplaceStatusLabelSent,
+        statusLabelFailed: dictionary.admin.integrationMarketplaceStatusLabelFailed,
+        statusLabelDeadLetter: dictionary.admin.integrationMarketplaceStatusLabelDeadLetter,
+        packageListLatestJobLabel: dictionary.admin.integrationMarketplacePackageListLatestJobLabel,
+        packageListDeadLetterLabel: dictionary.admin.integrationMarketplacePackageListDeadLetterLabel,
+        packageListFailedLabel: dictionary.admin.integrationMarketplacePackageListFailedLabel,
+        closeLabel: dictionary.admin.close,
+        nextActionTitle: dictionary.admin.integrationMarketplaceNextActionTitle,
+        nextActionReviewLines: dictionary.admin.integrationMarketplaceNextActionReviewLines,
+        nextActionCreateOrder: dictionary.admin.integrationMarketplaceNextActionCreateOrder,
+        nextActionNotifyPicking: dictionary.admin.integrationMarketplaceNextActionNotifyPicking,
+        nextActionSplitPackage: dictionary.admin.integrationMarketplaceNextActionSplitPackage,
+        nextActionRetryDeadLetter: dictionary.admin.integrationMarketplaceNextActionRetryDeadLetter,
+        nextActionReviewFailure: dictionary.admin.integrationMarketplaceNextActionReviewFailure,
+        nextActionHealthy: dictionary.admin.integrationMarketplaceNextActionHealthy,
+        operationsTitle: dictionary.admin.integrationMarketplaceOperationsTitle,
+        operationsHint: dictionary.admin.integrationMarketplaceOperationsHint,
+        openOperations: dictionary.admin.integrationMarketplaceOpenOperations,
+        packageListActionLabel: dictionary.admin.integrationMarketplacePackageListActionLabel,
+        selectProductRequired: dictionary.admin.integrationMarketplaceSelectProductRequired,
+        splitQuantityRequired: dictionary.admin.integrationMarketplaceSplitQuantityRequired,
+        splitQuantityInvalid: dictionary.admin.integrationMarketplaceSplitQuantityInvalid,
+        retryQueued: dictionary.admin.integrationMarketplaceRetryQueued,
+        retryStatusJob: dictionary.admin.integrationMarketplaceRetryStatusJob,
+        splitPackage: dictionary.admin.integrationMarketplaceN11SplitPackage,
+        splitPackageHint: dictionary.admin.integrationMarketplaceN11SplitPackageHint,
+        splitQuantity: dictionary.admin.integrationMarketplaceN11SplitQuantity,
+        splitCreated: dictionary.admin.integrationMarketplaceN11SplitCreated,
+        testConnection: dictionary.admin.integrationMarketplaceTestConnection,
+        connectionTested: dictionary.admin.integrationMarketplaceN11ConnectionTested,
+        capabilitiesTitle: dictionary.admin.integrationMarketplaceCapabilitiesTitle,
+        capabilitiesHint: dictionary.admin.integrationMarketplaceCapabilitiesHint,
+        capabilityAvailable: dictionary.admin.integrationMarketplaceCapabilityAvailable,
+        capabilityLimited: dictionary.admin.integrationMarketplaceCapabilityLimited,
+        capabilityOrderImport: dictionary.admin.integrationMarketplaceCapabilityOrderImport,
+        capabilityProductSync: dictionary.admin.integrationMarketplaceCapabilityProductSync,
+        capabilityPriceSync: dictionary.admin.integrationMarketplaceCapabilityPriceSync,
+        capabilityStockSync: dictionary.admin.integrationMarketplaceCapabilityStockSync,
+        capabilityPickingStatus: dictionary.admin.integrationMarketplaceCapabilityPickingStatus,
+        capabilityInvoicedStatus: dictionary.admin.integrationMarketplaceCapabilityInvoicedStatus,
+        capabilityPackageSplit: dictionary.admin.integrationMarketplaceCapabilityPackageSplit,
+        capabilityBrandMapping: dictionary.admin.integrationMarketplaceCapabilityBrandMapping,
+        capabilityCategoryMapping: dictionary.admin.integrationMarketplaceCapabilityCategoryMapping,
+        capabilityAttributeMapping: dictionary.admin.integrationMarketplaceCapabilityAttributeMapping,
+        capabilityAdvancedPreflight: dictionary.admin.integrationMarketplaceCapabilityAdvancedPreflight,
+        queued: dictionary.admin.integrationMarketplaceN11Queued,
+        operationFailed: dictionary.admin.operationFailed,
+        loading: dictionary.common.loading,
+      }}
+    />
+  );
+}

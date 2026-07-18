@@ -19,16 +19,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: error.issues[0]?.message ?? "Validation failed" }, { status: 400 });
     }
 
-    if (error instanceof Error && error.message === "TRENDYOL_CONFIG_NOT_FOUND") {
-      return NextResponse.json({ message: "Trendyol config not found" }, { status: 404 });
+    if (error instanceof Error && error.message === "MARKETPLACE_CONFIG_NOT_FOUND") {
+      return NextResponse.json({ message: "Marketplace config not found" }, { status: 404 });
     }
 
-    if (error instanceof Error && error.message === "TRENDYOL_CONFIG_INCOMPLETE") {
-      return NextResponse.json({ message: "Trendyol config is incomplete" }, { status: 400 });
+    if (error instanceof Error && (error.message === "TRENDYOL_CONFIG_INCOMPLETE" || error.message === "N11_CONFIG_INCOMPLETE" || error.message === "HEPSIBURADA_CONFIG_INCOMPLETE" || error.message === "MARKETPLACE_CONFIG_INCOMPLETE")) {
+      return NextResponse.json({ message: "Marketplace config is incomplete" }, { status: 400 });
     }
 
-    if (error instanceof Error && error.message.startsWith("TRENDYOL_GET_SHIPMENT_PACKAGES_FAILED")) {
-      return NextResponse.json({ message: "Trendyol connection failed" }, { status: 502 });
+    if (error instanceof Error && (error.message.startsWith("TRENDYOL_GET_SHIPMENT_PACKAGES_FAILED") || error.message.startsWith("N11_GET_SHIPMENT_PACKAGES_FAILED") || error.message.startsWith("HEPSIBURADA_GET_ORDERS_FAILED"))) {
+      return NextResponse.json({ message: "Marketplace connection failed" }, { status: 502 });
     }
 
     return NextResponse.json({ message: "Unexpected error" }, { status: 500 });

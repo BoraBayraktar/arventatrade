@@ -22,7 +22,7 @@ export type MarketplacePackageLineInput = {
 };
 
 export type MarketplacePackageInput = {
-  channel: "TRENDYOL";
+  channel: "TRENDYOL" | "N11" | "HEPSIBURADA";
   configId: string;
   externalPackageId: string;
   externalOrderNumber: string;
@@ -40,9 +40,10 @@ export type MarketplacePackageInput = {
 };
 
 export class MarketplaceIntegrationRepository {
-  async listConfigs() {
+  async listConfigs(channel?: "TRENDYOL" | "N11" | "HEPSIBURADA") {
     return prisma.marketplaceIntegrationConfig.findMany({
       where: {
+        ...(channel ? { channel } : {}),
         deleted: false,
       },
       orderBy: {
@@ -51,7 +52,7 @@ export class MarketplaceIntegrationRepository {
     });
   }
 
-  async listActiveConfigsByChannel(channel: "TRENDYOL") {
+  async listActiveConfigsByChannel(channel: "TRENDYOL" | "N11" | "HEPSIBURADA") {
     return prisma.marketplaceIntegrationConfig.findMany({
       where: {
         channel,
@@ -64,9 +65,10 @@ export class MarketplaceIntegrationRepository {
     });
   }
 
-  async listRecentPackages(limit: number) {
+  async listRecentPackages(limit: number, channel?: "TRENDYOL" | "N11" | "HEPSIBURADA") {
     return prisma.marketplaceOrderPackage.findMany({
       where: {
+        ...(channel ? { channel } : {}),
         deleted: false,
       },
       orderBy: {
@@ -162,11 +164,48 @@ export class MarketplaceIntegrationRepository {
     });
   }
 
+  async findPackageForSplit(id: string) {
+    return prisma.marketplaceOrderPackage.findFirst({
+      where: {
+        id,
+        deleted: false,
+      },
+      include: {
+        config: true,
+        lines: {
+          where: {
+            deleted: false,
+          },
+          select: {
+            id: true,
+            externalLineId: true,
+            quantity: true,
+            productName: true,
+          },
+        },
+      },
+    });
+  }
+
   async listPackageStatusJobs(packageId: string) {
+    const targetPackage = await prisma.marketplaceOrderPackage.findFirst({
+      where: {
+        id: packageId,
+        deleted: false,
+      },
+      select: {
+        channel: true,
+      },
+    });
+
+    if (!targetPackage) {
+      return [];
+    }
+
     return prisma.integrationSyncJob.findMany({
       where: {
         deleted: false,
-        channel: "TRENDYOL",
+        channel: targetPackage.channel,
         jobType: "ORDER_STATUS_SYNC",
         entityType: "MARKETPLACE_PACKAGE",
         entityId: packageId,
@@ -187,12 +226,55 @@ export class MarketplaceIntegrationRepository {
     });
   }
 
+  async listLatestPackageStatusJobs(packageIds: string[]) {
+    if (packageIds.length === 0) {
+      return [];
+    }
+
+    return prisma.integrationSyncJob.findMany({
+      where: {
+        deleted: false,
+        jobType: "ORDER_STATUS_SYNC",
+        entityType: "MARKETPLACE_PACKAGE",
+        entityId: {
+          in: packageIds,
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        deadLetter: {
+          select: {
+            id: true,
+            resolved: true,
+            resolvedAt: true,
+          },
+        },
+      },
+    });
+  }
+
   async findPackageStatusJob(args: { packageId: string; jobId: string }) {
+    const targetPackage = await prisma.marketplaceOrderPackage.findFirst({
+      where: {
+        id: args.packageId,
+        deleted: false,
+      },
+      select: {
+        channel: true,
+      },
+    });
+
+    if (!targetPackage) {
+      return null;
+    }
+
     return prisma.integrationSyncJob.findFirst({
       where: {
         id: args.jobId,
         deleted: false,
-        channel: "TRENDYOL",
+        channel: targetPackage.channel,
         jobType: "ORDER_STATUS_SYNC",
         entityType: "MARKETPLACE_PACKAGE",
         entityId: args.packageId,
@@ -205,11 +287,12 @@ export class MarketplaceIntegrationRepository {
 
   async upsertConfig(args: {
     id?: string;
-    channel: "TRENDYOL";
+    channel: "TRENDYOL" | "N11" | "HEPSIBURADA";
     displayName: string;
     sellerId: string;
     apiKeyEncrypted?: string;
     apiSecretEncrypted?: string;
+    serviceTokenEncrypted?: string | null;
     userAgent: string;
     storeFrontCode?: string | null;
     endpointUrl?: string | null;
@@ -228,6 +311,7 @@ export class MarketplaceIntegrationRepository {
       sellerId: args.sellerId,
       ...(args.apiKeyEncrypted !== undefined ? { apiKeyEncrypted: args.apiKeyEncrypted } : {}),
       ...(args.apiSecretEncrypted !== undefined ? { apiSecretEncrypted: args.apiSecretEncrypted } : {}),
+      ...(args.serviceTokenEncrypted !== undefined ? { serviceTokenEncrypted: args.serviceTokenEncrypted } : {}),
       userAgent: args.userAgent,
       storeFrontCode: args.storeFrontCode ?? null,
       endpointUrl: args.endpointUrl ?? null,
@@ -359,7 +443,7 @@ export class MarketplaceIntegrationRepository {
     return product ? { productId: product.id, productVariantId: null } : null;
   }
 
-  async findProductStockSyncTarget(args: { channel: "TRENDYOL"; productId: string; warehouseCode?: string | null }) {
+  async findProductStockSyncTarget(args: { channel: "TRENDYOL" | "N11" | "HEPSIBURADA"; productId: string; warehouseCode?: string | null }) {
     const product = await prisma.product.findFirst({
       where: {
         id: args.productId,
@@ -386,6 +470,7 @@ export class MarketplaceIntegrationRepository {
             createdAt: "asc",
           },
           select: {
+            externalProductId: true,
             externalSku: true,
             externalWarehouseCode: true,
             warehouseId: true,

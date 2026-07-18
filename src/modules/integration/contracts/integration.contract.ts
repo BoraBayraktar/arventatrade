@@ -1,4 +1,4 @@
-export type IntegrationChannel = "TRENDYOL" | "N11" | "EDOCS_MOCK";
+export type IntegrationChannel = "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
 export type IntegrationJobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_IMPORT" | "ORDER_STATUS_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
 export type IntegrationEntityType = "PRODUCT" | "MARKETPLACE_ACCOUNT" | "MARKETPLACE_PACKAGE" | "ORDER" | "BUSINESS_DOCUMENT";
 export type IntegrationJobStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
@@ -95,5 +95,24 @@ export type StockSyncDashboardResult = {
   failedCount: number;
   deadLetterCount: number;
   successCount: number;
+  channelCounts: {
+    trendyol: number;
+    n11: number;
+    hepsiburada: number;
+  };
   recentJobs: AdminIntegrationJobItem[];
+};
+
+export type MarketplaceCapabilitySet = {
+  supportsOrderImport: boolean;
+  supportsProductSync: boolean;
+  supportsPriceSync: boolean;
+  supportsStockSync: boolean;
+  supportsStatusPicking: boolean;
+  supportsStatusInvoiced: boolean;
+  supportsPackageSplit: boolean;
+  requiresBrandMapping: boolean;
+  requiresCategoryMapping: boolean;
+  requiresAttributeMapping: boolean;
+  preflightLevel: "STANDARD" | "ADVANCED";
 };

@@ -1,23 +1,31 @@
 import { NextResponse } from "next/server";
 
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { hepsiburadaProductSyncService } from "@/modules/integration/services/hepsiburada-product-sync.service";
+import { n11ProductSyncService } from "@/modules/integration/services/n11-product-sync.service";
 import { trendyolProductSyncService } from "@/modules/integration/services/trendyol-product-sync.service";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await requireUserRoles(["ADMIN", "EDITOR"]);
     const { id } = await params;
-    const result = await trendyolProductSyncService.preflightProduct(id);
+    const { searchParams } = new URL(request.url);
+    const channel = (searchParams.get("channel") as "TRENDYOL" | "N11" | "HEPSIBURADA" | null) ?? "TRENDYOL";
+    const result = channel === "N11"
+      ? await n11ProductSyncService.preflightProduct(id)
+      : channel === "HEPSIBURADA"
+        ? await hepsiburadaProductSyncService.preflightProduct(id)
+        : await trendyolProductSyncService.preflightProduct(id);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof AuthContextError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }
 
-    if (error instanceof Error && error.message === "TRENDYOL_PRODUCT_SYNC_PRODUCT_NOT_FOUND") {
+    if (error instanceof Error && (error.message === "TRENDYOL_PRODUCT_SYNC_PRODUCT_NOT_FOUND" || error.message === "N11_PRODUCT_SYNC_PRODUCT_NOT_FOUND" || error.message === "HEPSIBURADA_PRODUCT_SYNC_PRODUCT_NOT_FOUND")) {
       return NextResponse.json({ message: "Product not found" }, { status: 404 });
     }
 

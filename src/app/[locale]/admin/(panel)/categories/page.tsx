@@ -54,6 +54,7 @@ export default async function AdminCategoriesPage({
       canDelete={user.role === "ADMIN"}
       labels={{
         title: dictionary.admin.categoryManager,
+        marketplaceNote: dictionary.admin.categoriesMarketplaceNote,
         createTitle: dictionary.admin.createCategory,
         listTitle: dictionary.admin.categoryList,
         search: dictionary.admin.searchCategory,

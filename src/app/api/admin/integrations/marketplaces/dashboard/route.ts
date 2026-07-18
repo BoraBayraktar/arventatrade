@@ -3,10 +3,12 @@ import { NextResponse } from "next/server";
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
 import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     await requireUserRoles(["ADMIN", "EDITOR"]);
-    const result = await marketplaceIntegrationService.getDashboard();
+    const { searchParams } = new URL(request.url);
+    const channel = (searchParams.get("channel") as "TRENDYOL" | "N11" | "HEPSIBURADA" | null) ?? undefined;
+    const result = await marketplaceIntegrationService.getDashboard({ channel });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof AuthContextError) {

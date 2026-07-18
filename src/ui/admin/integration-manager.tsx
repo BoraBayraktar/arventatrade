@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { MarketplaceCapabilitySet } from "@/modules/integration/contracts/integration.contract";
 
 type JobStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
-type Channel = "TRENDYOL" | "N11" | "EDOCS_MOCK";
+type Channel = "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
 type JobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_IMPORT" | "ORDER_STATUS_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
 type EntityType = "PRODUCT" | "MARKETPLACE_ACCOUNT" | "MARKETPLACE_PACKAGE" | "ORDER" | "BUSINESS_DOCUMENT";
 type DrawerMode = "create" | "process";
@@ -35,10 +36,23 @@ type Job = {
   createdAt: string;
 };
 
-type TrendyolBatchResult = {
+type MarketplaceBatchResult = {
   jobId: string;
   batchRequestId: string;
   result: Record<string, unknown>;
+};
+
+type BatchSummaryItem = {
+  label: string;
+  value: string;
+  tone?: "neutral" | "success" | "warning";
+};
+
+type BatchIssueItem = {
+  key: string;
+  status: string | null;
+  reason: string | null;
+  recommendedAction: string | null;
 };
 
 type DeadLetter = {
@@ -55,6 +69,11 @@ type DeadLetter = {
   resolved: boolean;
 };
 
+type MarketplaceCapabilitySummary = {
+  channel: Extract<Channel, "TRENDYOL" | "N11" | "HEPSIBURADA">;
+  capabilities: MarketplaceCapabilitySet;
+};
+
 type Labels = {
   title: string;
   subtitle: string;
@@ -69,6 +88,15 @@ type Labels = {
   entityId: string;
   marketplaceOverview: string;
   marketplaceOverviewHint: string;
+  marketplaceCapabilitySummary: string;
+  capabilityAvailable: string;
+  capabilityLimited: string;
+  capabilityInvoicedStatus: string;
+  capabilityPackageSplit: string;
+  capabilityBrandMapping: string;
+  capabilityCategoryMapping: string;
+  capabilityAttributeMapping: string;
+  capabilityAdvancedPreflight: string;
   filterByChannel: string;
   activeFilters: string;
   recentActivity: string;
@@ -93,6 +121,7 @@ type Labels = {
   processedAt: string;
   channelTrendyol: string;
   channelN11: string;
+  channelHepsiburada: string;
   channelEDocsMock: string;
   jobTypeProductSync: string;
   jobTypePriceSync: string;
@@ -168,6 +197,10 @@ type Labels = {
   checkBatchResult: string;
   batchResultEmpty: string;
   batchCheckedAt: string;
+  batchIssueSummary: string;
+  batchIssueStatus: string;
+  batchIssueReason: string;
+  batchIssueRecommendedAction: string;
   all: string;
   validationEntityIds: string;
   validationQueueLimit: string;
@@ -249,6 +282,10 @@ function channelLabel(channel: Channel, labels: Labels) {
     return labels.channelN11;
   }
 
+  if (channel === "HEPSIBURADA") {
+    return labels.channelHepsiburada;
+  }
+
   return labels.channelEDocsMock;
 }
 
@@ -264,6 +301,168 @@ function jobTypeLabel(jobType: JobType, labels: Labels) {
   };
 
   return map[jobType];
+}
+
+function stringifyBatchValue(value: unknown) {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (value == null) {
+    return "-";
+  }
+
+  return JSON.stringify(value);
+}
+
+function summarizeBatchResult(result: MarketplaceBatchResult): BatchSummaryItem[] {
+  const payload = result.result ?? {};
+  const items: BatchSummaryItem[] = [
+    {
+      label: "Referans",
+      value: result.batchRequestId,
+    },
+  ];
+
+  if (typeof payload.status === "string") {
+    items.push({
+      label: "Durum",
+      value: payload.status,
+      tone: payload.status.toUpperCase().includes("SUCCESS") || payload.status.toUpperCase() === "COMPLETED"
+        ? "success"
+        : payload.status.toUpperCase().includes("FAIL")
+          ? "warning"
+          : "neutral",
+    });
+  }
+
+  if (typeof payload.taskId === "string" || typeof payload.taskId === "number") {
+    items.push({
+      label: "Task ID",
+      value: String(payload.taskId),
+    });
+  }
+
+  if (typeof payload.batchRequestId === "string") {
+    items.push({
+      label: "Batch ID",
+      value: payload.batchRequestId,
+    });
+  }
+
+  if (Array.isArray(payload.reasons) && payload.reasons.length > 0) {
+    items.push({
+      label: "Nedenler",
+      value: payload.reasons.map((item) => stringifyBatchValue(item)).join(" | "),
+      tone: "warning",
+    });
+  }
+
+  if (Array.isArray(payload.items) && payload.items.length > 0) {
+    items.push({
+      label: "Satir",
+      value: String(payload.items.length),
+    });
+  }
+
+  if (Array.isArray(payload.content) && payload.content.length > 0) {
+    items.push({
+      label: "Kayit",
+      value: String(payload.content.length),
+    });
+  }
+
+  if (payload.skus && typeof payload.skus === "object") {
+    const skuKeys = Object.keys(payload.skus as Record<string, unknown>);
+    if (skuKeys.length > 0) {
+      items.push({
+        label: "SKU",
+        value: String(skuKeys.length),
+      });
+    }
+  }
+
+  return items;
+}
+
+function readReason(value: unknown) {
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => readString(item))
+      .filter((item): item is string => Boolean(item));
+    return parts.length > 0 ? parts.join(" | ") : null;
+  }
+
+  return null;
+}
+
+function recommendedActionFromIssue(reason: string | null, status: string | null, labels: Labels) {
+  const normalizedReason = normalizeTechnicalHint(reason, labels);
+  if (normalizedReason && normalizedReason !== reason) {
+    return normalizedReason;
+  }
+
+  const normalizedStatus = normalizeTechnicalHint(status, labels);
+  if (normalizedStatus && normalizedStatus !== status) {
+    return normalizedStatus;
+  }
+
+  return null;
+}
+
+function summarizeBatchIssues(result: MarketplaceBatchResult, labels: Labels): BatchIssueItem[] {
+  const payload = result.result ?? {};
+  const issues: BatchIssueItem[] = [];
+
+  if (payload.skus && typeof payload.skus === "object") {
+    for (const [key, rawValue] of Object.entries(payload.skus as Record<string, unknown>)) {
+      if (!rawValue || typeof rawValue !== "object") {
+        continue;
+      }
+
+      const item = rawValue as Record<string, unknown>;
+      const status = readString(item.status);
+      const reason = readReason(item.reasons) ?? readReason(item.reason) ?? readReason(item.message);
+      if (status || reason) {
+        issues.push({
+          key,
+          status,
+          reason,
+          recommendedAction: null,
+        });
+      }
+    }
+  }
+
+  if (Array.isArray(payload.items)) {
+    for (const rawValue of payload.items) {
+      if (!rawValue || typeof rawValue !== "object") {
+        continue;
+      }
+
+      const item = rawValue as Record<string, unknown>;
+      const key = readString(item.barcode) ?? readString(item.stockCode) ?? readString(item.merchantSku) ?? readString(item.lineId);
+      const status = readString(item.status);
+      const reason = readReason(item.failureReasons) ?? readReason(item.reasons) ?? readReason(item.message);
+      if (key && (status || reason)) {
+        issues.push({
+          key,
+          status,
+          reason,
+          recommendedAction: null,
+        });
+      }
+    }
+  }
+
+  return issues.slice(0, 8).map((item) => ({
+    ...item,
+    recommendedAction: recommendedActionFromIssue(item.reason, item.status, labels),
+  }));
 }
 
 function statusLabel(status: JobStatus, labels: Labels) {
@@ -290,6 +489,41 @@ function entityTypeLabel(entityType: EntityType, labels: Labels) {
   return map[entityType];
 }
 
+function filterStatusLabel(value: "all" | JobStatus, labels: Labels) {
+  if (value === "all") {
+    return labels.all;
+  }
+
+  return statusLabel(value, labels);
+}
+
+function filterChannelLabel(value: "all" | Channel, labels: Labels) {
+  if (value === "all") {
+    return labels.all;
+  }
+
+  return channelLabel(value, labels);
+}
+
+function filterJobTypeLabel(value: "all" | JobType, labels: Labels) {
+  if (value === "all") {
+    return labels.all;
+  }
+
+  return jobTypeLabel(value, labels);
+}
+
+function capabilityItems(summary: MarketplaceCapabilitySummary, labels: Labels) {
+  return [
+    { label: labels.capabilityInvoicedStatus, enabled: summary.capabilities.supportsStatusInvoiced },
+    { label: labels.capabilityPackageSplit, enabled: summary.capabilities.supportsPackageSplit },
+    { label: labels.capabilityBrandMapping, enabled: summary.capabilities.requiresBrandMapping },
+    { label: labels.capabilityCategoryMapping, enabled: summary.capabilities.requiresCategoryMapping },
+    { label: labels.capabilityAttributeMapping, enabled: summary.capabilities.requiresAttributeMapping },
+    { label: labels.capabilityAdvancedPreflight, enabled: summary.capabilities.preflightLevel === "ADVANCED" },
+  ];
+}
+
 function actionHint(job: Job, labels: Labels) {
   if (job.status === "PENDING") {
     return labels.actionWaitingQueue;
@@ -300,11 +534,37 @@ function actionHint(job: Job, labels: Labels) {
   }
 
   if (job.status === "FAILED") {
+    const reasons = Array.isArray(job.responsePayload?.reasons)
+      ? job.responsePayload?.reasons
+        .map((item) => readString(item))
+        .filter((item): item is string => Boolean(item))
+      : [];
+    if (reasons.length > 0) {
+      return normalizeTechnicalHint(reasons[0], labels) ?? labels.actionReviewError;
+    }
+
+    const status = readString(job.responsePayload?.status);
+    if (status) {
+      return normalizeTechnicalHint(status, labels) ?? labels.actionReviewError;
+    }
+
     return labels.actionReviewError;
   }
 
   if (job.status === "DEAD_LETTER") {
+    const lastError = readString(job.lastError);
+    if (lastError) {
+      return normalizeTechnicalHint(lastError, labels) ?? labels.actionTrackDeadLetter;
+    }
+
     return labels.actionTrackDeadLetter;
+  }
+
+  if (job.status === "SUCCESS") {
+    const status = readString(job.responsePayload?.status);
+    if (status) {
+      return normalizeTechnicalHint(status, labels) ?? labels.noActionAvailable;
+    }
   }
 
   return labels.noActionAvailable;
@@ -314,12 +574,55 @@ function readString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
+function normalizeTechnicalHint(value: string | null, labels: Labels) {
+  if (!value) {
+    return null;
+  }
+
+  if (value.includes("CONFIG_NOT_FOUND") || value.includes("CONFIG_INCOMPLETE")) {
+    return "Entegrasyon baglanti ayarlarini kontrol edin";
+  }
+
+  if (value.includes("PRODUCT_NOT_FOUND")) {
+    return "Urun kaydi bulunamadi";
+  }
+
+  if (value.includes("BARCODE_REQUIRED") || value.includes("STOCK_CODE_REQUIRED")) {
+    return "Pazaryeri icin gerekli urun kodu eksik";
+  }
+
+  if (value.includes("TASK_ID_NOT_FOUND") || value.includes("BATCH_REQUEST_ID_NOT_FOUND")) {
+    return "Harici gorev referansi bulunamadi";
+  }
+
+  if (value.includes("JOB_UNSUPPORTED") || value.includes("UNSUPPORTED")) {
+    return "Bu is tipi bu kanal icin desteklenmiyor";
+  }
+
+  if (value.toUpperCase() === "COMPLETED") {
+    return labels.statusSuccess;
+  }
+
+  if (value.toUpperCase().includes("FAIL")) {
+    return `${labels.statusFailed}: ${value}`;
+  }
+
+  return value;
+}
+
 function jobHighlights(job: Job, labels: Labels) {
   const items: Array<{ label: string; value: string; tone: "neutral" | "cyan" | "amber" }> = [];
   const reference = readString(job.payload?.reference);
   const trigger = readString(job.payload?.trigger);
   const batchRequestId = readString(job.responsePayload?.batchRequestId);
+  const taskId = readString(job.responsePayload?.taskId);
+  const taskStatus = readString(job.responsePayload?.status);
   const sku = readString(job.responsePayload?.sku);
+  const reasons = Array.isArray(job.responsePayload?.reasons)
+    ? job.responsePayload?.reasons
+      .map((item) => readString(item))
+      .filter((item): item is string => Boolean(item))
+    : [];
 
   if (reference) {
     items.push({ label: labels.payloadReference, value: reference, tone: "neutral" });
@@ -333,8 +636,20 @@ function jobHighlights(job: Job, labels: Labels) {
     items.push({ label: labels.payloadBatch, value: batchRequestId, tone: "cyan" });
   }
 
+  if (taskId) {
+    items.push({ label: "Task", value: taskId, tone: "cyan" });
+  }
+
+  if (taskStatus) {
+    items.push({ label: "Durum", value: taskStatus, tone: taskStatus.toUpperCase().includes("FAIL") ? "amber" : "neutral" });
+  }
+
   if (sku) {
     items.push({ label: labels.payloadSku, value: sku, tone: "amber" });
+  }
+
+  if (reasons.length > 0) {
+    items.push({ label: "Neden", value: reasons.join(" | "), tone: "amber" });
   }
 
   return items;
@@ -404,18 +719,28 @@ function statusClass(status: JobStatus) {
   return "bg-neutral-100 text-neutral-700";
 }
 
+function toggleStatusFilter(
+  current: "all" | JobStatus,
+  next: JobStatus,
+  setStatusFilter: (value: "all" | JobStatus) => void,
+) {
+  setStatusFilter(current === next ? "all" : next);
+}
+
 export function IntegrationManager({
   locale,
   labels,
   canManage,
   initialJobs,
   initialDeadLetters,
+  marketplaceCapabilities,
 }: {
   locale: string;
   labels: Labels;
   canManage: boolean;
   initialJobs: Job[];
   initialDeadLetters: DeadLetter[];
+  marketplaceCapabilities: MarketplaceCapabilitySummary[];
 }) {
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [deadLetters, setDeadLetters] = useState<DeadLetter[]>(initialDeadLetters);
@@ -433,7 +758,7 @@ export function IntegrationManager({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [batchBusyJobId, setBatchBusyJobId] = useState<string | null>(null);
-  const [batchResult, setBatchResult] = useState<TrendyolBatchResult | null>(null);
+  const [batchResult, setBatchResult] = useState<MarketplaceBatchResult | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | JobStatus>("all");
@@ -447,7 +772,7 @@ export function IntegrationManager({
     failed: jobs.filter((item) => item.status === "FAILED").length,
     deadLetter: jobs.filter((item) => item.status === "DEAD_LETTER").length,
   }), [jobs]);
-  const channelSummaries = useMemo(() => (["TRENDYOL", "N11", "EDOCS_MOCK"] as Channel[]).map((item) => {
+  const channelSummaries = useMemo(() => (["TRENDYOL", "N11", "HEPSIBURADA"] as Channel[]).map((item) => {
     const channelJobs = jobs.filter((job) => job.channel === item);
     const activeCount = channelJobs.filter((job) => job.status === "PENDING" || job.status === "PROCESSING").length;
     const failedCount = channelJobs.filter((job) => job.status === "FAILED" || job.status === "DEAD_LETTER").length;
@@ -467,6 +792,12 @@ export function IntegrationManager({
   const targetEntityIdsHint = entityIdsHintForEntityType(targetEntityType, labels);
   const triggerOptions = JOB_TYPE_TRIGGER_PRESETS[jobType];
   const hasActiveFilters = search.trim().length > 0 || statusFilter !== "all" || channelFilter !== "all" || jobTypeFilter !== "all";
+  const activeFilterSummary = [
+    `${labels.filterStatus}: ${filterStatusLabel(statusFilter, labels)}`,
+    `${labels.filterChannel}: ${filterChannelLabel(channelFilter, labels)}`,
+    `${labels.filterJobType}: ${filterJobTypeLabel(jobTypeFilter, labels)}`,
+    search.trim().length > 0 ? `${labels.filterSearch}: ${search.trim()}` : null,
+  ].filter((item): item is string => Boolean(item)).join(" · ");
 
   const filteredJobs = useMemo(() => [...jobs]
     .filter((item) => (
@@ -637,7 +968,19 @@ export function IntegrationManager({
     setError(null);
 
     try {
-      const response = await fetch(`/api/admin/integrations/jobs/${jobId}/trendyol-batch`);
+      const targetJob = jobs.find((item) => item.id === jobId);
+
+      if (!targetJob) {
+        setError(labels.operationFailed);
+        return;
+      }
+
+      const endpoint = targetJob.channel === "N11"
+        ? `/api/admin/integrations/jobs/${jobId}/n11-task`
+        : targetJob.channel === "HEPSIBURADA"
+          ? `/api/admin/integrations/jobs/${jobId}/hepsiburada-upload`
+          : `/api/admin/integrations/jobs/${jobId}/trendyol-batch`;
+      const response = await fetch(endpoint);
 
       if (!response.ok) {
         const responsePayload = await response.json().catch(() => null) as { message?: string } | null;
@@ -645,7 +988,7 @@ export function IntegrationManager({
         return;
       }
 
-      const payload = await response.json() as TrendyolBatchResult;
+      const payload = await response.json() as MarketplaceBatchResult;
       setBatchResult(payload);
     } catch {
       setError(labels.operationFailed);
@@ -667,26 +1010,56 @@ export function IntegrationManager({
       ) : null}
 
       <div className="grid gap-4 border-b border-neutral-200 p-5 md:grid-cols-2 xl:grid-cols-5">
-        <article className="rounded-2xl border border-neutral-200 bg-white/80 p-4 shadow-sm">
+        <button
+          type="button"
+          onClick={() => toggleStatusFilter(statusFilter, "PENDING", setStatusFilter)}
+          className={`rounded-2xl border bg-white/80 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-sm ${
+            statusFilter === "PENDING" ? "border-neutral-950 ring-2 ring-neutral-200" : "border-neutral-200"
+          }`}
+        >
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.summaryPending}</p>
           <p className="mt-2 text-lg font-semibold text-neutral-950">{summary.pending}</p>
-        </article>
-        <article className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 shadow-sm">
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleStatusFilter(statusFilter, "PROCESSING", setStatusFilter)}
+          className={`rounded-2xl border bg-sky-50/70 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-sm ${
+            statusFilter === "PROCESSING" ? "border-sky-500 ring-2 ring-sky-200" : "border-sky-200"
+          }`}
+        >
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.summaryProcessing}</p>
           <p className="mt-2 text-lg font-semibold text-sky-700">{summary.processing}</p>
-        </article>
-        <article className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm">
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleStatusFilter(statusFilter, "SUCCESS", setStatusFilter)}
+          className={`rounded-2xl border bg-emerald-50/70 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-sm ${
+            statusFilter === "SUCCESS" ? "border-emerald-500 ring-2 ring-emerald-200" : "border-emerald-200"
+          }`}
+        >
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.summarySuccess}</p>
           <p className="mt-2 text-lg font-semibold text-emerald-700">{summary.success}</p>
-        </article>
-        <article className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-sm">
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleStatusFilter(statusFilter, "FAILED", setStatusFilter)}
+          className={`rounded-2xl border bg-amber-50/70 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-sm ${
+            statusFilter === "FAILED" ? "border-amber-500 ring-2 ring-amber-200" : "border-amber-200"
+          }`}
+        >
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.summaryFailed}</p>
           <p className="mt-2 text-lg font-semibold text-amber-700">{summary.failed}</p>
-        </article>
-        <article className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 shadow-sm">
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleStatusFilter(statusFilter, "DEAD_LETTER", setStatusFilter)}
+          className={`rounded-2xl border bg-rose-50/70 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-sm ${
+            statusFilter === "DEAD_LETTER" ? "border-rose-500 ring-2 ring-rose-200" : "border-rose-200"
+          }`}
+        >
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.summaryDeadLetter}</p>
           <p className="mt-2 text-lg font-semibold text-rose-700">{summary.deadLetter}</p>
-        </article>
+        </button>
       </div>
 
       <div className="border-b border-neutral-200 bg-white/90 p-5">
@@ -695,49 +1068,74 @@ export function IntegrationManager({
           <p className="text-sm text-neutral-600">{labels.marketplaceOverviewHint}</p>
         </div>
         <div className="mt-4 grid gap-4 lg:grid-cols-3">
-          {channelSummaries.map((item) => (
-            <button
-              key={item.channel}
-              type="button"
-              onClick={() => setChannelFilter(item.channel)}
-              className={`rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${
-                channelFilter === item.channel
-                  ? "border-cyan-300 bg-cyan-50/80"
-                  : "border-neutral-200 bg-neutral-50/80"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-neutral-950">{channelLabel(item.channel, labels)}</p>
-                  <p className="mt-1 text-xs text-neutral-500">{labels.filterByChannel}</p>
+          {channelSummaries.map((item) => {
+            const capabilitySummary = marketplaceCapabilities.find((entry) => entry.channel === item.channel);
+            const capabilityEntries = capabilitySummary ? capabilityItems(capabilitySummary, labels) : [];
+
+            return (
+              <button
+                key={item.channel}
+                type="button"
+                onClick={() => setChannelFilter(item.channel)}
+                className={`rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${
+                  channelFilter === item.channel
+                    ? "border-cyan-300 bg-cyan-50/80"
+                    : "border-neutral-200 bg-neutral-50/80"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-950">{channelLabel(item.channel, labels)}</p>
+                    <p className="mt-1 text-xs text-neutral-500">{labels.filterByChannel}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {capabilitySummary ? (
+                      <Badge className="bg-neutral-900 text-white">{capabilityEntries.filter((entry) => entry.enabled).length}/6</Badge>
+                    ) : null}
+                    <Badge className={item.failedCount > 0 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}>
+                      {item.failedCount > 0 ? labels.statusFailed : labels.statusSuccess}
+                    </Badge>
+                  </div>
                 </div>
-                <Badge className={item.failedCount > 0 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}>
-                  {item.failedCount > 0 ? labels.statusFailed : labels.statusSuccess}
-                </Badge>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-                <div className="rounded-xl bg-white px-3 py-2">
-                  <p className="text-xs text-neutral-500">{labels.jobs}</p>
-                  <p className="mt-1 font-semibold text-neutral-950">{item.total}</p>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+                  <div className="rounded-xl bg-white px-3 py-2">
+                    <p className="text-xs text-neutral-500">{labels.jobs}</p>
+                    <p className="mt-1 font-semibold text-neutral-950">{item.total}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-3 py-2">
+                    <p className="text-xs text-neutral-500">{labels.summaryPending}</p>
+                    <p className="mt-1 font-semibold text-sky-700">{item.activeCount}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-3 py-2">
+                    <p className="text-xs text-neutral-500">{labels.summaryFailed}</p>
+                    <p className="mt-1 font-semibold text-amber-700">{item.failedCount}</p>
+                  </div>
                 </div>
-                <div className="rounded-xl bg-white px-3 py-2">
-                  <p className="text-xs text-neutral-500">{labels.summaryPending}</p>
-                  <p className="mt-1 font-semibold text-sky-700">{item.activeCount}</p>
-                </div>
-                <div className="rounded-xl bg-white px-3 py-2">
-                  <p className="text-xs text-neutral-500">{labels.summaryFailed}</p>
-                  <p className="mt-1 font-semibold text-amber-700">{item.failedCount}</p>
-                </div>
-              </div>
-              {item.lastJob ? (
-                <p className="mt-3 text-xs text-neutral-500">
-                  {jobTypeLabel(item.lastJob.jobType, labels)} - {statusLabel(item.lastJob.status, labels)} - {formatDate(item.lastJob.createdAt, locale)}
-                </p>
-              ) : (
-                <p className="mt-3 text-xs text-neutral-500">{labels.emptyJobs}</p>
-              )}
-            </button>
-          ))}
+                {item.lastJob ? (
+                  <p className="mt-3 text-xs text-neutral-500">
+                    {jobTypeLabel(item.lastJob.jobType, labels)} - {statusLabel(item.lastJob.status, labels)} - {formatDate(item.lastJob.createdAt, locale)}
+                  </p>
+                ) : (
+                  <p className="mt-3 text-xs text-neutral-500">{labels.emptyJobs}</p>
+                )}
+                {capabilitySummary ? (
+                  <div className="mt-3 rounded-xl border border-neutral-200 bg-white/80 p-2.5">
+                    <p className="text-[11px] leading-4 text-neutral-500">{labels.marketplaceCapabilitySummary}</p>
+                    <div className="mt-2 grid gap-1.5">
+                      {capabilityEntries.map((entry) => (
+                        <div key={entry.label} className="flex items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-xs leading-4">
+                          <span className="text-neutral-700">{entry.label}</span>
+                          <Badge className={entry.enabled ? "h-6 bg-emerald-100 px-2 py-0 text-[11px] text-emerald-700" : "h-6 bg-amber-100 px-2 py-0 text-[11px] text-amber-800"}>
+                            {entry.enabled ? labels.capabilityAvailable : labels.capabilityLimited}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -757,6 +1155,7 @@ export function IntegrationManager({
                 <SelectItem value="all">{labels.filterChannel}: {labels.all}</SelectItem>
                 <SelectItem value="TRENDYOL">{labels.channelTrendyol}</SelectItem>
                 <SelectItem value="N11">{labels.channelN11}</SelectItem>
+                <SelectItem value="HEPSIBURADA">{labels.channelHepsiburada}</SelectItem>
                 <SelectItem value="EDOCS_MOCK">{labels.channelEDocsMock}</SelectItem>
               </SelectContent>
             </Select>
@@ -811,9 +1210,12 @@ export function IntegrationManager({
           </div>
         </div>
         {hasActiveFilters ? (
-          <p className="mt-3 rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs text-cyan-800">
-            {labels.activeFilters}: {filteredJobs.length} / {jobs.length}
-          </p>
+          <div className="mt-3 rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2">
+            <p className="text-xs font-medium text-cyan-800">
+              {labels.activeFilters}: {filteredJobs.length} / {jobs.length}
+            </p>
+            <p className="mt-1 text-[11px] leading-4 text-cyan-700">{activeFilterSummary}</p>
+          </div>
         ) : null}
       </div>
 
@@ -834,10 +1236,10 @@ export function IntegrationManager({
           ) : (
             <div className="divide-y divide-neutral-200">
               {filteredJobs.map((item) => {
-                const canCheckBatch = item.channel === "TRENDYOL"
+                const canCheckBatch = (item.channel === "TRENDYOL" || item.channel === "N11" || item.channel === "HEPSIBURADA")
                   && item.status === "SUCCESS"
                   && (item.jobType === "PRODUCT_SYNC" || item.jobType === "STOCK_SYNC" || item.jobType === "PRICE_SYNC")
-                  && Boolean(item.externalReference || item.responsePayload?.batchRequestId);
+                  && Boolean(item.externalReference || item.responsePayload?.batchRequestId || item.responsePayload?.taskId || item.responsePayload?.priceUploadId || item.responsePayload?.stockUploadId);
                 const highlights = jobHighlights(item, labels);
 
                 return (
@@ -850,11 +1252,11 @@ export function IntegrationManager({
                       <p className="text-sm font-medium text-neutral-800">{jobTypeLabel(item.jobType, labels)}</p>
                       <p className="mt-1 text-xs text-neutral-500">{labels.attemptProgress}: {item.attemptCount}/{item.maxAttempts}</p>
                     </div>
-                    <p>
+                    <div>
                       <Badge className={statusClass(item.status)}>
                         {statusLabel(item.status, labels)}
                       </Badge>
-                    </p>
+                    </div>
                     <div className="min-w-0">
                       <p className="break-all text-neutral-700">{item.entityId}</p>
                       <p className="mt-1 truncate text-xs text-neutral-500">{item.idempotencyKey}</p>
@@ -935,6 +1337,40 @@ export function IntegrationManager({
                 {labels.close}
               </Button>
             </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {summarizeBatchResult(batchResult).map((item) => (
+                <article
+                  key={`${item.label}:${item.value}`}
+                  className={`rounded-xl border px-3 py-3 ${
+                    item.tone === "success"
+                      ? "border-emerald-200 bg-emerald-50"
+                      : item.tone === "warning"
+                        ? "border-amber-200 bg-amber-50"
+                        : "border-neutral-200 bg-neutral-50"
+                  }`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{item.label}</p>
+                  <p className="mt-2 break-all text-sm font-semibold text-neutral-950">{item.value}</p>
+                </article>
+              ))}
+            </div>
+            {summarizeBatchIssues(batchResult, labels).length > 0 ? (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-semibold text-neutral-950">{labels.batchIssueSummary}</p>
+                <div className="mt-3 grid gap-2">
+                  {summarizeBatchIssues(batchResult, labels).map((item) => (
+                    <article key={`${item.key}:${item.status ?? "-"}:${item.reason ?? "-"}`} className="rounded-lg border border-amber-200 bg-white px-3 py-2">
+                      <p className="text-sm font-medium text-neutral-900">{item.key}</p>
+                      <p className="mt-1 text-xs text-neutral-600">
+                        {labels.batchIssueStatus}: {item.status ?? "-"}
+                        {item.reason ? ` • ${labels.batchIssueReason}: ${item.reason}` : ""}
+                        {item.recommendedAction ? ` • ${labels.batchIssueRecommendedAction}: ${item.recommendedAction}` : ""}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <pre className="mt-4 max-h-80 overflow-auto rounded-xl bg-neutral-950 p-4 text-xs text-neutral-50">
               {JSON.stringify(batchResult.result ?? labels.batchResultEmpty, null, 2)}
             </pre>
@@ -1052,6 +1488,7 @@ export function IntegrationManager({
                         <SelectContent>
                           <SelectItem value="TRENDYOL">{labels.channelTrendyol}</SelectItem>
                           <SelectItem value="N11">{labels.channelN11}</SelectItem>
+                          <SelectItem value="HEPSIBURADA">{labels.channelHepsiburada}</SelectItem>
                           <SelectItem value="EDOCS_MOCK">{labels.channelEDocsMock}</SelectItem>
                         </SelectContent>
                       </Select>

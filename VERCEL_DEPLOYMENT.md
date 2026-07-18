@@ -27,11 +27,23 @@ If `REDIS_URL` is omitted, the application can still serve requests, but cache-b
 
 ## Scheduled jobs
 
-[`vercel.json`](/Users/borabayraktar/Documents/GitHub/arventatrade/vercel.json:1) registers a daily production cron:
+[`vercel.json`](/Users/borabayraktar/Documents/GitHub/arventatrade/vercel.json:1) registers daily production crons:
 
 - Path: `/api/system/integrations/trendyol-sync`
 - Schedule: `0 3 * * *` (03:00 UTC)
 - Scope: queues active Trendyol order imports, processes the integration queue, and follows up Trendyol stock/price batch results.
+
+- Path: `/api/system/integrations/n11-sync`
+- Schedule: `30 3 * * *` (03:30 UTC)
+- Scope: queues active N11 order imports, processes the integration queue, and follows up N11 order/product/price/stock task results.
+
+- Path: `/api/system/integrations/hepsiburada-sync`
+- Schedule: `0 4 * * *` (04:00 UTC)
+- Scope: queues active Hepsiburada order imports and processes the integration queue.
+
+- Available but not yet registered in [`vercel.json`](/Users/borabayraktar/Documents/GitHub/arventatrade/vercel.json:1):
+- Path: `/api/system/integrations/n11-task-follow-up`
+- Scope: only checks pending N11 task results for successful `PRODUCT_SYNC`, `PRICE_SYNC`, and `STOCK_SYNC` jobs.
 
 Vercel Cron only runs on production deployments. For more frequent Trendyol syncing, update the cron expression in `vercel.json` after confirming the Vercel plan supports the desired interval.
 

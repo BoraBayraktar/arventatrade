@@ -4,6 +4,18 @@
     {
       "path": "/api/system/integrations/trendyol-sync",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/system/integrations/n11-sync",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/system/integrations/hepsiburada-sync",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/system/integrations/hepsiburada-upload-follow-up",
+      "schedule": "15 4 * * *"
     }
   ]
 }

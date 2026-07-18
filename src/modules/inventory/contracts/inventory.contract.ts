@@ -571,7 +571,7 @@ export type AdminInventoryReportsResult = {
 
 export type AdminInventoryIntegrationJobItem = {
   id: string;
-  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
   status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
   entityId: string;
   createdAt: string;
@@ -584,10 +584,15 @@ export type AdminInventoryIntegrationSummary = {
   failedCount: number;
   deadLetterCount: number;
   successCount: number;
+  channelCounts: {
+    trendyol: number;
+    n11: number;
+    hepsiburada: number;
+  };
   recentJobs: AdminInventoryIntegrationJobItem[];
 };
 
-export type InventoryIntegrationChannel = "TRENDYOL" | "N11";
+export type InventoryIntegrationChannel = "TRENDYOL" | "N11" | "HEPSIBURADA";
 export type ExternalStockEventType = "SNAPSHOT_ON_HAND" | "SNAPSHOT_AVAILABLE";
 export type ExternalStockEventStatus = "RECEIVED" | "APPLIED" | "FAILED" | "DUPLICATE";
 

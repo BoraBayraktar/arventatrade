@@ -1,20 +1,29 @@
 import { z } from "zod";
 
+import { HepsiburadaClient } from "@/modules/integration/connectors/hepsiburada.client";
 import { marketplaceOrderService, MarketplaceOrderCreationError } from "@/modules/commerce/services/marketplace-order.service";
+import { N11Client } from "@/modules/integration/connectors/n11.client";
 import { TrendyolClient } from "@/modules/integration/connectors/trendyol.client";
+import type { MarketplaceCapabilitySet } from "@/modules/integration/contracts/integration.contract";
 import { MarketplaceIntegrationRepository } from "@/modules/integration/repositories/marketplace-integration.repository";
 import { integrationService } from "@/modules/integration/services/integration.service";
 import { integrationSecretCryptoService } from "@/modules/integration/services/integration-secret-crypto.service";
+import { n11OrderImportService } from "@/modules/integration/services/n11-order-import.service";
+import { n11PackageStatusService } from "@/modules/integration/services/n11-package-status.service";
+import { n11PackageSplitService } from "@/modules/integration/services/n11-package-split.service";
+import { n11StockSyncService } from "@/modules/integration/services/n11-stock-sync.service";
+import { trendyolPackageSplitService } from "@/modules/integration/services/trendyol-package-split.service";
 import { trendyolStockSyncService } from "@/modules/integration/services/trendyol-stock-sync.service";
 
 const upsertConfigSchema = z.object({
   id: z.string().trim().min(1).optional(),
-  channel: z.literal("TRENDYOL").default("TRENDYOL"),
+  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]).default("TRENDYOL"),
   displayName: z.string().trim().min(1).max(120),
   sellerId: z.string().trim().min(1).max(80),
   apiKey: z.string().trim().min(1).max(240).optional(),
   apiSecret: z.string().trim().min(1).max(240).optional(),
-  userAgent: z.string().trim().min(1).max(180),
+  serviceToken: z.string().trim().min(1).max(500).optional(),
+  userAgent: z.string().trim().max(180).optional().default(""),
   storeFrontCode: z.string().trim().min(1).max(80).optional().nullable().or(z.literal("")).transform((value) => value || null),
   endpointUrl: z.string().trim().url().optional().nullable().or(z.literal("")).transform((value) => value || null),
   trendyolCargoCompanyId: z.coerce.number().int().positive().optional().nullable(),
@@ -25,21 +34,47 @@ const upsertConfigSchema = z.object({
   environment: z.enum(["PRODUCTION", "STAGE"]).default("PRODUCTION"),
   syncWindowMinutes: z.coerce.number().int().min(15).max(1440).default(60),
   isActive: z.boolean().default(true),
+}).superRefine((value, context) => {
+  if ((value.channel === "TRENDYOL" || value.channel === "HEPSIBURADA") && value.userAgent.trim().length === 0) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["userAgent"],
+      message: "User-Agent zorunludur",
+    });
+  }
 });
 
 const testConfigSchema = z.object({
   id: z.string().trim().min(1).optional(),
+  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]).optional(),
   sellerId: z.string().trim().min(1).max(80).optional(),
   apiKey: z.string().trim().min(1).max(240).optional(),
   apiSecret: z.string().trim().min(1).max(240).optional(),
-  userAgent: z.string().trim().min(1).max(180).optional(),
+  userAgent: z.string().trim().max(180).optional(),
   storeFrontCode: z.string().trim().min(1).max(80).optional().nullable().or(z.literal("")).transform((value) => value || null),
   endpointUrl: z.string().trim().url().optional().nullable().or(z.literal("")).transform((value) => value || null),
-}).refine((value) => Boolean(value.id) || Boolean(value.sellerId && value.apiKey && value.apiSecret && value.userAgent), {
-  message: "Connection credentials are required",
+}).superRefine((value, context) => {
+  const channel = value.channel ?? "TRENDYOL";
+  const hasBaseCreds = Boolean(value.sellerId && value.apiKey && value.apiSecret);
+
+  if (!value.id && !hasBaseCreds) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Connection credentials are required",
+    });
+  }
+
+  if (!value.id && (channel === "TRENDYOL" || channel === "HEPSIBURADA") && !value.userAgent?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["userAgent"],
+      message: "User-Agent zorunludur",
+    });
+  }
 });
 
 const syncConfigSchema = z.object({
+  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]).default("TRENDYOL"),
   id: z.string().trim().min(1),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
@@ -52,6 +87,15 @@ const scheduledSyncSchema = z.object({
   followUpBatches: z.boolean().default(true),
   batchLimit: z.coerce.number().int().min(1).max(50).default(10),
   batchMinCheckIntervalMinutes: z.coerce.number().int().min(1).max(1440).default(15),
+});
+
+const scheduledN11SyncSchema = z.object({
+  processQueue: z.boolean().default(true),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  followUpTasks: z.boolean().default(true),
+  taskLimit: z.coerce.number().int().min(1).max(50).default(10),
+  taskMinCheckIntervalMinutes: z.coerce.number().int().min(1).max(1440).default(15),
+  status: z.string().trim().min(1).max(80).default("Created"),
 });
 
 const packageIdSchema = z.object({
@@ -72,12 +116,51 @@ const createOrderSchema = z.object({
   packageId: z.string().trim().min(1),
 });
 
+const splitPackageSchema = z.object({
+  packageId: z.string().trim().min(1),
+  splits: z.array(z.object({
+    lineId: z.string().trim().min(1),
+    quantity: z.coerce.number().int().positive(),
+  })).min(1),
+});
+
 const queueStatusSyncSchema = z.object({
   packageId: z.string().trim().min(1),
+  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]).optional(),
   status: z.enum(["Picking", "Invoiced"]),
   invoiceNumber: z.string().trim().min(1).max(120).optional(),
-}).refine((value) => value.status !== "Invoiced" || Boolean(value.invoiceNumber), {
-  message: "Invoice number is required for Invoiced status",
+  invoiceLink: z.string().trim().url().optional(),
+  invoiceArrangementDate: z.string().trim().min(1).max(80).optional(),
+  invoiceRowNumber: z.string().trim().min(1).max(80).optional(),
+  invoiceSerialNumber: z.string().trim().min(1).max(80).optional(),
+}).superRefine((value, context) => {
+  const channel = value.channel ?? "TRENDYOL";
+  if (channel === "TRENDYOL" && value.status === "Invoiced" && !value.invoiceNumber) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Invoice number is required for Invoiced status",
+    });
+  }
+  if (channel === "N11" && value.status === "Invoiced") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["status"],
+      message: "N11 dokumanina gore bu fazda yalnizca Picking guncellemesi desteklenir",
+    });
+  }
+  if (channel === "HEPSIBURADA" && value.status === "Invoiced") {
+    if (!value.invoiceLink) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["invoiceLink"],
+        message: "Hepsiburada fatura bildirimi icin fatura linki zorunludur",
+      });
+    }
+  }
+});
+
+const dashboardQuerySchema = z.object({
+  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]).optional(),
 });
 
 const retryStatusJobSchema = z.object({
@@ -115,6 +198,7 @@ function mapConfig(item: Awaited<ReturnType<MarketplaceIntegrationRepository["li
     sellerId: item.sellerId,
     apiKeyMasked: maskSecret(item.apiKeyEncrypted),
     apiSecretMasked: maskSecret(item.apiSecretEncrypted),
+    serviceTokenMasked: maskSecret(item.serviceTokenEncrypted),
     userAgent: item.userAgent,
     storeFrontCode: item.storeFrontCode,
     endpointUrl: item.endpointUrl,
@@ -172,12 +256,80 @@ function mapPackageStatusJob(item: Awaited<ReturnType<MarketplaceIntegrationRepo
     lastAttemptAt: item.lastAttemptAt?.toISOString() ?? null,
     processedAt: item.processedAt?.toISOString() ?? null,
     lastError: item.lastError,
+    externalReference: item.externalReference,
     createdAt: item.createdAt.toISOString(),
     deadLetter: item.deadLetter ? {
       id: item.deadLetter.id,
       resolved: item.deadLetter.resolved,
       resolvedAt: item.deadLetter.resolvedAt?.toISOString() ?? null,
     } : null,
+  };
+}
+
+function mapLatestPackageStatusJob(item: Awaited<ReturnType<MarketplaceIntegrationRepository["listLatestPackageStatusJobs"]>>[number]) {
+  const payload = item.payload as Record<string, unknown> | null;
+
+  return {
+    id: item.id,
+    status: item.status,
+    targetStatus: typeof payload?.status === "string" ? payload.status : null,
+    lastError: item.lastError,
+    externalReference: item.externalReference,
+    createdAt: item.createdAt.toISOString(),
+    processedAt: item.processedAt?.toISOString() ?? null,
+    deadLetter: item.deadLetter ? {
+      id: item.deadLetter.id,
+      resolved: item.deadLetter.resolved,
+      resolvedAt: item.deadLetter.resolvedAt?.toISOString() ?? null,
+    } : null,
+  };
+}
+
+function getMarketplaceCapabilities(channel: "TRENDYOL" | "N11" | "HEPSIBURADA"): MarketplaceCapabilitySet {
+  if (channel === "HEPSIBURADA") {
+    return {
+      supportsOrderImport: true,
+      supportsProductSync: true,
+      supportsPriceSync: true,
+      supportsStockSync: true,
+      supportsStatusPicking: true,
+      supportsStatusInvoiced: true,
+      supportsPackageSplit: false,
+      requiresBrandMapping: false,
+      requiresCategoryMapping: false,
+      requiresAttributeMapping: false,
+      preflightLevel: "STANDARD",
+    };
+  }
+
+  if (channel === "N11") {
+    return {
+      supportsOrderImport: true,
+      supportsProductSync: true,
+      supportsPriceSync: true,
+      supportsStockSync: true,
+      supportsStatusPicking: true,
+      supportsStatusInvoiced: false,
+      supportsPackageSplit: true,
+      requiresBrandMapping: false,
+      requiresCategoryMapping: false,
+      requiresAttributeMapping: false,
+      preflightLevel: "STANDARD",
+    };
+  }
+
+  return {
+    supportsOrderImport: true,
+    supportsProductSync: true,
+    supportsPriceSync: true,
+    supportsStockSync: true,
+    supportsStatusPicking: true,
+    supportsStatusInvoiced: true,
+    supportsPackageSplit: true,
+    requiresBrandMapping: true,
+    requiresCategoryMapping: true,
+    requiresAttributeMapping: true,
+    preflightLevel: "ADVANCED",
   };
 }
 
@@ -250,15 +402,30 @@ export class MarketplaceIntegrationService {
     };
   }
 
-  async getDashboard() {
+  async getDashboard(input?: unknown) {
+    const parsed = dashboardQuerySchema.parse(input ?? {});
+    const channel = parsed.channel ?? "TRENDYOL";
     const [configs, packages] = await Promise.all([
-      this.repository.listConfigs(),
-      this.repository.listRecentPackages(30),
+      this.repository.listConfigs(parsed.channel),
+      this.repository.listRecentPackages(30, parsed.channel),
     ]);
+    const latestStatusJobs = await this.repository.listLatestPackageStatusJobs(packages.map((item) => item.id));
+    const latestStatusJobByPackageId = new Map<string, ReturnType<typeof mapLatestPackageStatusJob>>();
+
+    for (const job of latestStatusJobs) {
+      if (!latestStatusJobByPackageId.has(job.entityId)) {
+        latestStatusJobByPackageId.set(job.entityId, mapLatestPackageStatusJob(job));
+      }
+    }
 
     return {
+      channel,
+      capabilities: getMarketplaceCapabilities(channel),
       configs: configs.map(mapConfig),
-      packages: packages.map(mapPackage),
+      packages: packages.map((item) => ({
+        ...mapPackage(item),
+        latestStatusJob: latestStatusJobByPackageId.get(item.id) ?? null,
+      })),
       summary: {
         activeConfigCount: configs.filter((item) => item.isActive).length,
         packageCount: packages.length,
@@ -329,6 +496,7 @@ export class MarketplaceIntegrationService {
       sellerId: parsed.sellerId,
       ...(parsed.apiKey ? { apiKeyEncrypted: integrationSecretCryptoService.encrypt(parsed.apiKey) ?? undefined } : {}),
       ...(parsed.apiSecret ? { apiSecretEncrypted: integrationSecretCryptoService.encrypt(parsed.apiSecret) ?? undefined } : {}),
+      ...(parsed.serviceToken ? { serviceTokenEncrypted: integrationSecretCryptoService.encrypt(parsed.serviceToken) ?? undefined } : {}),
       userAgent: parsed.userAgent,
       storeFrontCode: parsed.storeFrontCode,
       endpointUrl: parsed.endpointUrl,
@@ -347,6 +515,7 @@ export class MarketplaceIntegrationService {
 
   async testConnection(input: unknown) {
     const parsed = testConfigSchema.parse(input);
+    let channel = parsed.channel ?? "TRENDYOL";
     let sellerId = parsed.sellerId ?? null;
     let apiKey = parsed.apiKey ?? null;
     let apiSecret = parsed.apiSecret ?? null;
@@ -358,9 +527,12 @@ export class MarketplaceIntegrationService {
       const config = await this.repository.findActiveConfigById(parsed.id);
 
       if (!config || config.channel !== "TRENDYOL") {
-        throw new Error("TRENDYOL_CONFIG_NOT_FOUND");
+        if (!config || (config.channel !== "TRENDYOL" && config.channel !== "N11" && config.channel !== "HEPSIBURADA")) {
+          throw new Error("MARKETPLACE_CONFIG_NOT_FOUND");
+        }
       }
 
+      channel = config.channel;
       sellerId = sellerId ?? config.sellerId;
       apiKey = apiKey ?? integrationSecretCryptoService.decrypt(config.apiKeyEncrypted);
       apiSecret = apiSecret ?? integrationSecretCryptoService.decrypt(config.apiSecretEncrypted);
@@ -369,20 +541,44 @@ export class MarketplaceIntegrationService {
       endpointUrl = endpointUrl ?? config.endpointUrl;
     }
 
-    if (!sellerId || !apiKey || !apiSecret || !userAgent) {
-      throw new Error("TRENDYOL_CONFIG_INCOMPLETE");
+    if (!sellerId || !apiKey || !apiSecret) {
+      throw new Error("MARKETPLACE_CONFIG_INCOMPLETE");
     }
 
-    const client = new TrendyolClient({
-      sellerId,
-      apiKey,
-      apiSecret,
-      userAgent,
-      storeFrontCode,
-      endpointUrl,
-    });
-
-    await client.testConnection();
+    if (channel === "TRENDYOL") {
+      if (!userAgent) {
+        throw new Error("TRENDYOL_CONFIG_INCOMPLETE");
+      }
+      const client = new TrendyolClient({
+        sellerId,
+        apiKey,
+        apiSecret,
+        userAgent,
+        storeFrontCode,
+        endpointUrl,
+      });
+      await client.testConnection();
+    } else if (channel === "HEPSIBURADA") {
+      if (!userAgent) {
+        throw new Error("HEPSIBURADA_CONFIG_INCOMPLETE");
+      }
+      const client = new HepsiburadaClient({
+        merchantId: sellerId,
+        apiKey,
+        apiSecret,
+        userAgent,
+        endpointUrl,
+      });
+      await client.testConnection();
+    } else {
+      const client = new N11Client({
+        sellerId,
+        apiKey,
+        apiSecret,
+        endpointUrl,
+      });
+      await client.testConnection();
+    }
 
     return {
       ok: true,
@@ -399,7 +595,7 @@ export class MarketplaceIntegrationService {
     };
 
     return integrationService.dispatchJobs({
-      channel: "TRENDYOL",
+      channel: parsed.channel,
       jobType: "ORDER_IMPORT",
       entityType: "MARKETPLACE_ACCOUNT",
       entityIds: [parsed.id],
@@ -417,6 +613,8 @@ export class MarketplaceIntegrationService {
       throw new Error("MARKETPLACE_PACKAGE_NOT_FOUND");
     }
 
+    const channel = parsed.channel ?? item.channel;
+
     if (parsed.status === "Picking" && (item.packageStatus === "Picking" || item.packageStatus === "Invoiced")) {
       throw new Error("MARKETPLACE_PACKAGE_STATUS_ORDER_INVALID");
     }
@@ -426,7 +624,7 @@ export class MarketplaceIntegrationService {
     }
 
     return integrationService.dispatchJobs({
-      channel: "TRENDYOL",
+      channel,
       jobType: "ORDER_STATUS_SYNC",
       entityType: "MARKETPLACE_PACKAGE",
       entityIds: [parsed.packageId],
@@ -434,8 +632,18 @@ export class MarketplaceIntegrationService {
       payload: {
         status: parsed.status,
         ...(parsed.invoiceNumber ? { invoiceNumber: parsed.invoiceNumber } : {}),
+        ...(parsed.invoiceLink ? { invoiceLink: parsed.invoiceLink } : {}),
+        ...(parsed.invoiceArrangementDate ? { invoiceArrangementDate: parsed.invoiceArrangementDate } : {}),
+        ...(parsed.invoiceRowNumber ? { invoiceRowNumber: parsed.invoiceRowNumber } : {}),
+        ...(parsed.invoiceSerialNumber ? { invoiceSerialNumber: parsed.invoiceSerialNumber } : {}),
       },
-      idempotencySuffix: `${parsed.status}:${parsed.invoiceNumber ?? "no-invoice"}:${new Date().toISOString()}`,
+      idempotencySuffix: [
+        parsed.status,
+        parsed.invoiceNumber ?? parsed.invoiceLink ?? "no-invoice",
+        parsed.invoiceSerialNumber ?? "no-serial",
+        parsed.invoiceRowNumber ?? "no-row",
+        new Date().toISOString(),
+      ].join(":"),
     });
   }
 
@@ -493,6 +701,81 @@ export class MarketplaceIntegrationService {
       deduplicated,
       processed,
       batchFollowUp,
+    };
+  }
+
+  async scheduleActiveN11Imports(input: unknown) {
+    const parsed = scheduledN11SyncSchema.parse(input ?? {});
+    const configs = await this.repository.listActiveConfigsByChannel("N11");
+
+    let accepted = 0;
+    let deduplicated = 0;
+
+    for (const config of configs) {
+      const result = await integrationService.dispatchJobs({
+        channel: "N11",
+        jobType: "ORDER_IMPORT",
+        entityType: "MARKETPLACE_ACCOUNT",
+        entityIds: [config.id],
+        maxAttempts: 3,
+        payload: {
+          status: parsed.status,
+        },
+        idempotencySuffix: new Date().toISOString(),
+      });
+      accepted += result.accepted;
+      deduplicated += result.deduplicated;
+    }
+
+    const processed = parsed.processQueue
+      ? await integrationService.processQueue({ limit: parsed.limit })
+      : null;
+    const taskFollowUp = parsed.followUpTasks
+      ? await n11StockSyncService.followUpPendingTasks({
+          limit: parsed.taskLimit,
+          minCheckIntervalMinutes: parsed.taskMinCheckIntervalMinutes,
+        })
+      : null;
+
+    return {
+      configCount: configs.length,
+      accepted,
+      deduplicated,
+      processed,
+      taskFollowUp,
+    };
+  }
+
+  async scheduleActiveHepsiburadaImports(input: unknown) {
+    const parsed = scheduledSyncSchema.parse(input ?? {});
+    const configs = await this.repository.listActiveConfigsByChannel("HEPSIBURADA");
+
+    let accepted = 0;
+    let deduplicated = 0;
+
+    for (const config of configs) {
+      const result = await integrationService.dispatchJobs({
+        channel: "HEPSIBURADA",
+        jobType: "ORDER_IMPORT",
+        entityType: "MARKETPLACE_ACCOUNT",
+        entityIds: [config.id],
+        maxAttempts: 3,
+        payload: {},
+        idempotencySuffix: new Date().toISOString(),
+      });
+      accepted += result.accepted;
+      deduplicated += result.deduplicated;
+    }
+
+    const processed = parsed.processQueue
+      ? await integrationService.processQueue({ limit: parsed.limit })
+      : null;
+
+    return {
+      configCount: configs.length,
+      accepted,
+      deduplicated,
+      processed,
     };
   }
 
@@ -559,6 +842,8 @@ export class MarketplaceIntegrationService {
       const created = await marketplaceOrderService.createOrderFromMarketplace({
         channel: item.channel,
         externalOrderNumber: item.externalOrderNumber,
+        customerName: item.customerName,
+        customerEmail: item.customerEmail,
         lines: orderLines.map((line) => ({
           productId: line.productId!,
           productVariantId: line.productVariantId,
@@ -586,6 +871,25 @@ export class MarketplaceIntegrationService {
 
       throw error;
     }
+  }
+
+  async splitPackage(input: unknown) {
+    const parsed = splitPackageSchema.parse(input);
+    const targetPackage = await this.repository.findPackageForSplit(parsed.packageId);
+
+    if (!targetPackage) {
+      throw new Error("MARKETPLACE_PACKAGE_NOT_FOUND");
+    }
+
+    if (targetPackage.channel === "TRENDYOL") {
+      return trendyolPackageSplitService.splitPackage(parsed);
+    }
+
+    if (targetPackage.channel === "N11") {
+      return n11PackageSplitService.splitPackage(parsed);
+    }
+
+    throw new Error("MARKETPLACE_PACKAGE_UNSUPPORTED_CHANNEL");
   }
 
 }

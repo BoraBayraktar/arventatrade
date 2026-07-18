@@ -14,6 +14,9 @@ export class FinanceRepository {
       where: {
         deleted: false,
         status: "CONFIRMED",
+        customerAccountId: {
+          not: null,
+        },
         paymentStatus: {
           in: args.paymentStatuses,
         },
@@ -72,6 +75,9 @@ export class FinanceRepository {
       where: {
         deleted: false,
         status: "CONFIRMED",
+        customerAccountId: {
+          not: null,
+        },
         paymentStatus: {
           in: args.paymentStatuses,
         },
@@ -91,6 +97,9 @@ export class FinanceRepository {
     const baseWhere = {
       deleted: false,
       status: "CONFIRMED" as const,
+      customerAccountId: {
+        not: null,
+      },
     };
 
     const [aggregate, pendingCount, authorizedCount, failedCount] = await Promise.all([

@@ -981,6 +981,7 @@ model MarketplaceIntegrationConfig {
   sellerId             String
   apiKeyEncrypted      String
   apiSecretEncrypted   String
+  serviceTokenEncrypted String?
   userAgent            String
   storeFrontCode       String?
   endpointUrl          String?
@@ -1289,6 +1290,7 @@ enum PromotionType {
 enum IntegrationChannel {
   TRENDYOL
   N11
+  HEPSIBURADA
   EDOCS_MOCK
 }
 

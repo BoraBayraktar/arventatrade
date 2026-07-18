@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { integrationService } from "@/modules/integration/services/integration.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
 import { IntegrationManager } from "@/ui/admin/integration-manager";
 
 export default async function AdminIntegrationsPage({
@@ -23,9 +24,12 @@ export default async function AdminIntegrationsPage({
     redirect(`/${locale}/admin/login`);
   }
 
-  const [jobs, deadLetters] = await Promise.all([
+  const [jobs, deadLetters, trendyolDashboard, n11Dashboard, hepsiburadaDashboard] = await Promise.all([
     integrationService.listJobs({ page: 1, pageSize: 20 }),
     integrationService.listDeadLetters(),
+    marketplaceIntegrationService.getDashboard({ channel: "TRENDYOL" }),
+    marketplaceIntegrationService.getDashboard({ channel: "N11" }),
+    marketplaceIntegrationService.getDashboard({ channel: "HEPSIBURADA" }),
   ]);
 
   return (
@@ -34,6 +38,11 @@ export default async function AdminIntegrationsPage({
       canManage={user.role === "ADMIN"}
       initialJobs={jobs.items}
       initialDeadLetters={deadLetters.items}
+      marketplaceCapabilities={[
+        { channel: "TRENDYOL", capabilities: trendyolDashboard.capabilities },
+        { channel: "N11", capabilities: n11Dashboard.capabilities },
+        { channel: "HEPSIBURADA", capabilities: hepsiburadaDashboard.capabilities },
+      ]}
       labels={{
         title: dictionary.admin.integrationManager,
         subtitle: dictionary.admin.integrationSubtitle,
@@ -48,6 +57,15 @@ export default async function AdminIntegrationsPage({
         entityId: dictionary.admin.integrationEntityId,
         marketplaceOverview: dictionary.admin.integrationMarketplaceOverview,
         marketplaceOverviewHint: dictionary.admin.integrationMarketplaceOverviewHint,
+        marketplaceCapabilitySummary: dictionary.admin.integrationMarketplaceCapabilitySummary,
+        capabilityAvailable: dictionary.admin.integrationMarketplaceCapabilityAvailable,
+        capabilityLimited: dictionary.admin.integrationMarketplaceCapabilityLimited,
+        capabilityInvoicedStatus: dictionary.admin.integrationMarketplaceCapabilityInvoicedStatus,
+        capabilityPackageSplit: dictionary.admin.integrationMarketplaceCapabilityPackageSplit,
+        capabilityBrandMapping: dictionary.admin.integrationMarketplaceCapabilityBrandMapping,
+        capabilityCategoryMapping: dictionary.admin.integrationMarketplaceCapabilityCategoryMapping,
+        capabilityAttributeMapping: dictionary.admin.integrationMarketplaceCapabilityAttributeMapping,
+        capabilityAdvancedPreflight: dictionary.admin.integrationMarketplaceCapabilityAdvancedPreflight,
         filterByChannel: dictionary.admin.integrationFilterByChannel,
         activeFilters: dictionary.admin.integrationActiveFilters,
         recentActivity: dictionary.admin.integrationRecentActivity,
@@ -72,6 +90,7 @@ export default async function AdminIntegrationsPage({
         processedAt: dictionary.admin.integrationProcessedAt,
         channelTrendyol: dictionary.admin.integrationChannelTrendyol,
         channelN11: dictionary.admin.integrationChannelN11,
+        channelHepsiburada: dictionary.admin.integrationChannelHepsiburada,
         channelEDocsMock: dictionary.admin.integrationChannelEDocsMock,
         jobTypeProductSync: dictionary.admin.integrationJobTypeProductSync,
         jobTypePriceSync: dictionary.admin.integrationJobTypePriceSync,
@@ -147,6 +166,10 @@ export default async function AdminIntegrationsPage({
         checkBatchResult: dictionary.admin.integrationCheckBatchResult,
         batchResultEmpty: dictionary.admin.integrationBatchResultEmpty,
         batchCheckedAt: dictionary.admin.integrationBatchCheckedAt,
+        batchIssueSummary: dictionary.admin.integrationBatchIssueSummary,
+        batchIssueStatus: dictionary.admin.integrationBatchIssueStatus,
+        batchIssueReason: dictionary.admin.integrationBatchIssueReason,
+        batchIssueRecommendedAction: dictionary.admin.integrationBatchIssueRecommendedAction,
         all: dictionary.admin.statusAll,
         validationEntityIds: dictionary.admin.integrationValidationEntityIds,
         validationQueueLimit: dictionary.admin.integrationValidationQueueLimit,

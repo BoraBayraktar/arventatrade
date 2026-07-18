@@ -31,6 +31,7 @@ export default async function AdminBrandsPage({
       labels={{
         title: dictionary.admin.brandsTitle,
         description: dictionary.admin.brandsDescription,
+        marketplaceNote: dictionary.admin.brandsMarketplaceNote,
         createTitle: dictionary.admin.brandsCreateTitle,
         listTitle: dictionary.admin.brandsTitle,
         search: dictionary.admin.searchBrand,

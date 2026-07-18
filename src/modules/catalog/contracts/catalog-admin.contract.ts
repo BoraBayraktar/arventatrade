@@ -132,6 +132,12 @@ export type AdminUpdateProductInput = {
   variants?: AdminProductVariantInput[];
 };
 
+export type AdminUpdateProductVariantsInput = {
+  productId: string;
+  attributeLinks: AdminProductAttributeLinkInput[];
+  variants: AdminProductVariantInput[];
+};
+
 export type AdminProductAttributeDefinitionItem = {
   id: string;
   slug: string;
@@ -202,7 +208,7 @@ export type AdminProductAttributeValueMarketplaceMappingItem = {
   id: string;
   attributeDefinitionId: string;
   attributeName: string;
-  channel: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
   localValue: string;
   externalAttributeValueId: number | null;
   externalAttributeValueName: string | null;
