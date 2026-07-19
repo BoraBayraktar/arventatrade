@@ -3,6 +3,7 @@ import { z } from "zod";
 import { HepsiburadaClient } from "@/modules/integration/connectors/hepsiburada.client";
 import { marketplaceOrderService, MarketplaceOrderCreationError } from "@/modules/commerce/services/marketplace-order.service";
 import { N11Client } from "@/modules/integration/connectors/n11.client";
+import { PazaramaClient } from "@/modules/integration/connectors/pazarama.client";
 import { TrendyolClient } from "@/modules/integration/connectors/trendyol.client";
 import type { MarketplaceCapabilitySet } from "@/modules/integration/contracts/integration.contract";
 import { MarketplaceIntegrationRepository } from "@/modules/integration/repositories/marketplace-integration.repository";
@@ -12,12 +13,13 @@ import { n11OrderImportService } from "@/modules/integration/services/n11-order-
 import { n11PackageStatusService } from "@/modules/integration/services/n11-package-status.service";
 import { n11PackageSplitService } from "@/modules/integration/services/n11-package-split.service";
 import { n11StockSyncService } from "@/modules/integration/services/n11-stock-sync.service";
+import { pazaramaOrderImportService } from "@/modules/integration/services/pazarama-order-import.service";
 import { trendyolPackageSplitService } from "@/modules/integration/services/trendyol-package-split.service";
 import { trendyolStockSyncService } from "@/modules/integration/services/trendyol-stock-sync.service";
 
 const upsertConfigSchema = z.object({
   id: z.string().trim().min(1).optional(),
-  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]).default("TRENDYOL"),
+  channel: z.enum(["TRENDYOL", "N11", "PAZARAMA", "HEPSIBURADA"]).default("TRENDYOL"),
   displayName: z.string().trim().min(1).max(120),
   sellerId: z.string().trim().min(1).max(80),
   apiKey: z.string().trim().min(1).max(240).optional(),
@@ -46,7 +48,7 @@ const upsertConfigSchema = z.object({
 
 const testConfigSchema = z.object({
   id: z.string().trim().min(1).optional(),
-  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]).optional(),
+  channel: z.enum(["TRENDYOL", "N11", "PAZARAMA", "HEPSIBURADA"]).optional(),
   sellerId: z.string().trim().min(1).max(80).optional(),
   apiKey: z.string().trim().min(1).max(240).optional(),
   apiSecret: z.string().trim().min(1).max(240).optional(),
@@ -74,7 +76,7 @@ const testConfigSchema = z.object({
 });
 
 const syncConfigSchema = z.object({
-  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]).default("TRENDYOL"),
+  channel: z.enum(["TRENDYOL", "N11", "PAZARAMA", "HEPSIBURADA"]).default("TRENDYOL"),
   id: z.string().trim().min(1),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
@@ -126,13 +128,17 @@ const splitPackageSchema = z.object({
 
 const queueStatusSyncSchema = z.object({
   packageId: z.string().trim().min(1),
-  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]).optional(),
+  channel: z.enum(["TRENDYOL", "N11", "PAZARAMA", "HEPSIBURADA"]).optional(),
   status: z.enum(["Picking", "Invoiced"]),
   invoiceNumber: z.string().trim().min(1).max(120).optional(),
   invoiceLink: z.string().trim().url().optional(),
   invoiceArrangementDate: z.string().trim().min(1).max(80).optional(),
   invoiceRowNumber: z.string().trim().min(1).max(80).optional(),
   invoiceSerialNumber: z.string().trim().min(1).max(80).optional(),
+  cargoCompanyId: z.string().trim().min(1).max(120).optional(),
+  shippingTrackingNumber: z.string().trim().min(1).max(120).optional(),
+  trackingUrl: z.string().trim().url().optional(),
+  shipmentNumber: z.string().trim().min(1).max(120).optional(),
 }).superRefine((value, context) => {
   const channel = value.channel ?? "TRENDYOL";
   if (channel === "TRENDYOL" && value.status === "Invoiced" && !value.invoiceNumber) {
@@ -157,10 +163,26 @@ const queueStatusSyncSchema = z.object({
       });
     }
   }
+  if (channel === "PAZARAMA" && value.status === "Invoiced") {
+    if (!value.cargoCompanyId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["cargoCompanyId"],
+        message: "Pazarama kargoya verildi bildirimi icin kargo sirketi id zorunludur",
+      });
+    }
+    if (!value.shippingTrackingNumber) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["shippingTrackingNumber"],
+        message: "Pazarama kargoya verildi bildirimi icin takip numarasi zorunludur",
+      });
+    }
+  }
 });
 
 const dashboardQuerySchema = z.object({
-  channel: z.enum(["TRENDYOL", "N11", "HEPSIBURADA"]).optional(),
+  channel: z.enum(["TRENDYOL", "N11", "PAZARAMA", "HEPSIBURADA"]).optional(),
 });
 
 const retryStatusJobSchema = z.object({
@@ -285,7 +307,23 @@ function mapLatestPackageStatusJob(item: Awaited<ReturnType<MarketplaceIntegrati
   };
 }
 
-function getMarketplaceCapabilities(channel: "TRENDYOL" | "N11" | "HEPSIBURADA"): MarketplaceCapabilitySet {
+function getMarketplaceCapabilities(channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA"): MarketplaceCapabilitySet {
+  if (channel === "PAZARAMA") {
+    return {
+      supportsOrderImport: true,
+      supportsProductSync: true,
+      supportsPriceSync: true,
+      supportsStockSync: true,
+      supportsStatusPicking: true,
+      supportsStatusInvoiced: false,
+      supportsPackageSplit: false,
+      requiresBrandMapping: true,
+      requiresCategoryMapping: true,
+      requiresAttributeMapping: true,
+      preflightLevel: "ADVANCED",
+    };
+  }
+
   if (channel === "HEPSIBURADA") {
     return {
       supportsOrderImport: true,
@@ -395,6 +433,27 @@ export class MarketplaceIntegrationService {
     });
   }
 
+  private async getActivePazaramaClient() {
+    const [config] = await this.repository.listActiveConfigsByChannel("PAZARAMA");
+
+    if (!config) {
+      throw new Error("PAZARAMA_CONFIG_NOT_FOUND");
+    }
+
+    const apiKey = integrationSecretCryptoService.decrypt(config.apiKeyEncrypted);
+    const apiSecret = integrationSecretCryptoService.decrypt(config.apiSecretEncrypted);
+
+    if (!apiKey || !apiSecret) {
+      throw new Error("PAZARAMA_CONFIG_INCOMPLETE");
+    }
+
+    return new PazaramaClient({
+      apiKey,
+      apiSecret,
+      endpointUrl: config.endpointUrl,
+    });
+  }
+
   async listConfigs() {
     const items = await this.repository.listConfigs();
     return {
@@ -471,6 +530,35 @@ export class MarketplaceIntegrationService {
     };
   }
 
+  async searchPazaramaBrands(input: unknown) {
+    const parsed = catalogLookupSchema.parse(input);
+    const client = await this.getActivePazaramaClient();
+
+    return {
+      items: await client.searchBrands(parsed.query),
+    };
+  }
+
+  async searchPazaramaCategories(input: unknown) {
+    const parsed = catalogLookupSchema.parse(input);
+    const client = await this.getActivePazaramaClient();
+
+    return {
+      items: await client.searchCategories(parsed.query),
+    };
+  }
+
+  async listPazaramaCategoryAttributes(input: unknown) {
+    const parsed = z.object({
+      categoryId: z.string().trim().min(1),
+    }).parse(input);
+    const client = await this.getActivePazaramaClient();
+
+    return {
+      items: await client.getCategoryAttributes(parsed.categoryId),
+    };
+  }
+
   async getPackageDetail(input: unknown) {
     const parsed = packageIdSchema.parse(input);
     const item = await this.repository.findPackageById(parsed.id);
@@ -527,7 +615,7 @@ export class MarketplaceIntegrationService {
       const config = await this.repository.findActiveConfigById(parsed.id);
 
       if (!config || config.channel !== "TRENDYOL") {
-        if (!config || (config.channel !== "TRENDYOL" && config.channel !== "N11" && config.channel !== "HEPSIBURADA")) {
+        if (!config || (config.channel !== "TRENDYOL" && config.channel !== "N11" && config.channel !== "PAZARAMA" && config.channel !== "HEPSIBURADA")) {
           throw new Error("MARKETPLACE_CONFIG_NOT_FOUND");
         }
       }
@@ -555,6 +643,13 @@ export class MarketplaceIntegrationService {
         apiSecret,
         userAgent,
         storeFrontCode,
+        endpointUrl,
+      });
+      await client.testConnection();
+    } else if (channel === "PAZARAMA") {
+      const client = new PazaramaClient({
+        apiKey,
+        apiSecret,
         endpointUrl,
       });
       await client.testConnection();
@@ -636,10 +731,15 @@ export class MarketplaceIntegrationService {
         ...(parsed.invoiceArrangementDate ? { invoiceArrangementDate: parsed.invoiceArrangementDate } : {}),
         ...(parsed.invoiceRowNumber ? { invoiceRowNumber: parsed.invoiceRowNumber } : {}),
         ...(parsed.invoiceSerialNumber ? { invoiceSerialNumber: parsed.invoiceSerialNumber } : {}),
+        ...(parsed.cargoCompanyId ? { cargoCompanyId: parsed.cargoCompanyId } : {}),
+        ...(parsed.shippingTrackingNumber ? { shippingTrackingNumber: parsed.shippingTrackingNumber } : {}),
+        ...(parsed.trackingUrl ? { trackingUrl: parsed.trackingUrl } : {}),
+        ...(parsed.shipmentNumber ? { shipmentNumber: parsed.shipmentNumber } : {}),
       },
       idempotencySuffix: [
         parsed.status,
         parsed.invoiceNumber ?? parsed.invoiceLink ?? "no-invoice",
+        parsed.shippingTrackingNumber ?? "no-tracking",
         parsed.invoiceSerialNumber ?? "no-serial",
         parsed.invoiceRowNumber ?? "no-row",
         new Date().toISOString(),
@@ -743,6 +843,39 @@ export class MarketplaceIntegrationService {
       deduplicated,
       processed,
       taskFollowUp,
+    };
+  }
+
+  async scheduleActivePazaramaImports(input: unknown) {
+    const parsed = scheduledSyncSchema.parse(input ?? {});
+    const configs = await this.repository.listActiveConfigsByChannel("PAZARAMA");
+
+    let accepted = 0;
+    let deduplicated = 0;
+
+    for (const config of configs) {
+      const result = await integrationService.dispatchJobs({
+        channel: "PAZARAMA",
+        jobType: "ORDER_IMPORT",
+        entityType: "MARKETPLACE_ACCOUNT",
+        entityIds: [config.id],
+        maxAttempts: 3,
+        payload: {},
+        idempotencySuffix: new Date().toISOString(),
+      });
+      accepted += result.accepted;
+      deduplicated += result.deduplicated;
+    }
+
+    const processed = parsed.processQueue
+      ? await integrationService.processQueue({ limit: parsed.limit })
+      : null;
+
+    return {
+      configCount: configs.length,
+      accepted,
+      deduplicated,
+      processed,
     };
   }
 

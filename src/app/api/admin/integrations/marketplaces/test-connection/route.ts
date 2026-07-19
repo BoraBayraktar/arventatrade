@@ -23,11 +23,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Marketplace config not found" }, { status: 404 });
     }
 
-    if (error instanceof Error && (error.message === "TRENDYOL_CONFIG_INCOMPLETE" || error.message === "N11_CONFIG_INCOMPLETE" || error.message === "HEPSIBURADA_CONFIG_INCOMPLETE" || error.message === "MARKETPLACE_CONFIG_INCOMPLETE")) {
+    if (error instanceof Error && (error.message === "TRENDYOL_CONFIG_INCOMPLETE" || error.message === "N11_CONFIG_INCOMPLETE" || error.message === "PAZARAMA_CONFIG_INCOMPLETE" || error.message === "HEPSIBURADA_CONFIG_INCOMPLETE" || error.message === "MARKETPLACE_CONFIG_INCOMPLETE")) {
       return NextResponse.json({ message: "Marketplace config is incomplete" }, { status: 400 });
     }
 
-    if (error instanceof Error && (error.message.startsWith("TRENDYOL_GET_SHIPMENT_PACKAGES_FAILED") || error.message.startsWith("N11_GET_SHIPMENT_PACKAGES_FAILED") || error.message.startsWith("HEPSIBURADA_GET_ORDERS_FAILED"))) {
+    if (error instanceof Error && (error.message.startsWith("TRENDYOL_GET_SHIPMENT_PACKAGES_FAILED") || error.message.startsWith("N11_GET_SHIPMENT_PACKAGES_FAILED") || error.message.startsWith("PAZARAMA_GET_ORDERS_FAILED") || error.message.startsWith("PAZARAMA_AUTH_FAILED") || error.message.startsWith("HEPSIBURADA_GET_ORDERS_FAILED"))) {
       return NextResponse.json({ message: "Marketplace connection failed" }, { status: 502 });
     }
 

@@ -126,4 +126,15 @@ ALTER TABLE "CollectionRecord" ADD CONSTRAINT "CollectionRecord_financialAccount
 ALTER TABLE "PaymentRecord" ADD CONSTRAINT "PaymentRecord_financialAccountId_fkey" FOREIGN KEY ("financialAccountId") REFERENCES "FinancialAccount"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- RenameIndex
-ALTER INDEX "ProductVariantAttributeValue_productVariantId_attributeDefiniti" RENAME TO "ProductVariantAttributeValue_productVariantId_attributeDefi_key";
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'ProductVariantAttributeValue_productVariantId_attributeDefiniti'
+  ) THEN
+    ALTER INDEX "ProductVariantAttributeValue_productVariantId_attributeDefiniti"
+      RENAME TO "ProductVariantAttributeValue_productVariantId_attributeDefi_key";
+  END IF;
+END $$;

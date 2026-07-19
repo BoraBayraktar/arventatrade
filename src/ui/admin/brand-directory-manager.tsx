@@ -36,6 +36,10 @@ type Labels = {
   trendyolSearch: string;
   trendyolSearchHint: string;
   trendyolSelected: string;
+  pazaramaId: string;
+  pazaramaSearch: string;
+  pazaramaSearchHint: string;
+  pazaramaSelected: string;
   create: string;
   edit: string;
   delete: string;
@@ -62,6 +66,7 @@ type BrandForm = {
   slug: string;
   name: string;
   trendyolBrandId: string;
+  pazaramaBrandId: string;
 };
 
 type TrendyolBrandOption = {
@@ -69,10 +74,16 @@ type TrendyolBrandOption = {
   name: string;
 };
 
+type PazaramaBrandOption = {
+  id: string;
+  name: string;
+};
+
 const emptyForm: BrandForm = {
   slug: "",
   name: "",
   trendyolBrandId: "",
+  pazaramaBrandId: "",
 };
 
 export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
@@ -91,6 +102,10 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
   const [editForm, setEditForm] = useState<BrandForm>(emptyForm);
   const trendyolBrandSearch = useTrendyolCatalogSearch<TrendyolBrandOption>({
     endpoint: "/api/admin/integrations/marketplaces/trendyol/catalog/brands",
+    enabled: Boolean(drawerMode),
+  });
+  const pazaramaBrandSearch = useTrendyolCatalogSearch<PazaramaBrandOption>({
+    endpoint: "/api/admin/integrations/marketplaces/pazarama/catalog/brands",
     enabled: Boolean(drawerMode),
   });
 
@@ -182,6 +197,7 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
     setEditingId(null);
     setCreateForm(emptyForm);
     trendyolBrandSearch.clear();
+    pazaramaBrandSearch.clear();
     setDrawerMode("create");
   }
 
@@ -192,9 +208,12 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
       slug: item.slug,
       name: item.name,
       trendyolBrandId: item.trendyolBrandId ? String(item.trendyolBrandId) : "",
+      pazaramaBrandId: item.pazaramaBrandId ?? "",
     });
     trendyolBrandSearch.setQuery(item.name);
     trendyolBrandSearch.setItems([]);
+    pazaramaBrandSearch.setQuery(item.name);
+    pazaramaBrandSearch.setItems([]);
     setDrawerMode("edit");
   }
 
@@ -240,6 +259,7 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
         body: JSON.stringify({
           ...form,
           trendyolBrandId: form.trendyolBrandId.trim() ? Number(form.trendyolBrandId) : null,
+          pazaramaBrandId: form.pazaramaBrandId.trim() || null,
         }),
       });
 
@@ -473,10 +493,11 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
         </div>
 
         <div className="overflow-hidden rounded-xl border border-neutral-200">
-          <div className="hidden grid-cols-[1fr_1fr_120px_120px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+          <div className="hidden grid-cols-[1fr_1fr_120px_120px_120px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
             <span>{labels.name}</span>
             <span>{labels.slug}</span>
             <span>{labels.trendyolId}</span>
+            <span>{labels.pazaramaId}</span>
             <span>{labels.productCount}</span>
             <span className="text-right">İşlem</span>
           </div>
@@ -486,12 +507,13 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
           ) : (
             <div className="divide-y divide-neutral-200">
               {filteredItems.map((item) => (
-                <article key={item.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_120px_120px_190px] lg:items-center">
+                <article key={item.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_120px_120px_120px_190px] lg:items-center">
                   <div>
                     <h3 className="font-medium text-neutral-950">{item.name}</h3>
                   </div>
                   <p className="text-sm text-neutral-500">{item.slug}</p>
                   <p className="text-sm text-neutral-500">{item.trendyolBrandId ?? "-"}</p>
+                  <p className="text-sm text-neutral-500">{item.pazaramaBrandId ?? "-"}</p>
                   <p className="text-sm font-semibold text-neutral-950">{item.productCount}</p>
                   <div className="flex flex-wrap gap-2 lg:justify-end">
                     <Button type="button" size="sm" variant="secondary" disabled={loading} onClick={() => openEditDrawer(item)}>{labels.edit}</Button>
@@ -560,6 +582,47 @@ export function BrandDirectoryManager({ items, labels, canDelete }: Props) {
                             patchActiveField("trendyolBrandId", String(option.id));
                             trendyolBrandSearch.setQuery(option.name);
                             trendyolBrandSearch.setItems([]);
+                          }}
+                          className="rounded-lg bg-white px-3 py-2 text-left text-sm transition hover:bg-cyan-50"
+                        >
+                          <span className="font-medium text-neutral-950">{option.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>{labels.pazaramaId}</Label>
+                <Input
+                  value={pazaramaBrandSearch.query}
+                  onChange={(event) => pazaramaBrandSearch.setQuery(event.target.value)}
+                  placeholder={labels.pazaramaSearch}
+                  disabled={loading}
+                />
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                  {activeForm.pazaramaBrandId ? (
+                    <div className="mb-2 flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                      <span className="text-neutral-700">{labels.pazaramaSelected}: {activeForm.pazaramaBrandId}</span>
+                      <button type="button" className="text-xs font-medium text-rose-600" onClick={() => patchActiveField("pazaramaBrandId", "")}>
+                        {labels.delete}
+                      </button>
+                    </div>
+                  ) : null}
+                  {pazaramaBrandSearch.busy ? (
+                    <p className="text-sm text-neutral-500">{labels.loading}</p>
+                  ) : pazaramaBrandSearch.items.length === 0 ? (
+                    <p className="text-sm text-neutral-500">{labels.pazaramaSearchHint}</p>
+                  ) : (
+                    <div className="grid gap-1">
+                      {pazaramaBrandSearch.items.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => {
+                            patchActiveField("pazaramaBrandId", option.id);
+                            pazaramaBrandSearch.setQuery(option.name);
+                            pazaramaBrandSearch.setItems([]);
                           }}
                           className="rounded-lg bg-white px-3 py-2 text-left text-sm transition hover:bg-cyan-50"
                         >

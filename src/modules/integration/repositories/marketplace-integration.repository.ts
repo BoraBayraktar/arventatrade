@@ -22,7 +22,7 @@ export type MarketplacePackageLineInput = {
 };
 
 export type MarketplacePackageInput = {
-  channel: "TRENDYOL" | "N11" | "HEPSIBURADA";
+  channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA";
   configId: string;
   externalPackageId: string;
   externalOrderNumber: string;
@@ -40,7 +40,7 @@ export type MarketplacePackageInput = {
 };
 
 export class MarketplaceIntegrationRepository {
-  async listConfigs(channel?: "TRENDYOL" | "N11" | "HEPSIBURADA") {
+  async listConfigs(channel?: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA") {
     return prisma.marketplaceIntegrationConfig.findMany({
       where: {
         ...(channel ? { channel } : {}),
@@ -52,7 +52,7 @@ export class MarketplaceIntegrationRepository {
     });
   }
 
-  async listActiveConfigsByChannel(channel: "TRENDYOL" | "N11" | "HEPSIBURADA") {
+  async listActiveConfigsByChannel(channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA") {
     return prisma.marketplaceIntegrationConfig.findMany({
       where: {
         channel,
@@ -65,7 +65,7 @@ export class MarketplaceIntegrationRepository {
     });
   }
 
-  async listRecentPackages(limit: number, channel?: "TRENDYOL" | "N11" | "HEPSIBURADA") {
+  async listRecentPackages(limit: number, channel?: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA") {
     return prisma.marketplaceOrderPackage.findMany({
       where: {
         ...(channel ? { channel } : {}),
@@ -287,7 +287,7 @@ export class MarketplaceIntegrationRepository {
 
   async upsertConfig(args: {
     id?: string;
-    channel: "TRENDYOL" | "N11" | "HEPSIBURADA";
+    channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA";
     displayName: string;
     sellerId: string;
     apiKeyEncrypted?: string;
@@ -443,7 +443,7 @@ export class MarketplaceIntegrationRepository {
     return product ? { productId: product.id, productVariantId: null } : null;
   }
 
-  async findProductStockSyncTarget(args: { channel: "TRENDYOL" | "N11" | "HEPSIBURADA"; productId: string; warehouseCode?: string | null }) {
+  async findProductStockSyncTarget(args: { channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA"; productId: string; warehouseCode?: string | null }) {
     const product = await prisma.product.findFirst({
       where: {
         id: args.productId,
@@ -525,6 +525,7 @@ export class MarketplaceIntegrationRepository {
             id: true,
             name: true,
             trendyolCategoryId: true,
+            pazaramaCategoryId: true,
           },
         },
         brand: {
@@ -532,6 +533,7 @@ export class MarketplaceIntegrationRepository {
             id: true,
             name: true,
             trendyolBrandId: true,
+            pazaramaBrandId: true,
           },
         },
         variants: {
@@ -559,11 +561,14 @@ export class MarketplaceIntegrationRepository {
                     trendyolAttributeId: true,
                     marketplaceValueMappings: {
                       where: {
-                        channel: "TRENDYOL",
+                        channel: {
+                          in: ["TRENDYOL", "PAZARAMA"],
+                        },
                         deleted: false,
                         isActive: true,
                       },
                       select: {
+                        channel: true,
                         localValue: true,
                         externalAttributeValueId: true,
                         externalAttributeValueName: true,

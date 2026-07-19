@@ -865,6 +865,7 @@ export class CatalogAdminRepository {
         slug: input.slug,
         name: input.name,
         trendyolBrandId: input.trendyolBrandId ?? null,
+        pazaramaBrandId: input.pazaramaBrandId ?? null,
         isActive: input.isActive ?? true,
       },
       include: {
@@ -890,6 +891,7 @@ export class CatalogAdminRepository {
         ...(input.slug !== undefined ? { slug: input.slug } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.trendyolBrandId !== undefined ? { trendyolBrandId: input.trendyolBrandId } : {}),
+        ...(input.pazaramaBrandId !== undefined ? { pazaramaBrandId: input.pazaramaBrandId } : {}),
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       },
       include: {
@@ -1073,7 +1075,7 @@ export class CatalogAdminRepository {
     });
   }
 
-  async listAttributeValueMarketplaceMappings(channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK") {
+  async listAttributeValueMarketplaceMappings(channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | "EDOCS_MOCK") {
     return prisma.productAttributeValueMarketplaceMapping.findMany({
       where: {
         channel,
@@ -1174,6 +1176,11 @@ export class CatalogAdminRepository {
       },
       select: {
         id: true,
+        slug: true,
+        name: true,
+        trendyolBrandId: true,
+        pazaramaBrandId: true,
+        isActive: true,
         _count: {
           select: {
             products: {
@@ -1341,6 +1348,7 @@ export class CatalogAdminRepository {
         slug: true,
         name: true,
         trendyolCategoryId: true,
+        pazaramaCategoryId: true,
         parentId: true,
         _count: {
           select: {
@@ -1404,12 +1412,13 @@ export class CatalogAdminRepository {
     });
   }
 
-  async createCategory(input: { slug: string; name: string; trendyolCategoryId?: number | null; parentId?: string | null }) {
+  async createCategory(input: { slug: string; name: string; trendyolCategoryId?: number | null; pazaramaCategoryId?: string | null; parentId?: string | null }) {
     return prisma.category.create({
       data: {
         slug: input.slug,
         name: input.name,
         trendyolCategoryId: input.trendyolCategoryId ?? null,
+        pazaramaCategoryId: input.pazaramaCategoryId ?? null,
         parentId: input.parentId ?? null,
       },
       select: {
@@ -1417,6 +1426,7 @@ export class CatalogAdminRepository {
         slug: true,
         name: true,
         trendyolCategoryId: true,
+        pazaramaCategoryId: true,
         parentId: true,
         _count: {
           select: {
@@ -1440,6 +1450,7 @@ export class CatalogAdminRepository {
         ...(input.slug !== undefined ? { slug: input.slug } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.trendyolCategoryId !== undefined ? { trendyolCategoryId: input.trendyolCategoryId } : {}),
+        ...(input.pazaramaCategoryId !== undefined ? { pazaramaCategoryId: input.pazaramaCategoryId } : {}),
         ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
       },
       select: {
@@ -1447,6 +1458,7 @@ export class CatalogAdminRepository {
         slug: true,
         name: true,
         trendyolCategoryId: true,
+        pazaramaCategoryId: true,
         parentId: true,
         _count: {
           select: {
@@ -1491,7 +1503,20 @@ export class CatalogAdminRepository {
       },
       select: {
         id: true,
+        slug: true,
+        name: true,
+        trendyolCategoryId: true,
+        pazaramaCategoryId: true,
         parentId: true,
+        _count: {
+          select: {
+            products: {
+              where: {
+                deleted: false,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -1511,6 +1536,19 @@ export class CatalogAdminRepository {
       select: {
         id: true,
         name: true,
+        slug: true,
+        trendyolCategoryId: true,
+        pazaramaCategoryId: true,
+        parentId: true,
+        _count: {
+          select: {
+            products: {
+              where: {
+                deleted: false,
+              },
+            },
+          },
+        },
       },
     });
   }

@@ -165,6 +165,7 @@ const createBrandSchema = z.object({
   slug: z.string().trim().min(2).max(120),
   name: z.string().trim().min(2).max(120),
   trendyolBrandId: z.coerce.number().int().positive().optional().nullable(),
+  pazaramaBrandId: z.string().trim().min(1).max(120).optional().nullable(),
   isActive: z.boolean().default(true),
 });
 
@@ -173,6 +174,7 @@ const updateBrandSchema = z.object({
   slug: z.string().trim().min(2).max(120).optional(),
   name: z.string().trim().min(2).max(120).optional(),
   trendyolBrandId: z.coerce.number().int().positive().optional().nullable(),
+  pazaramaBrandId: z.string().trim().min(1).max(120).optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
@@ -305,16 +307,18 @@ function mapBrand(item: {
   slug: string;
   name: string;
   trendyolBrandId: number | null;
+  pazaramaBrandId?: string | null;
   isActive: boolean;
-  _count: { products: number };
+  _count?: { products: number };
 }): AdminBrandItem {
   return {
     id: item.id,
     slug: item.slug,
     name: item.name,
     trendyolBrandId: item.trendyolBrandId,
+    pazaramaBrandId: item.pazaramaBrandId ?? null,
     isActive: item.isActive,
-    productCount: item._count.products,
+    productCount: item._count?.products ?? 0,
   };
 }
 
@@ -365,7 +369,7 @@ function mapAttributeDefinition(item: {
 function mapAttributeValueMarketplaceMapping(item: {
   id: string;
   attributeDefinitionId: string;
-  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | "EDOCS_MOCK";
   localValue: string;
   externalAttributeValueId: number | null;
   externalAttributeValueName: string | null;
@@ -397,6 +401,7 @@ const createCategorySchema = z.object({
   slug: z.string().trim().min(2),
   name: z.string().trim().min(2),
   trendyolCategoryId: z.coerce.number().int().positive().optional().nullable(),
+  pazaramaCategoryId: z.string().trim().min(1).max(120).optional().nullable(),
   parentId: z.string().trim().min(1).optional().nullable(),
 });
 
@@ -406,9 +411,10 @@ const updateCategorySchema = z
     slug: z.string().trim().min(2).optional(),
     name: z.string().trim().min(2).optional(),
     trendyolCategoryId: z.coerce.number().int().positive().optional().nullable(),
+    pazaramaCategoryId: z.string().trim().min(1).max(120).optional().nullable(),
     parentId: z.string().trim().min(1).optional().nullable(),
   })
-  .refine((value) => value.slug !== undefined || value.name !== undefined || value.parentId !== undefined, {
+  .refine((value) => value.slug !== undefined || value.name !== undefined || value.parentId !== undefined || value.trendyolCategoryId !== undefined || value.pazaramaCategoryId !== undefined, {
     message: "At least one category field must be provided",
   });
 
@@ -590,8 +596,9 @@ function mapCategory(category: {
   slug: string;
   name: string;
   trendyolCategoryId: number | null;
+  pazaramaCategoryId?: string | null;
   parentId: string | null;
-  _count: {
+  _count?: {
     products: number;
   };
 }, parentName: string | null): AdminCategoryListItem {
@@ -600,9 +607,10 @@ function mapCategory(category: {
     slug: category.slug,
     name: category.name,
     trendyolCategoryId: category.trendyolCategoryId,
+    pazaramaCategoryId: category.pazaramaCategoryId ?? null,
     parentId: category.parentId,
     parentName,
-    productCount: category._count.products,
+    productCount: category._count?.products ?? 0,
   };
 }
 
@@ -1290,7 +1298,7 @@ export class CatalogAdminService {
     return mapAttributeDefinition(updated);
   }
 
-  async listAttributeValueMarketplaceMappings(channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK" = "TRENDYOL"): Promise<AdminProductAttributeValueMarketplaceMappingItem[]> {
+  async listAttributeValueMarketplaceMappings(channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | "EDOCS_MOCK" = "TRENDYOL"): Promise<AdminProductAttributeValueMarketplaceMappingItem[]> {
     const [mappings, localValues] = await Promise.all([
       this.repository.listAttributeValueMarketplaceMappings(channel),
       this.repository.listDistinctVariantAttributeValues(),

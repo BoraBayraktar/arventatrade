@@ -235,7 +235,7 @@ function statusClass(status: MarketplacePackage["importStatus"]) {
 function getAdminProductCreateUrl(locale: string, line: MarketplacePackageLine) {
   const params = new URLSearchParams();
   params.set("search", line.barcode ?? line.merchantSku ?? line.productName);
-  params.set("source", "n11");
+  params.set("source", "marketplace");
   return `/${locale}/admin/products?${params.toString()}`;
 }
 
@@ -365,6 +365,7 @@ export function N11IntegrationManager({
   labels,
   locale,
   canManage,
+  channel = "N11",
   initialConfigs,
   initialPackages,
   capabilities,
@@ -374,6 +375,7 @@ export function N11IntegrationManager({
   labels: Labels;
   locale: string;
   canManage: boolean;
+  channel?: "N11" | "PAZARAMA";
   initialConfigs: MarketplaceConfig[];
   initialPackages: MarketplacePackage[];
   capabilities: MarketplaceCapabilitySet;
@@ -383,7 +385,7 @@ export function N11IntegrationManager({
   const [configs, setConfigs] = useState(initialConfigs);
   const [packages, setPackages] = useState(initialPackages);
   const [dashboardSummary, setDashboardSummary] = useState(summary);
-  const [displayName, setDisplayName] = useState(configs[0]?.displayName ?? "N11");
+  const [displayName, setDisplayName] = useState(configs[0]?.displayName ?? (channel === "PAZARAMA" ? "Pazarama" : "N11"));
   const [sellerId, setSellerId] = useState(configs[0]?.sellerId ?? "");
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
@@ -404,7 +406,7 @@ export function N11IntegrationManager({
   const latestStatusJob = selectedPackage?.statusHistory[0] ?? null;
 
   async function refreshDashboard() {
-    const response = await fetch("/api/admin/integrations/marketplaces/dashboard?channel=N11");
+    const response = await fetch(`/api/admin/integrations/marketplaces/dashboard?channel=${channel}`);
 
     if (!response.ok) {
       throw new Error(labels.operationFailed);
@@ -427,7 +429,7 @@ export function N11IntegrationManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...(activeConfig ? { id: activeConfig.id } : {}),
-          channel: "N11",
+          channel,
           displayName,
           sellerId,
           ...(apiKey ? { apiKey } : {}),
@@ -465,7 +467,7 @@ export function N11IntegrationManager({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          channel: "N11",
+          channel,
           ...(activeConfig ? { id: activeConfig.id } : {}),
           sellerId,
           ...(apiKey ? { apiKey } : {}),
@@ -500,9 +502,9 @@ export function N11IntegrationManager({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          channel: "N11",
+          channel,
           id: activeConfig.id,
-          status: "Created",
+          ...(channel === "N11" ? { status: "Created" } : {}),
         }),
       });
 
@@ -728,7 +730,7 @@ export function N11IntegrationManager({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          channel: "N11",
+          channel,
           status: "Picking",
         }),
       });
@@ -945,15 +947,17 @@ export function N11IntegrationManager({
                 <p className="mt-1 text-sm text-neutral-500">{selectedPackage.customerName ?? selectedPackage.configName}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  onClick={queuePickingSync}
-                  disabled={!canManage || detailBusy || !canNotifyPicking}
-                  size="sm"
-                  variant="secondary"
-                >
-                  {labels.notifyPicking}
-                </Button>
+                {capabilities.supportsStatusPicking ? (
+                  <Button
+                    type="button"
+                    onClick={queuePickingSync}
+                    disabled={!canManage || detailBusy || !canNotifyPicking}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    {labels.notifyPicking}
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   onClick={createOrder}
@@ -963,15 +967,17 @@ export function N11IntegrationManager({
                   <ShoppingCart className="h-4 w-4" />
                   {labels.createOrder}
                 </Button>
-                <Button
-                  type="button"
-                  onClick={splitPackage}
-                  disabled={!canManage || detailBusy || selectedPackage.packageStatus !== "Picking" || selectedPackage.lines.every((line) => !splitQuantities[line.id])}
-                  size="sm"
-                  variant="secondary"
-                >
-                  {labels.splitPackage}
-                </Button>
+                {capabilities.supportsPackageSplit ? (
+                  <Button
+                    type="button"
+                    onClick={splitPackage}
+                    disabled={!canManage || detailBusy || selectedPackage.packageStatus !== "Picking" || selectedPackage.lines.every((line) => !splitQuantities[line.id])}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    {labels.splitPackage}
+                  </Button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setSelectedPackage(null)}
@@ -1057,29 +1063,31 @@ export function N11IntegrationManager({
                 </article>
               </div>
 
-              <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
-                <h4 className="text-sm font-semibold text-neutral-950">{labels.splitPackage}</h4>
-                <p className="mt-1 text-xs text-neutral-500">{labels.splitPackageHint}</p>
-                <div className="mt-3 grid gap-3">
-                  {selectedPackage.lines.map((line) => (
-                    <div key={`${line.id}-split`} className="grid gap-2 md:grid-cols-[1fr_140px] md:items-center">
-                      <div className="text-sm text-neutral-700">
-                        {line.productName}
-                        <span className="ml-2 text-neutral-500">Mevcut: {line.quantity}</span>
+              {capabilities.supportsPackageSplit ? (
+                <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+                  <h4 className="text-sm font-semibold text-neutral-950">{labels.splitPackage}</h4>
+                  <p className="mt-1 text-xs text-neutral-500">{labels.splitPackageHint}</p>
+                  <div className="mt-3 grid gap-3">
+                    {selectedPackage.lines.map((line) => (
+                      <div key={`${line.id}-split`} className="grid gap-2 md:grid-cols-[1fr_140px] md:items-center">
+                        <div className="text-sm text-neutral-700">
+                          {line.productName}
+                          <span className="ml-2 text-neutral-500">Mevcut: {line.quantity}</span>
+                        </div>
+                        <Input
+                          value={splitQuantities[line.id] ?? ""}
+                          onChange={(event) => setSplitQuantities((current) => ({ ...current, [line.id]: event.target.value }))}
+                          placeholder={labels.splitQuantity}
+                          disabled={!canManage || detailBusy || selectedPackage.packageStatus !== "Picking"}
+                          type="number"
+                          min={0}
+                          max={line.quantity}
+                        />
                       </div>
-                      <Input
-                        value={splitQuantities[line.id] ?? ""}
-                        onChange={(event) => setSplitQuantities((current) => ({ ...current, [line.id]: event.target.value }))}
-                        placeholder={labels.splitQuantity}
-                        disabled={!canManage || detailBusy || selectedPackage.packageStatus !== "Picking"}
-                        type="number"
-                        min={0}
-                        max={line.quantity}
-                      />
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className="rounded-lg border border-neutral-200 p-4">
                 <h4 className="text-sm font-semibold text-neutral-950">{labels.statusHistory}</h4>

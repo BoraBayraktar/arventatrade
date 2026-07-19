@@ -16,6 +16,7 @@ import type {
   AdminInventoryAlertSummary,
   AdminExternalStockEventMonitoring,
   AdminInventoryExportHistoryItem,
+  AdminInventoryIntegrationSummary,
   AdminInventoryListResult,
   AdminInventoryListPreferences,
   AdminInventoryOperationHistoryItem,
@@ -516,26 +517,7 @@ type Props = {
   };
   stockCounts: AdminStockCountItem[];
   reports: AdminInventoryReportsResult;
-  integrationSummary: {
-    pendingCount: number;
-    processingCount: number;
-    failedCount: number;
-    deadLetterCount: number;
-    successCount: number;
-    channelCounts: {
-      trendyol: number;
-      n11: number;
-      hepsiburada: number;
-    };
-    recentJobs: Array<{
-      id: string;
-      channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
-      status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
-      entityId: string;
-      createdAt: string;
-      lastError: string | null;
-    }>;
-  };
+  integrationSummary: AdminInventoryIntegrationSummary;
   externalEventMonitoring: AdminExternalStockEventMonitoring;
   operationHistory: AdminInventoryOperationHistoryItem[];
   exportHistory: AdminInventoryExportHistoryItem[];

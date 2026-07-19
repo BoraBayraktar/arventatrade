@@ -24,11 +24,12 @@ export default async function AdminIntegrationsPage({
     redirect(`/${locale}/admin/login`);
   }
 
-  const [jobs, deadLetters, trendyolDashboard, n11Dashboard, hepsiburadaDashboard] = await Promise.all([
+  const [jobs, deadLetters, trendyolDashboard, n11Dashboard, pazaramaDashboard, hepsiburadaDashboard] = await Promise.all([
     integrationService.listJobs({ page: 1, pageSize: 20 }),
     integrationService.listDeadLetters(),
     marketplaceIntegrationService.getDashboard({ channel: "TRENDYOL" }),
     marketplaceIntegrationService.getDashboard({ channel: "N11" }),
+    marketplaceIntegrationService.getDashboard({ channel: "PAZARAMA" }),
     marketplaceIntegrationService.getDashboard({ channel: "HEPSIBURADA" }),
   ]);
 
@@ -41,6 +42,7 @@ export default async function AdminIntegrationsPage({
       marketplaceCapabilities={[
         { channel: "TRENDYOL", capabilities: trendyolDashboard.capabilities },
         { channel: "N11", capabilities: n11Dashboard.capabilities },
+        { channel: "PAZARAMA", capabilities: pazaramaDashboard.capabilities },
         { channel: "HEPSIBURADA", capabilities: hepsiburadaDashboard.capabilities },
       ]}
       labels={{
@@ -90,6 +92,7 @@ export default async function AdminIntegrationsPage({
         processedAt: dictionary.admin.integrationProcessedAt,
         channelTrendyol: dictionary.admin.integrationChannelTrendyol,
         channelN11: dictionary.admin.integrationChannelN11,
+        channelPazarama: dictionary.admin.integrationChannelPazarama,
         channelHepsiburada: dictionary.admin.integrationChannelHepsiburada,
         channelEDocsMock: dictionary.admin.integrationChannelEDocsMock,
         jobTypeProductSync: dictionary.admin.integrationJobTypeProductSync,

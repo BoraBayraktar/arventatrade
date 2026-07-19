@@ -14,6 +14,7 @@ type Category = {
   slug: string;
   name: string;
   trendyolCategoryId: number | null;
+  pazaramaCategoryId: string | null;
   parentId: string | null;
   parentName: string | null;
   productCount: number;
@@ -40,6 +41,10 @@ type Labels = {
   trendyolSearch: string;
   trendyolSearchHint: string;
   trendyolSelected: string;
+  pazaramaId: string;
+  pazaramaSearch: string;
+  pazaramaSearchHint: string;
+  pazaramaSelected: string;
   parentCategory: string;
   filterProducts: string;
   filterAllProducts: string;
@@ -88,6 +93,7 @@ type CategoryForm = {
   slug: string;
   name: string;
   trendyolCategoryId: string;
+  pazaramaCategoryId: string;
   parentId: string;
 };
 
@@ -98,10 +104,18 @@ type TrendyolCategoryOption = {
   leaf: boolean;
 };
 
+type PazaramaCategoryOption = {
+  id: string;
+  name: string;
+  path: string;
+  leaf: boolean;
+};
+
 const emptyForm: CategoryForm = {
   slug: "",
   name: "",
   trendyolCategoryId: "",
+  pazaramaCategoryId: "",
   parentId: "",
 };
 
@@ -110,6 +124,7 @@ function mapPayload(form: CategoryForm) {
     slug: form.slug,
     name: form.name,
     trendyolCategoryId: form.trendyolCategoryId.trim() ? Number(form.trendyolCategoryId) : null,
+    pazaramaCategoryId: form.pazaramaCategoryId.trim() || null,
     parentId: form.parentId.trim() ? form.parentId : null,
   };
 }
@@ -131,6 +146,10 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
   const [editForm, setEditForm] = useState<CategoryForm>(emptyForm);
   const trendyolCategorySearch = useTrendyolCatalogSearch<TrendyolCategoryOption>({
     endpoint: "/api/admin/integrations/marketplaces/trendyol/catalog/categories",
+    enabled: Boolean(drawerMode),
+  });
+  const pazaramaCategorySearch = useTrendyolCatalogSearch<PazaramaCategoryOption>({
+    endpoint: "/api/admin/integrations/marketplaces/pazarama/catalog/categories",
     enabled: Boolean(drawerMode),
   });
 
@@ -287,6 +306,7 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
     setEditingId(null);
     setCreateForm(emptyForm);
     trendyolCategorySearch.clear();
+    pazaramaCategorySearch.clear();
     setDrawerMode("create");
   }
 
@@ -297,10 +317,13 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
       slug: category.slug,
       name: category.name,
       trendyolCategoryId: category.trendyolCategoryId ? String(category.trendyolCategoryId) : "",
+      pazaramaCategoryId: category.pazaramaCategoryId ?? "",
       parentId: category.parentId ?? "",
     });
     trendyolCategorySearch.setQuery(category.name);
     trendyolCategorySearch.setItems([]);
+    pazaramaCategorySearch.setQuery(category.name);
+    pazaramaCategorySearch.setItems([]);
     setDrawerMode("edit");
   }
 
@@ -615,10 +638,11 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
         </div>
 
         <div className="overflow-hidden rounded-xl border border-neutral-200">
-          <div className="hidden grid-cols-[1fr_1fr_120px_1fr_120px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+          <div className="hidden grid-cols-[1fr_1fr_120px_120px_1fr_120px_190px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
             <span>{labels.name}</span>
             <span>{labels.slug}</span>
             <span>{labels.trendyolId}</span>
+            <span>{labels.pazaramaId}</span>
             <span>{labels.parentCategory}</span>
             <span>{labels.productCount}</span>
             <span className="text-right">Islem</span>
@@ -629,12 +653,13 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
           ) : (
             <div className="divide-y divide-neutral-200">
               {result.items.map((category) => (
-                <article key={category.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_120px_1fr_120px_190px] lg:items-center">
+                <article key={category.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_120px_120px_1fr_120px_190px] lg:items-center">
                   <div>
                     <h3 className="font-medium text-neutral-950">{category.name}</h3>
                   </div>
                   <p className="text-sm text-neutral-500">{category.slug}</p>
                   <p className="text-sm text-neutral-500">{category.trendyolCategoryId ?? "-"}</p>
+                  <p className="text-sm text-neutral-500">{category.pazaramaCategoryId ?? "-"}</p>
                   <p className="text-sm text-neutral-500">{getParentBreadcrumb(category)}</p>
                   <p className="text-sm font-semibold text-neutral-950">{category.productCount}</p>
                   <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -674,6 +699,47 @@ export function CategoryManager({ initialResult, parentCandidates, labels, canDe
               <div className="grid gap-2">
                 <Label>{labels.slug}</Label>
                 <Input value={activeForm.slug} onChange={(event) => patchActiveField("slug", event.target.value)} required />
+              </div>
+              <div className="grid gap-2">
+                <Label>{labels.pazaramaId}</Label>
+                <Input
+                  value={pazaramaCategorySearch.query}
+                  onChange={(event) => pazaramaCategorySearch.setQuery(event.target.value)}
+                  placeholder={labels.pazaramaSearch}
+                  disabled={loading}
+                />
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                  {activeForm.pazaramaCategoryId ? (
+                    <div className="mb-2 flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                      <span className="text-neutral-700">{labels.pazaramaSelected}: {activeForm.pazaramaCategoryId}</span>
+                      <button type="button" className="text-xs font-medium text-rose-600" onClick={() => patchActiveField("pazaramaCategoryId", "")}>
+                        {labels.delete}
+                      </button>
+                    </div>
+                  ) : null}
+                  {pazaramaCategorySearch.busy ? (
+                    <p className="text-sm text-neutral-500">{labels.loading}</p>
+                  ) : pazaramaCategorySearch.items.length === 0 ? (
+                    <p className="text-sm text-neutral-500">{labels.pazaramaSearchHint}</p>
+                  ) : (
+                    <div className="grid gap-1">
+                      {pazaramaCategorySearch.items.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => {
+                            patchActiveField("pazaramaCategoryId", option.id);
+                            pazaramaCategorySearch.setQuery(option.path);
+                            pazaramaCategorySearch.setItems([]);
+                          }}
+                          className="rounded-lg bg-white px-3 py-2 text-left text-sm transition hover:bg-cyan-50"
+                        >
+                          <span className="font-medium text-neutral-950">{option.path}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label>{labels.name}</Label>

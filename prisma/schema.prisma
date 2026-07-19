@@ -8,41 +8,45 @@ datasource db {
 }
 
 model Category {
-  id              String           @id @default(cuid())
-  slug            String           @unique
-  name            String
+  id                 String           @id @default(cuid())
+  slug               String           @unique
+  name               String
   trendyolCategoryId Int?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  deleted         Boolean          @default(false)
-  deletedDate     DateTime?
-  deletedUserId   String?
-  parentId        String?
-  Category        Category?        @relation("CategoryToCategory", fields: [parentId], references: [id])
-  other_Category  Category[]       @relation("CategoryToCategory")
-  products        Product[]
-  storefrontItems StorefrontItem[]
+  pazaramaCategoryId String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  deleted            Boolean          @default(false)
+  deletedDate        DateTime?
+  deletedUserId      String?
+  parentId           String?
+  Category           Category?        @relation("CategoryToCategory", fields: [parentId], references: [id])
+  other_Category     Category[]       @relation("CategoryToCategory")
+  products           Product[]
+  storefrontItems    StorefrontItem[]
 
   @@index([deleted])
   @@index([parentId])
   @@index([trendyolCategoryId])
+  @@index([pazaramaCategoryId])
 }
 
 model Brand {
-  id            String    @id @default(cuid())
-  slug          String    @unique
-  name          String
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  name            String
   trendyolBrandId Int?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deleted       Boolean   @default(false)
-  deletedDate   DateTime?
-  deletedUserId String?
-  products      Product[]
+  pazaramaBrandId String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deleted         Boolean   @default(false)
+  deletedDate     DateTime?
+  deletedUserId   String?
+  products        Product[]
 
   @@index([deleted, isActive])
   @@index([trendyolBrandId])
+  @@index([pazaramaBrandId])
 }
 
 model Supplier {
@@ -1290,6 +1294,7 @@ enum PromotionType {
 enum IntegrationChannel {
   TRENDYOL
   N11
+  PAZARAMA
   HEPSIBURADA
   EDOCS_MOCK
 }

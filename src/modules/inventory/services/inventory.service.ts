@@ -793,7 +793,7 @@ function mapWarehouse(warehouse: {
 
 function mapInventoryIntegrationMapping(item: {
   id: string;
-  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | "EDOCS_MOCK";
   externalProductId: string | null;
   externalSku: string | null;
   externalWarehouseCode: string | null;
@@ -835,7 +835,7 @@ function mapInventoryIntegrationMapping(item: {
 
 function mapExternalStockEvent(item: {
   id: string;
-  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | "EDOCS_MOCK";
   eventKey: string;
   eventType: "SNAPSHOT_ON_HAND" | "SNAPSHOT_AVAILABLE";
   direction: "INBOUND" | "OUTBOUND";

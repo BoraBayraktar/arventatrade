@@ -12,7 +12,7 @@ export type MarketplaceOrderLineInput = {
 };
 
 export type CreateMarketplaceOrderInput = {
-  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | "EDOCS_MOCK";
   externalOrderNumber: string;
   customerName?: string | null;
   customerEmail?: string | null;

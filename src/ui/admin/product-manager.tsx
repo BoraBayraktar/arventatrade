@@ -250,6 +250,17 @@ type Labels = {
   trendyolPreflightIssues: string;
   trendyolDraftPayload: string;
   trendyolQueueProductSync: string;
+  pazaramaPreflight: string;
+  pazaramaPreflightReady: string;
+  pazaramaPreflightBlocked: string;
+  pazaramaPreflightWarnings: string;
+  pazaramaPreflightIssues: string;
+  pazaramaDraftPayload: string;
+  pazaramaQueueProductSync: string;
+  pazaramaProductSyncQueued: string;
+  pazaramaProductSyncTracking: string;
+  pazaramaProductSyncJobStatus: string;
+  pazaramaProductSyncCheckAgain: string;
   n11Preflight: string;
   n11PreflightReady: string;
   n11PreflightBlocked: string;
@@ -418,6 +429,18 @@ type N11PreflightResult = {
   draftPayload: { payload: { skus: unknown[] } } | null;
 };
 
+type PazaramaPreflightResult = {
+  productId: string;
+  sku: string;
+  title: string;
+  readyForPazaramaProductSync: boolean;
+  blockingIssues: string[];
+  warnings: string[];
+  mappedAttributeValueCount: number;
+  variantCount: number;
+  draftPayload: { products: unknown[] } | null;
+};
+
 type HepsiburadaPreflightResult = {
   productId: string;
   hbSku: string;
@@ -439,6 +462,18 @@ type TrendyolProductSyncTracking = {
   sku: string;
   jobId: string | null;
   status: string;
+};
+
+type PazaramaProductSyncTracking = {
+  productId: string;
+  sku: string;
+  title: string;
+  jobId: string | null;
+  status: string;
+  batchRequestId: string | null;
+  detailStatus: string | null;
+  recommendedAction: string | null;
+  lastCheckedAt: string | null;
 };
 
 type N11ProductSyncTracking = {
@@ -508,6 +543,19 @@ type N11TaskResultResponse = {
   jobId: string;
   batchRequestId: string;
   result: Record<string, unknown>;
+};
+
+type PazaramaBatchResultResponse = {
+  jobId: string;
+  batchRequestId: string;
+  result: {
+    data?: {
+      status?: number;
+      failedProducts?: Array<{
+        errorReason?: string;
+      }>;
+    };
+  };
 };
 
 type VariantGenerationState = Record<string, string>;
@@ -1010,6 +1058,10 @@ export function ProductManager({
   const [trendyolPreflightResult, setTrendyolPreflightResult] = useState<TrendyolPreflightResult | null>(null);
   const [trendyolProductSyncBusyId, setTrendyolProductSyncBusyId] = useState<string | null>(null);
   const [trendyolProductSyncTracking, setTrendyolProductSyncTracking] = useState<TrendyolProductSyncTracking | null>(null);
+  const [pazaramaPreflightBusyId, setPazaramaPreflightBusyId] = useState<string | null>(null);
+  const [pazaramaPreflightResult, setPazaramaPreflightResult] = useState<PazaramaPreflightResult | null>(null);
+  const [pazaramaProductSyncBusyId, setPazaramaProductSyncBusyId] = useState<string | null>(null);
+  const [pazaramaProductSyncTracking, setPazaramaProductSyncTracking] = useState<PazaramaProductSyncTracking | null>(null);
   const [n11PreflightBusyId, setN11PreflightBusyId] = useState<string | null>(null);
   const [n11PreflightResult, setN11PreflightResult] = useState<N11PreflightResult | null>(null);
   const [n11ProductSyncBusyId, setN11ProductSyncBusyId] = useState<string | null>(null);
@@ -2059,6 +2111,15 @@ export function ProductManager({
     });
   }
 
+  async function checkPazaramaPreflight(productId: string) {
+    await runMarketplacePreflight({
+      productId,
+      channel: "PAZARAMA",
+      setBusyId: setPazaramaPreflightBusyId,
+      onSuccess: (payload) => setPazaramaPreflightResult(payload as PazaramaPreflightResult),
+    });
+  }
+
   async function checkHepsiburadaPreflight(productId: string) {
     await runMarketplacePreflight({
       productId,
@@ -2110,6 +2171,46 @@ export function ProductManager({
     }
   }
 
+  async function refreshPazaramaProductSyncTracking(tracking: PazaramaProductSyncTracking) {
+    if (!tracking.jobId) {
+      await checkPazaramaPreflight(tracking.productId);
+      return;
+    }
+
+    setPazaramaProductSyncBusyId(tracking.productId);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/integrations/jobs/${tracking.jobId}/pazarama-batch`);
+
+      if (!response.ok) {
+        const payload = await readJsonSafely<{ message?: string }>(response);
+        setError(payload?.message ?? labels.opFailed);
+        return;
+      }
+
+      const payload = await response.json() as PazaramaBatchResultResponse;
+      const batchStatus = payload.result?.data?.status ?? null;
+      const failedReason = payload.result?.data?.failedProducts?.map((item) => readString(item.errorReason)).filter((item): item is string => Boolean(item)).join(" | ") ?? null;
+      const detailStatus = batchStatus === 1 ? "InProgress" : batchStatus === 2 ? "Done" : batchStatus === 3 ? "Error" : null;
+
+      setPazaramaProductSyncTracking((current) => current && current.productId === tracking.productId
+        ? {
+            ...current,
+            status: batchStatus === 3 ? "FAILED" : batchStatus === 2 ? "SUCCESS" : current.status,
+            batchRequestId: payload.batchRequestId,
+            detailStatus,
+            recommendedAction: failedReason,
+            lastCheckedAt: new Date().toLocaleString("tr-TR"),
+          }
+        : current);
+    } catch {
+      setError(labels.opFailed);
+    } finally {
+      setPazaramaProductSyncBusyId(null);
+    }
+  }
+
   async function queueTrendyolProductSync(result: TrendyolPreflightResult) {
     if (!result.readyForTrendyolProductV2) {
       return;
@@ -2129,6 +2230,33 @@ export function ProductManager({
           status: job?.status ?? "PENDING",
         });
         setImportSummary(labels.trendyolProductSyncQueued);
+      },
+    });
+  }
+
+  async function queuePazaramaProductSync(result: PazaramaPreflightResult) {
+    if (!result.readyForPazaramaProductSync) {
+      return;
+    }
+
+    await queueMarketplaceProductSync({
+      channel: "PAZARAMA",
+      productId: result.productId,
+      sku: result.sku,
+      setBusyId: setPazaramaProductSyncBusyId,
+      onSuccess: (job) => {
+        setPazaramaProductSyncTracking({
+          productId: result.productId,
+          sku: result.sku,
+          title: result.title,
+          jobId: job?.id ?? null,
+          status: job?.status ?? "PENDING",
+          batchRequestId: null,
+          detailStatus: null,
+          recommendedAction: null,
+          lastCheckedAt: null,
+        });
+        setImportSummary(labels.pazaramaProductSyncQueued);
       },
     });
   }
@@ -2183,9 +2311,9 @@ export function ProductManager({
 
   async function runMarketplacePreflight(args: {
     productId: string;
-    channel: "TRENDYOL" | "N11" | "HEPSIBURADA";
+    channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA";
     setBusyId: (value: string | null) => void;
-    onSuccess: (payload: TrendyolPreflightResult | N11PreflightResult | HepsiburadaPreflightResult) => void;
+    onSuccess: (payload: TrendyolPreflightResult | PazaramaPreflightResult | N11PreflightResult | HepsiburadaPreflightResult) => void;
   }) {
     args.setBusyId(args.productId);
     setError(null);
@@ -2200,7 +2328,7 @@ export function ProductManager({
         return;
       }
 
-      const payload = await response.json() as TrendyolPreflightResult | N11PreflightResult | HepsiburadaPreflightResult;
+      const payload = await response.json() as TrendyolPreflightResult | PazaramaPreflightResult | N11PreflightResult | HepsiburadaPreflightResult;
       args.onSuccess(payload);
     } catch {
       setError(labels.opFailed);
@@ -2210,7 +2338,7 @@ export function ProductManager({
   }
 
   async function queueMarketplaceProductSync(args: {
-    channel: "TRENDYOL" | "N11" | "HEPSIBURADA";
+    channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA";
     productId: string;
     sku: string;
     setBusyId: (value: string | null) => void;
@@ -2349,6 +2477,23 @@ export function ProductManager({
           onRefresh: () => void checkTrendyolPreflight(trendyolProductSyncTracking.productId),
           onClose: () => setTrendyolProductSyncTracking(null),
         }, labels.loading, labels.cancel) : null}
+        {pazaramaProductSyncTracking ? renderSyncTrackingCard({
+          tone: "amber",
+          label: labels.pazaramaProductSyncTracking,
+          title: pazaramaProductSyncTracking.title,
+          sku: pazaramaProductSyncTracking.sku,
+          statusLabel: labels.pazaramaProductSyncJobStatus,
+          status: pazaramaProductSyncTracking.status,
+          jobId: pazaramaProductSyncTracking.jobId,
+          detailStatus: pazaramaProductSyncTracking.detailStatus,
+          recommendedAction: pazaramaProductSyncTracking.recommendedAction,
+          lastCheckedAt: pazaramaProductSyncTracking.lastCheckedAt,
+          productId: pazaramaProductSyncTracking.productId,
+          busy: pazaramaProductSyncBusyId === pazaramaProductSyncTracking.productId,
+          refreshLabel: labels.pazaramaProductSyncCheckAgain,
+          onRefresh: () => void refreshPazaramaProductSyncTracking(pazaramaProductSyncTracking),
+          onClose: () => setPazaramaProductSyncTracking(null),
+        }, labels.loading, labels.cancel) : null}
         {n11ProductSyncTracking ? renderSyncTrackingCard({
           tone: "amber",
           label: labels.n11ProductSyncTracking,
@@ -2399,6 +2544,23 @@ export function ProductManager({
           queueLabel: labels.trendyolQueueProductSync,
           onQueue: () => void queueTrendyolProductSync(trendyolPreflightResult),
           onClose: () => setTrendyolPreflightResult(null),
+        }, labels.loading, labels.cancel) : null}
+        {pazaramaPreflightResult ? renderPreflightCard({
+          label: labels.pazaramaPreflight,
+          title: pazaramaPreflightResult.title,
+          summary: `${pazaramaPreflightResult.readyForPazaramaProductSync ? labels.pazaramaPreflightReady : labels.pazaramaPreflightBlocked} SKU: ${pazaramaPreflightResult.sku} • Varyant: ${pazaramaPreflightResult.variantCount} • Mapping: ${pazaramaPreflightResult.mappedAttributeValueCount}${pazaramaPreflightResult.draftPayload ? ` • Payload ürün: ${pazaramaPreflightResult.draftPayload.products.length}` : ""}`,
+          ready: pazaramaPreflightResult.readyForPazaramaProductSync,
+          issuesLabel: labels.pazaramaPreflightIssues,
+          warningsLabel: labels.pazaramaPreflightWarnings,
+          draftLabel: labels.pazaramaDraftPayload,
+          issues: pazaramaPreflightResult.blockingIssues,
+          warnings: pazaramaPreflightResult.warnings,
+          draftPayload: pazaramaPreflightResult.draftPayload,
+          canQueue: pazaramaPreflightResult.readyForPazaramaProductSync && canManageIntegrations,
+          queueBusy: pazaramaProductSyncBusyId === pazaramaPreflightResult.productId,
+          queueLabel: labels.pazaramaQueueProductSync,
+          onQueue: () => void queuePazaramaProductSync(pazaramaPreflightResult),
+          onClose: () => setPazaramaPreflightResult(null),
         }, labels.loading, labels.cancel) : null}
         {n11PreflightResult ? renderPreflightCard({
           label: labels.n11Preflight,
@@ -2599,6 +2761,17 @@ export function ProductManager({
                           className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {trendyolPreflightBusyId === product.id ? labels.loading : labels.trendyolPreflight}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pazaramaPreflightBusyId === product.id}
+                          onClick={() => {
+                            setOpenProductActionMenuId(null);
+                            void checkPazaramaPreflight(product.id);
+                          }}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {pazaramaPreflightBusyId === product.id ? labels.loading : labels.pazaramaPreflight}
                         </button>
                         <button
                           type="button"

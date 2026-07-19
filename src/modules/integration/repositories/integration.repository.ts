@@ -485,6 +485,72 @@ export class IntegrationRepository {
     });
   }
 
+  async listPendingPazaramaBatchCheckJobs(args: { limit: number; staleBefore: Date }) {
+    return prisma.integrationSyncJob.findMany({
+      where: {
+        deleted: false,
+        channel: "PAZARAMA",
+        jobType: "PRODUCT_SYNC",
+        status: "SUCCESS",
+        externalReference: {
+          not: null,
+        },
+        OR: [
+          {
+            responsePayload: {
+              path: ["batchCheckedAt"],
+              equals: Prisma.JsonNull,
+            },
+          },
+          {
+            responsePayload: {
+              path: ["batchCheckedAt"],
+              lt: args.staleBefore.toISOString(),
+            },
+          },
+        ],
+      },
+      orderBy: {
+        processedAt: "asc",
+      },
+      take: args.limit,
+    });
+  }
+
+  async listPendingPazaramaListingBatchCheckJobs(args: { limit: number; staleBefore: Date }) {
+    return prisma.integrationSyncJob.findMany({
+      where: {
+        deleted: false,
+        channel: "PAZARAMA",
+        jobType: {
+          in: ["STOCK_SYNC", "PRICE_SYNC"],
+        },
+        status: "SUCCESS",
+        externalReference: {
+          not: null,
+        },
+        OR: [
+          {
+            responsePayload: {
+              path: ["batchCheckedAt"],
+              equals: Prisma.JsonNull,
+            },
+          },
+          {
+            responsePayload: {
+              path: ["batchCheckedAt"],
+              lt: args.staleBefore.toISOString(),
+            },
+          },
+        ],
+      },
+      orderBy: {
+        processedAt: "asc",
+      },
+      take: args.limit,
+    });
+  }
+
   async listRecentStockSyncJobs(limit: number) {
     return prisma.integrationSyncJob.findMany({
       where: {
@@ -520,7 +586,7 @@ export class IntegrationRepository {
         deleted: false,
         jobType: "STOCK_SYNC",
         channel: {
-          in: ["TRENDYOL", "N11", "HEPSIBURADA"],
+          in: ["TRENDYOL", "N11", "PAZARAMA", "HEPSIBURADA"],
         },
       },
       _count: {

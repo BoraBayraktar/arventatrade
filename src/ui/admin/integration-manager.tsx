@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { MarketplaceCapabilitySet } from "@/modules/integration/contracts/integration.contract";
 
 type JobStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
-type Channel = "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
+type Channel = "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | "EDOCS_MOCK";
 type JobType = "PRODUCT_SYNC" | "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_IMPORT" | "ORDER_STATUS_SYNC" | "DOCUMENT_OUTBOUND" | "DOCUMENT_STATUS_SYNC";
 type EntityType = "PRODUCT" | "MARKETPLACE_ACCOUNT" | "MARKETPLACE_PACKAGE" | "ORDER" | "BUSINESS_DOCUMENT";
 type DrawerMode = "create" | "process";
@@ -70,7 +70,7 @@ type DeadLetter = {
 };
 
 type MarketplaceCapabilitySummary = {
-  channel: Extract<Channel, "TRENDYOL" | "N11" | "HEPSIBURADA">;
+  channel: Extract<Channel, "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA">;
   capabilities: MarketplaceCapabilitySet;
 };
 
@@ -121,6 +121,7 @@ type Labels = {
   processedAt: string;
   channelTrendyol: string;
   channelN11: string;
+  channelPazarama: string;
   channelHepsiburada: string;
   channelEDocsMock: string;
   jobTypeProductSync: string;
@@ -280,6 +281,10 @@ function channelLabel(channel: Channel, labels: Labels) {
 
   if (channel === "N11") {
     return labels.channelN11;
+  }
+
+  if (channel === "PAZARAMA") {
+    return labels.channelPazarama;
   }
 
   if (channel === "HEPSIBURADA") {
@@ -979,7 +984,11 @@ export function IntegrationManager({
         ? `/api/admin/integrations/jobs/${jobId}/n11-task`
         : targetJob.channel === "HEPSIBURADA"
           ? `/api/admin/integrations/jobs/${jobId}/hepsiburada-upload`
-          : `/api/admin/integrations/jobs/${jobId}/trendyol-batch`;
+          : targetJob.channel === "PAZARAMA" && targetJob.jobType === "PRODUCT_SYNC"
+            ? `/api/admin/integrations/jobs/${jobId}/pazarama-batch`
+            : targetJob.channel === "PAZARAMA"
+              ? `/api/admin/integrations/jobs/${jobId}/pazarama-listing-batch`
+              : `/api/admin/integrations/jobs/${jobId}/trendyol-batch`;
       const response = await fetch(endpoint);
 
       if (!response.ok) {
@@ -1155,6 +1164,7 @@ export function IntegrationManager({
                 <SelectItem value="all">{labels.filterChannel}: {labels.all}</SelectItem>
                 <SelectItem value="TRENDYOL">{labels.channelTrendyol}</SelectItem>
                 <SelectItem value="N11">{labels.channelN11}</SelectItem>
+                <SelectItem value="PAZARAMA">{labels.channelPazarama}</SelectItem>
                 <SelectItem value="HEPSIBURADA">{labels.channelHepsiburada}</SelectItem>
                 <SelectItem value="EDOCS_MOCK">{labels.channelEDocsMock}</SelectItem>
               </SelectContent>
@@ -1236,10 +1246,10 @@ export function IntegrationManager({
           ) : (
             <div className="divide-y divide-neutral-200">
               {filteredJobs.map((item) => {
-                const canCheckBatch = (item.channel === "TRENDYOL" || item.channel === "N11" || item.channel === "HEPSIBURADA")
+                const canCheckBatch = (item.channel === "TRENDYOL" || item.channel === "N11" || item.channel === "PAZARAMA" || item.channel === "HEPSIBURADA")
                   && item.status === "SUCCESS"
                   && (item.jobType === "PRODUCT_SYNC" || item.jobType === "STOCK_SYNC" || item.jobType === "PRICE_SYNC")
-                  && Boolean(item.externalReference || item.responsePayload?.batchRequestId || item.responsePayload?.taskId || item.responsePayload?.priceUploadId || item.responsePayload?.stockUploadId);
+                  && Boolean(item.externalReference || item.responsePayload?.batchRequestId || item.responsePayload?.taskId || item.responsePayload?.priceUploadId || item.responsePayload?.stockUploadId || item.responsePayload?.dataId);
                 const highlights = jobHighlights(item, labels);
 
                 return (
@@ -1488,6 +1498,7 @@ export function IntegrationManager({
                         <SelectContent>
                           <SelectItem value="TRENDYOL">{labels.channelTrendyol}</SelectItem>
                           <SelectItem value="N11">{labels.channelN11}</SelectItem>
+                          <SelectItem value="PAZARAMA">{labels.channelPazarama}</SelectItem>
                           <SelectItem value="HEPSIBURADA">{labels.channelHepsiburada}</SelectItem>
                           <SelectItem value="EDOCS_MOCK">{labels.channelEDocsMock}</SelectItem>
                         </SelectContent>

@@ -1,0 +1,1 @@
+ALTER TYPE "IntegrationChannel" ADD VALUE IF NOT EXISTS 'PAZARAMA';

@@ -818,11 +818,12 @@ type InventorySyncPanelProps = {
     channelCounts: {
       trendyol: number;
       n11: number;
+      pazarama: number;
       hepsiburada: number;
     };
     recentJobs: Array<{
       id: string;
-      channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
+      channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | "EDOCS_MOCK";
       status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD_LETTER";
       entityId: string;
       createdAt: string;
@@ -919,13 +920,17 @@ export function InventorySyncPanel({
     }
   };
 
-  const formatChannelLabel = (value: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK"): string => {
+  const formatChannelLabel = (value: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | "EDOCS_MOCK"): string => {
     if (value === "TRENDYOL") {
       return labels.channelTrendyol;
     }
 
     if (value === "N11") {
       return labels.channelN11;
+    }
+
+    if (value === "PAZARAMA") {
+      return "Pazarama";
     }
 
     if (value === "HEPSIBURADA") {

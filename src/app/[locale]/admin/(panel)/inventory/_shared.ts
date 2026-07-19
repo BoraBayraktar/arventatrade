@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import type { AdminInventoryIntegrationSummary } from "@/modules/inventory/contracts/inventory.contract";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
 
 export type InventoryRouteSearchParams = {
@@ -188,7 +189,7 @@ export async function loadInventoryRouteContext(
   const [integrationSummary, operationHistory, exportHistory] = await Promise.all([
     pageVariant === "overview"
       ? inventoryService.getInventoryIntegrationSummary()
-      : Promise.resolve({
+      : Promise.resolve<AdminInventoryIntegrationSummary>({
         pendingCount: 0,
         processingCount: 0,
         failedCount: 0,
@@ -197,6 +198,7 @@ export async function loadInventoryRouteContext(
         channelCounts: {
           trendyol: 0,
           n11: 0,
+          pazarama: 0,
           hepsiburada: 0,
         },
         recentJobs: [],

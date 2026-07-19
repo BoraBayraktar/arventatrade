@@ -208,7 +208,7 @@ export type AdminProductAttributeValueMarketplaceMappingItem = {
   id: string;
   attributeDefinitionId: string;
   attributeName: string;
-  channel: "TRENDYOL" | "N11" | "HEPSIBURADA" | "EDOCS_MOCK";
+  channel: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | "EDOCS_MOCK";
   localValue: string;
   externalAttributeValueId: number | null;
   externalAttributeValueName: string | null;
@@ -220,7 +220,7 @@ export type AdminProductAttributeValueMarketplaceMappingItem = {
 
 export type AdminUpsertProductAttributeValueMarketplaceMappingInput = {
   attributeDefinitionId: string;
-  channel?: "TRENDYOL" | "N11" | "EDOCS_MOCK";
+  channel?: "TRENDYOL" | "N11" | "PAZARAMA" | "EDOCS_MOCK";
   localValue: string;
   externalAttributeValueId?: number | null;
   externalAttributeValueName?: string | null;
@@ -233,6 +233,7 @@ export type AdminBrandItem = {
   slug: string;
   name: string;
   trendyolBrandId: number | null;
+  pazaramaBrandId: string | null;
   isActive: boolean;
   productCount: number;
 };
@@ -252,6 +253,7 @@ export type AdminCreateBrandInput = {
   slug: string;
   name: string;
   trendyolBrandId?: number | null;
+  pazaramaBrandId?: string | null;
   isActive?: boolean;
 };
 
@@ -260,6 +262,7 @@ export type AdminUpdateBrandInput = {
   slug?: string;
   name?: string;
   trendyolBrandId?: number | null;
+  pazaramaBrandId?: string | null;
   isActive?: boolean;
 };
 
@@ -328,6 +331,7 @@ export type AdminCategoryListItem = {
   slug: string;
   name: string;
   trendyolCategoryId: number | null;
+  pazaramaCategoryId: string | null;
   parentId: string | null;
   parentName: string | null;
   productCount: number;
@@ -355,6 +359,7 @@ export type AdminCreateCategoryInput = {
   slug: string;
   name: string;
   trendyolCategoryId?: number | null;
+  pazaramaCategoryId?: string | null;
   parentId?: string | null;
 };
 
@@ -363,6 +368,7 @@ export type AdminUpdateCategoryInput = {
   slug?: string;
   name?: string;
   trendyolCategoryId?: number | null;
+  pazaramaCategoryId?: string | null;
   parentId?: string | null;
 };
 
