@@ -777,7 +777,7 @@ export function IntegrationManager({
     failed: jobs.filter((item) => item.status === "FAILED").length,
     deadLetter: jobs.filter((item) => item.status === "DEAD_LETTER").length,
   }), [jobs]);
-  const channelSummaries = useMemo(() => (["TRENDYOL", "N11", "HEPSIBURADA"] as Channel[]).map((item) => {
+  const channelSummaries = useMemo(() => (["TRENDYOL", "N11", "PAZARAMA", "HEPSIBURADA"] as Channel[]).map((item) => {
     const channelJobs = jobs.filter((job) => job.channel === item);
     const activeCount = channelJobs.filter((job) => job.status === "PENDING" || job.status === "PROCESSING").length;
     const failedCount = channelJobs.filter((job) => job.status === "FAILED" || job.status === "DEAD_LETTER").length;
@@ -1076,7 +1076,7 @@ export function IntegrationManager({
           <h3 className="text-lg font-semibold tracking-tight text-neutral-950">{labels.marketplaceOverview}</h3>
           <p className="text-sm text-neutral-600">{labels.marketplaceOverviewHint}</p>
         </div>
-        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <div className="mt-4 grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
           {channelSummaries.map((item) => {
             const capabilitySummary = marketplaceCapabilities.find((entry) => entry.channel === item.channel);
             const capabilityEntries = capabilitySummary ? capabilityItems(capabilitySummary, labels) : [];
