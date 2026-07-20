@@ -56,6 +56,8 @@ type Labels = {
   customValue: string;
   channelTrendyol: string;
   channelN11: string;
+  channelPazarama: string;
+  channelHepsiburada: string;
 };
 
 type TrendyolCategoryOption = {
@@ -82,7 +84,7 @@ type Props = {
   labels: Labels;
 };
 
-type MarketplaceChannel = "TRENDYOL" | "N11";
+type MarketplaceChannel = "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA";
 
 type DrawerMode = "create" | "edit";
 
@@ -751,6 +753,8 @@ export function AttributeDefinitionManager({ items, valueMappings, labels }: Pro
                 <SelectContent>
                   <SelectItem value="TRENDYOL">{labels.channelTrendyol}</SelectItem>
                   <SelectItem value="N11">{labels.channelN11}</SelectItem>
+                  <SelectItem value="PAZARAMA">{labels.channelPazarama}</SelectItem>
+                  <SelectItem value="HEPSIBURADA">{labels.channelHepsiburada}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

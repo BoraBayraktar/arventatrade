@@ -220,7 +220,7 @@ export type AdminProductAttributeValueMarketplaceMappingItem = {
 
 export type AdminUpsertProductAttributeValueMarketplaceMappingInput = {
   attributeDefinitionId: string;
-  channel?: "TRENDYOL" | "N11" | "PAZARAMA" | "EDOCS_MOCK";
+  channel?: "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | "EDOCS_MOCK";
   localValue: string;
   externalAttributeValueId?: number | null;
   externalAttributeValueName?: string | null;

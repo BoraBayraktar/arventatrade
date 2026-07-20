@@ -218,7 +218,7 @@ const updateAttributeDefinitionSchema = z.object({
 
 const upsertAttributeValueMarketplaceMappingSchema = z.object({
   attributeDefinitionId: z.string().trim().min(1),
-  channel: z.enum(["TRENDYOL", "N11", "EDOCS_MOCK"]).default("TRENDYOL"),
+  channel: z.enum(["TRENDYOL", "N11", "PAZARAMA", "HEPSIBURADA", "EDOCS_MOCK"]).default("TRENDYOL"),
   localValue: z.string().trim().min(1).max(240),
   externalAttributeValueId: z.coerce.number().int().positive().optional().nullable(),
   externalAttributeValueName: z.string().trim().max(240).optional().nullable(),

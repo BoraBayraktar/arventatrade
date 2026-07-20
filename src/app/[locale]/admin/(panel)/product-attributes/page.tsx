@@ -73,6 +73,8 @@ export default async function AdminProductAttributesPage({
         customValue: dictionary.admin.customValue,
         channelTrendyol: dictionary.admin.integrationChannelTrendyol,
         channelN11: dictionary.admin.integrationChannelN11,
+        channelPazarama: dictionary.admin.integrationChannelPazarama,
+        channelHepsiburada: dictionary.admin.integrationChannelHepsiburada,
       }}
     />
   );
