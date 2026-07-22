@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { financialAccountsService } from "@/modules/finance/services/financial-accounts.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(request: Request) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("finance.read");
     const { searchParams } = new URL(request.url);
     const items = await financialAccountsService.listAccounts({
       search: searchParams.get("search") ?? undefined,
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("finance.manage");
     const payload = await request.json();
     const item = await financialAccountsService.createAccount(payload);
     await auditLogService.recordFromRequest(request, {

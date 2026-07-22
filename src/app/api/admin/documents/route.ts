@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { documentService, DocumentAdminError } from "@/modules/documents/services/document.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(request: Request) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("documents.read");
     const { searchParams } = new URL(request.url);
     const result = await documentService.listBusinessDocuments({
       search: searchParams.get("search") ?? undefined,
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("documents.manage");
     const payload = await request.json();
     const created = await documentService.createBusinessDocument(payload);
 

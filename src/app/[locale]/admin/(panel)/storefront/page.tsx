@@ -4,6 +4,7 @@ import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { catalogService } from "@/modules/catalog/services/catalog.service";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { rbacService } from "@/modules/identity/services/rbac.service";
 import { storefrontService } from "@/modules/storefront/services/storefront.service";
 import { StorefrontManager } from "@/ui/admin/storefront-manager";
 
@@ -39,7 +40,7 @@ export default async function AdminStorefrontPage({
       items={storefrontItems}
       productOptions={storefrontProductOptions.items}
       categoryOptions={categories}
-      canDelete={user.role === "ADMIN"}
+      canDelete={await rbacService.hasPermission(user, "products.manage")}
       labels={{
         title: dictionary.admin.storefrontManager,
         createTitle: dictionary.admin.createStorefrontItem,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { hepsiburadaStockSyncService } from "@/modules/integration/services/hepsiburada-stock-sync.service";
 
 export async function GET(
@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("integrations.read");
     const { id } = await params;
     const result = await hepsiburadaStockSyncService.getUploadResultForJob(id);
     return NextResponse.json(result);

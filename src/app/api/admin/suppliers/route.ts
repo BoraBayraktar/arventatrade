@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET() {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("products.read");
     const items = await catalogAdminService.listSuppliers();
     return NextResponse.json({ items });
   } catch (error) {
@@ -21,7 +21,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("products.manage");
     const payload = await request.json();
     const created = await catalogAdminService.createSupplier(payload);
     await auditLogService.recordFromRequest(request, {

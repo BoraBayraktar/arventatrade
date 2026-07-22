@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
 
 export async function GET(
@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("integrations.read");
     const { id } = await params;
     const result = await marketplaceIntegrationService.getPackageDetail({ id });
     return NextResponse.json(result);

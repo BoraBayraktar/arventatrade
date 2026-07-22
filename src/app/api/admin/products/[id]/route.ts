@@ -4,7 +4,7 @@ import { ZodError } from "zod";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
@@ -13,7 +13,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("products.read");
     const { id } = await context.params;
     const item = await catalogAdminService.getProductById(id);
 
@@ -36,7 +36,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("products.manage");
     const { id } = await context.params;
     const payload = await request.json();
     const updated = await catalogAdminService.updateProduct({
@@ -69,7 +69,7 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("products.manage");
     const { id } = await context.params;
     await catalogAdminService.softDeleteProduct(id, user.id);
     await auditLogService.recordFromRequest(request, {

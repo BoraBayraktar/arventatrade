@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { rbacService } from "@/modules/identity/services/rbac.service";
 import {
   auditLogActionLabels,
   auditLogEntityLabels,
@@ -170,7 +171,8 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
     redirect(`/${locale}/admin/login`);
   }
 
-  if (user.role !== "ADMIN") {
+  const canReadAuditLogs = await rbacService.hasPermission(user, "audit.read");
+  if (!canReadAuditLogs) {
     redirect(`/${locale}/admin`);
   }
 

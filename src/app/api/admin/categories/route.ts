@@ -4,13 +4,13 @@ import { ZodError } from "zod";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(request: Request) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("products.read");
     const { searchParams } = new URL(request.url);
 
     const categories = await catalogAdminService.listCategories({
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("products.manage");
     const payload = await request.json();
     const created = await catalogAdminService.createCategory(payload);
     await auditLogService.recordFromRequest(request, {

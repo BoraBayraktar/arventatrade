@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 import { storefrontService } from "@/modules/storefront/services/storefront.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
@@ -13,7 +13,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("products.manage");
     const { id } = await context.params;
     const payload = await request.json();
     const item = await storefrontService.upsertItem({ id, ...payload });
@@ -43,7 +43,7 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("products.manage");
     const { id } = await context.params;
     await storefrontService.softDeleteItem(id, user.id);
     await auditLogService.recordFromRequest(request, {

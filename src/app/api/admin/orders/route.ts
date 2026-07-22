@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { commerceService } from "@/modules/commerce/services/commerce.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 
 export async function GET(request: Request) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("orders.read");
     const { searchParams } = new URL(request.url);
 
     const orders = await commerceService.listOrders({

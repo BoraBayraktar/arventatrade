@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { documentEvidencePackageService } from "@/modules/documents/services/document-evidence-package.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("documents.manage");
     const { id } = await context.params;
     const evidencePackage = await documentEvidencePackageService.buildPackage(id);
 

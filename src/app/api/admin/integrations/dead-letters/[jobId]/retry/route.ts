@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { integrationService } from "@/modules/integration/services/integration.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("integrations.manage");
     const { jobId } = await context.params;
     const result = await integrationService.retryDeadLetter({
       jobId,

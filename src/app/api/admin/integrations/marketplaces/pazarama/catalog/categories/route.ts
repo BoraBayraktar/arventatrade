@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
 
 export async function GET(request: Request) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("integrations.read");
     const { searchParams } = new URL(request.url);
     const result = await marketplaceIntegrationService.searchPazaramaCategories({
       query: searchParams.get("query") ?? "",

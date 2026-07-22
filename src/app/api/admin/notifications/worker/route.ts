@@ -3,13 +3,13 @@ import { ZodError } from "zod";
 
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 import { notificationService } from "@/modules/system/services/notification.service";
 
 export async function POST(request: Request) {
   try {
-    await requireUserRoles(["ADMIN"]);
+    await requirePermission("users.manage");
     const payload = await request.json().catch(() => ({}));
     const result = await notificationService.processEmailQueue(payload);
     return NextResponse.json(result);

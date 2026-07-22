@@ -4,13 +4,13 @@ import { ZodError } from "zod";
 import { identityAdminService } from "@/modules/identity/services/identity-admin.service";
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(request: Request) {
   try {
-    await requireUserRoles(["ADMIN"]);
+    await requirePermission("users.manage");
     const { searchParams } = new URL(request.url);
 
     const users = await identityAdminService.listUsers({
@@ -36,9 +36,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("users.manage");
     const payload = await request.json();
-    const created = await identityAdminService.createUser(payload);
+    const created = await identityAdminService.createUser(payload, user.id);
     await auditLogService.recordFromRequest(request, {
       entityType: "USER",
       entityId: created.id,
@@ -54,6 +54,7 @@ export async function POST(request: Request) {
       summary: `Kullanıcı yetkisi tanımlandı: ${created.email}`,
       metadata: {
         targetRole: created.role,
+        targetRoleIds: payload.roleIds ?? [],
       },
     });
     return NextResponse.json({ item: created }, { status: 201 });

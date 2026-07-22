@@ -2,7 +2,34 @@ import { notFound, redirect } from "next/navigation";
 
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { rbacService } from "@/modules/identity/services/rbac.service";
 import { AdminPanelShell, type MenuItem } from "@/ui/admin/panel-shell";
+
+type ProtectedMenuItem = MenuItem & {
+  permissionKey?: string;
+  children?: ProtectedMenuItem[];
+};
+
+function filterMenuByPermissions(items: ProtectedMenuItem[], permissionKeys: string[]): MenuItem[] {
+  const filteredItems: MenuItem[] = [];
+
+  for (const item of items) {
+    const children = item.children ? filterMenuByPermissions(item.children, permissionKeys) : undefined;
+    const canSeeItem = !item.permissionKey || permissionKeys.includes(item.permissionKey);
+
+    if (!canSeeItem && (!children || children.length === 0)) {
+      continue;
+    }
+
+    filteredItems.push({
+      href: item.href,
+      label: item.label,
+      children,
+    });
+  }
+
+  return filteredItems;
+}
 
 export default async function AdminPanelLayout({
   children,
@@ -24,94 +51,102 @@ export default async function AdminPanelLayout({
     redirect(`/${locale}/admin/login`);
   }
 
-  if (user.role !== "ADMIN" && user.role !== "EDITOR") {
+  const effectiveRbac = await rbacService.getEffectivePermissions(user);
+
+  if (!effectiveRbac.permissionKeys.includes("admin.access")) {
     redirect(`/${locale}`);
   }
 
-  const localizedRole = user.role === "ADMIN" ? dictionary.admin.roleAdmin : dictionary.admin.roleEditor;
-  const adminMenuItems: MenuItem[] =
-    user.role === "ADMIN"
-      ? [
-          {
-            href: `/${locale}/admin/users`,
-            label: dictionary.admin.userManagerGroup,
-            children: [
-              { href: `/${locale}/admin/customers`, label: dictionary.admin.customerManager },
-              { href: `/${locale}/admin/users`, label: dictionary.admin.userManager },
-              { href: `/${locale}/admin/audit-logs`, label: dictionary.admin.auditLogMenu },
-            ],
-          },
-        ]
-      : [];
+  const localizedRole = effectiveRbac.roleNames.length > 0
+    ? effectiveRbac.roleNames.join(", ")
+    : user.role === "ADMIN"
+      ? dictionary.admin.roleAdmin
+      : dictionary.admin.roleEditor;
 
-  const menuItems: MenuItem[] = [
+  const rawMenuItems: ProtectedMenuItem[] = [
     {
       href: `/${locale}/admin/products`,
       label: dictionary.admin.productManager,
+      permissionKey: "products.read",
       children: [
-        { href: `/${locale}/admin/products`, label: "Ürünler" },
-        { href: `/${locale}/admin/product-questions`, label: dictionary.admin.questionManager },
-        { href: `/${locale}/admin/categories`, label: dictionary.admin.categoryManager },
-        { href: `/${locale}/admin/storefront`, label: dictionary.admin.storefrontManager },
-        { href: `/${locale}/admin/product-attributes`, label: dictionary.admin.productAttributesTitle },
-        { href: `/${locale}/admin/orders`, label: dictionary.admin.orderManager },
-        { href: `/${locale}/admin/brands`, label: dictionary.admin.brandsTitle },
+        { href: `/${locale}/admin/products`, label: "Ürünler", permissionKey: "products.read" },
+        { href: `/${locale}/admin/product-questions`, label: dictionary.admin.questionManager, permissionKey: "products.read" },
+        { href: `/${locale}/admin/categories`, label: dictionary.admin.categoryManager, permissionKey: "products.manage" },
+        { href: `/${locale}/admin/storefront`, label: dictionary.admin.storefrontManager, permissionKey: "products.manage" },
+        { href: `/${locale}/admin/product-attributes`, label: dictionary.admin.productAttributesTitle, permissionKey: "products.manage" },
+        { href: `/${locale}/admin/orders`, label: dictionary.admin.orderManager, permissionKey: "orders.read" },
+        { href: `/${locale}/admin/brands`, label: dictionary.admin.brandsTitle, permissionKey: "products.manage" },
       ],
     },
     {
       href: `/${locale}/admin/inventory`,
       label: dictionary.admin.inventoryManager,
+      permissionKey: "inventory.read",
       children: [
-        { href: `/${locale}/admin/inventory`, label: "Genel Bakış" },
-        { href: `/${locale}/admin/inventory/quick-actions`, label: "Hızlı Barkod İşlemleri" },
-        { href: `/${locale}/admin/inventory/products`, label: "Ürün Stokları" },
-        { href: `/${locale}/admin/inventory/transactions`, label: dictionary.admin.inventoryTransactionsTitle },
-        { href: `/${locale}/admin/inventory/counts`, label: dictionary.admin.inventoryStockCountTitle },
-        { href: `/${locale}/admin/inventory/warehouses`, label: dictionary.admin.inventoryWarehousesTitle },
-        { href: `/${locale}/admin/suppliers`, label: dictionary.admin.suppliersTitle },
-        { href: `/${locale}/admin/inventory/exports`, label: "Dışa Aktarım Geçmişi" },
+        { href: `/${locale}/admin/inventory`, label: "Genel Bakış", permissionKey: "inventory.read" },
+        { href: `/${locale}/admin/inventory/quick-actions`, label: "Hızlı Barkod İşlemleri", permissionKey: "inventory.manage" },
+        { href: `/${locale}/admin/inventory/products`, label: "Ürün Stokları", permissionKey: "inventory.read" },
+        { href: `/${locale}/admin/inventory/transactions`, label: dictionary.admin.inventoryTransactionsTitle, permissionKey: "inventory.read" },
+        { href: `/${locale}/admin/inventory/counts`, label: dictionary.admin.inventoryStockCountTitle, permissionKey: "inventory.manage" },
+        { href: `/${locale}/admin/inventory/warehouses`, label: dictionary.admin.inventoryWarehousesTitle, permissionKey: "inventory.manage" },
+        { href: `/${locale}/admin/suppliers`, label: dictionary.admin.suppliersTitle, permissionKey: "inventory.manage" },
+        { href: `/${locale}/admin/inventory/exports`, label: "Dışa Aktarım Geçmişi", permissionKey: "inventory.read" },
       ],
     },
     {
       href: `/${locale}/admin/documents`,
       label: dictionary.admin.documentManager,
+      permissionKey: "documents.read",
       children: [
-        { href: `/${locale}/admin/documents`, label: dictionary.admin.documentsMenuOverview },
-        { href: `/${locale}/admin/documents/pending-invoices`, label: dictionary.admin.documentsMenuPendingInvoices },
-        { href: `/${locale}/admin/documents/providers`, label: dictionary.admin.documentsMenuProviders },
-        { href: `/${locale}/admin/documents/webhooks`, label: dictionary.admin.documentsMenuWebhooks },
+        { href: `/${locale}/admin/documents`, label: dictionary.admin.documentsMenuOverview, permissionKey: "documents.read" },
+        { href: `/${locale}/admin/documents/pending-invoices`, label: dictionary.admin.documentsMenuPendingInvoices, permissionKey: "documents.manage" },
+        { href: `/${locale}/admin/documents/providers`, label: dictionary.admin.documentsMenuProviders, permissionKey: "documents.manage" },
+        { href: `/${locale}/admin/documents/webhooks`, label: dictionary.admin.documentsMenuWebhooks, permissionKey: "documents.manage" },
       ],
     },
     {
       href: `/${locale}/admin/finance`,
       label: dictionary.admin.financeManager,
+      permissionKey: "finance.read",
       children: [
-        { href: `/${locale}/admin/finance`, label: dictionary.admin.financeMenuOverview },
-        { href: `/${locale}/admin/finance/payables`, label: dictionary.admin.financeMenuSupplierPayables },
-        { href: `/${locale}/admin/finance/receivables`, label: dictionary.admin.financeMenuCustomerReceivables },
-        { href: `/${locale}/admin/finance/accounts`, label: dictionary.admin.financeMenuAccounts },
-        { href: `/${locale}/admin/customer-accounts`, label: dictionary.admin.customerAccountsTitle },
-        { href: `/${locale}/admin/finance/collections`, label: dictionary.admin.financeMenuCollections },
-        { href: `/${locale}/admin/finance/payments`, label: dictionary.admin.financeMenuPayments },
-        { href: `/${locale}/admin/finance/bank-cash`, label: dictionary.admin.financeMenuBankCash },
-        { href: `/${locale}/admin/finance/transactions`, label: dictionary.admin.financeMenuTransactions },
-        { href: `/${locale}/admin/finance/reports`, label: dictionary.admin.financeMenuReports },
+        { href: `/${locale}/admin/finance`, label: dictionary.admin.financeMenuOverview, permissionKey: "finance.read" },
+        { href: `/${locale}/admin/finance/payables`, label: dictionary.admin.financeMenuSupplierPayables, permissionKey: "finance.read" },
+        { href: `/${locale}/admin/finance/receivables`, label: dictionary.admin.financeMenuCustomerReceivables, permissionKey: "finance.read" },
+        { href: `/${locale}/admin/finance/accounts`, label: dictionary.admin.financeMenuAccounts, permissionKey: "finance.manage" },
+        { href: `/${locale}/admin/customer-accounts`, label: dictionary.admin.customerAccountsTitle, permissionKey: "finance.manage" },
+        { href: `/${locale}/admin/finance/collections`, label: dictionary.admin.financeMenuCollections, permissionKey: "finance.manage" },
+        { href: `/${locale}/admin/finance/payments`, label: dictionary.admin.financeMenuPayments, permissionKey: "finance.manage" },
+        { href: `/${locale}/admin/finance/bank-cash`, label: dictionary.admin.financeMenuBankCash, permissionKey: "finance.manage" },
+        { href: `/${locale}/admin/finance/transactions`, label: dictionary.admin.financeMenuTransactions, permissionKey: "finance.manage" },
+        { href: `/${locale}/admin/finance/reports`, label: dictionary.admin.financeMenuReports, permissionKey: "finance.read" },
       ],
     },
     {
       href: `/${locale}/admin/integrations`,
       label: dictionary.admin.integrationManager,
+      permissionKey: "integrations.read",
       children: [
-        { href: `/${locale}/admin/integrations`, label: dictionary.admin.integrationManager },
-        { href: `/${locale}/admin/integrations/trendyol`, label: dictionary.admin.integrationMarketplaceTrendyol },
-        { href: `/${locale}/admin/integrations/n11`, label: dictionary.admin.integrationMarketplaceN11 },
-        { href: `/${locale}/admin/integrations/pazarama`, label: dictionary.admin.integrationMarketplacePazarama },
-        { href: `/${locale}/admin/integrations/hepsiburada`, label: dictionary.admin.integrationMarketplaceHepsiburada },
-        { href: `/${locale}/admin/inventory/external-events`, label: "Harici Stok Eventleri" },
+        { href: `/${locale}/admin/integrations`, label: dictionary.admin.integrationManager, permissionKey: "integrations.read" },
+        { href: `/${locale}/admin/integrations/trendyol`, label: dictionary.admin.integrationMarketplaceTrendyol, permissionKey: "integrations.manage" },
+        { href: `/${locale}/admin/integrations/n11`, label: dictionary.admin.integrationMarketplaceN11, permissionKey: "integrations.manage" },
+        { href: `/${locale}/admin/integrations/pazarama`, label: dictionary.admin.integrationMarketplacePazarama, permissionKey: "integrations.manage" },
+        { href: `/${locale}/admin/integrations/hepsiburada`, label: dictionary.admin.integrationMarketplaceHepsiburada, permissionKey: "integrations.manage" },
+        { href: `/${locale}/admin/inventory/external-events`, label: "Harici Stok Eventleri", permissionKey: "integrations.read" },
       ],
     },
-    ...adminMenuItems,
+    {
+      href: `/${locale}/admin/users`,
+      label: dictionary.admin.userManagerGroup,
+      permissionKey: "users.manage",
+      children: [
+        { href: `/${locale}/admin/customers`, label: dictionary.admin.customerManager, permissionKey: "users.manage" },
+        { href: `/${locale}/admin/users`, label: dictionary.admin.userManager, permissionKey: "users.manage" },
+        { href: `/${locale}/admin/roles`, label: dictionary.admin.roleManager, permissionKey: "users.manage" },
+        { href: `/${locale}/admin/audit-logs`, label: dictionary.admin.auditLogMenu, permissionKey: "audit.read" },
+      ],
+    },
   ];
+  const menuItems = filterMenuByPermissions(rawMenuItems, effectiveRbac.permissionKeys);
 
   return (
     <AdminPanelShell

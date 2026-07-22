@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
@@ -15,7 +15,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string; lineId: string }> },
 ) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("inventory.manage");
     const { id, lineId } = await context.params;
     const payload = updateLineSchema.parse(await request.json());
 

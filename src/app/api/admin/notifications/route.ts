@@ -3,13 +3,13 @@ import { ZodError } from "zod";
 
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 import { notificationService } from "@/modules/system/services/notification.service";
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("admin.access");
     const { searchParams } = new URL(request.url);
 
     const result = await notificationService.listInAppForUser({

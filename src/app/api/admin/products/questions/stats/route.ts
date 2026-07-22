@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 
 function getQuestionSlaHours() {
@@ -17,7 +17,7 @@ function getQuestionSlaHours() {
 
 export async function GET() {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("products.read");
     const result = await catalogAdminService.getProductQuestionStats(getQuestionSlaHours());
 
     return NextResponse.json(result);

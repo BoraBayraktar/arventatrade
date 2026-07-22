@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
@@ -18,7 +18,7 @@ const exportSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("inventory.manage");
     const payload = exportSchema.parse(await request.json());
 
     const exportHistory = await inventoryService.recordInventoryExportHistory({

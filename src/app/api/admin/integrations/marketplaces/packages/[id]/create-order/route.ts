@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { MarketplaceOrderCreationError } from "@/modules/commerce/services/marketplace-order.service";
 import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
@@ -11,7 +11,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("integrations.manage");
     const { id } = await params;
     const result = await marketplaceIntegrationService.createOrderFromPackage({ packageId: id });
     await auditLogService.recordFromRequest(request, {

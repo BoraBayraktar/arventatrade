@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditAnchorService } from "@/modules/system/services/audit-anchor.service";
 
 export async function GET(request: Request) {
   try {
-    await requireUserRoles(["ADMIN"]);
+    await requirePermission("audit.read");
     const { searchParams } = new URL(request.url);
     const result = await auditAnchorService.verifyRange({
       startDate: searchParams.get("startDate") ?? undefined,

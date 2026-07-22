@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { rbacService } from "@/modules/identity/services/rbac.service";
 import { BrandDirectoryManager } from "@/ui/admin/brand-directory-manager";
 
 export default async function AdminBrandsPage({
@@ -27,7 +28,7 @@ export default async function AdminBrandsPage({
   return (
     <BrandDirectoryManager
       items={items}
-      canDelete={user.role === "ADMIN"}
+      canDelete={await rbacService.hasPermission(user, "products.manage")}
       labels={{
         title: dictionary.admin.brandsTitle,
         description: dictionary.admin.brandsDescription,

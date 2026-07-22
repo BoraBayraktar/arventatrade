@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { documentService, DocumentAdminError } from "@/modules/documents/services/document.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET() {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("documents.read");
     const items = await documentService.listProviderConfigs();
     return NextResponse.json({ items });
   } catch (error) {
@@ -21,7 +21,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("documents.manage");
     const payload = await request.json();
     const item = await documentService.upsertProviderConfig(payload);
 

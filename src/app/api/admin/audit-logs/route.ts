@@ -3,15 +3,15 @@ import { ZodError } from "zod";
 
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 import { AUDIT_LOG_ACTIONS, AUDIT_LOG_ENTITY_TYPES, type AuditLogAction, type AuditLogEntityType } from "@/modules/system/contracts/audit-log.contract";
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
     const { searchParams } = new URL(request.url);
+    const user = await requirePermission(searchParams.get("export") === "manifest" ? "audit.export" : "audit.read");
     const entityType = AUDIT_LOG_ENTITY_TYPES.includes(searchParams.get("entityType") as AuditLogEntityType)
       ? searchParams.get("entityType") as AuditLogEntityType
       : undefined;

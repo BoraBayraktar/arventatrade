@@ -4,6 +4,7 @@ import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { CommerceOrderAdminError, commerceService } from "@/modules/commerce/services/commerce.service";
 import { financialAccountsService } from "@/modules/finance/services/financial-accounts.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { rbacService } from "@/modules/identity/services/rbac.service";
 import { OrderDetailManager } from "@/ui/admin/order-detail-manager";
 
 export default async function AdminOrderDetailPage({
@@ -41,7 +42,7 @@ export default async function AdminOrderDetailPage({
     <OrderDetailManager
       locale={locale}
       order={order}
-      canManage={user.role === "ADMIN"}
+      canManage={await rbacService.hasPermission(user, "orders.manage")}
       accountOptions={accountOptions}
       labels={{
         back: dictionary.admin.backToOrders,

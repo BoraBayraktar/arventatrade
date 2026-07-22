@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { identityAdminService } from "@/modules/identity/services/identity-admin.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { rbacService } from "@/modules/identity/services/rbac.service";
 import { UserManager } from "@/ui/admin/user-manager";
 
 export default async function AdminCustomersPage({
@@ -22,7 +23,8 @@ export default async function AdminCustomersPage({
     redirect(`/${locale}/admin/login`);
   }
 
-  if (user.role !== "ADMIN") {
+  const canManageUsers = await rbacService.hasPermission(user, "users.manage");
+  if (!canManageUsers) {
     redirect(`/${locale}/admin`);
   }
 
@@ -48,8 +50,10 @@ export default async function AdminCustomersPage({
         email: dictionary.admin.email,
         name: dictionary.admin.name,
         role: dictionary.admin.role,
+        roles: dictionary.admin.roles,
         password: dictionary.admin.password,
         passwordOptional: dictionary.admin.passwordOptional,
+        changePassword: dictionary.admin.changePassword,
         page: dictionary.admin.page,
         prev: dictionary.admin.prev,
         next: dictionary.admin.next,

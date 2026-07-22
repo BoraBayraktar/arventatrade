@@ -3,14 +3,14 @@ import { ZodError } from "zod";
 
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 import { storefrontService } from "@/modules/storefront/services/storefront.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET() {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("products.read");
     const items = await storefrontService.listAdminItems();
     return NextResponse.json({ items });
   } catch (error) {
@@ -24,7 +24,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("products.manage");
     const payload = await request.json();
     const item = await storefrontService.upsertItem(payload);
     await auditLogService.recordFromRequest(request, {

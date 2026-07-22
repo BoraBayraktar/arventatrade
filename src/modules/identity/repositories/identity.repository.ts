@@ -32,6 +32,22 @@ export class IdentityRepository {
     });
   }
 
+  async findByIdWithPassword(id: string) {
+    return prisma.user.findFirst({
+      where: {
+        id,
+        deleted: false,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        passwordHash: true,
+      },
+    });
+  }
+
   async listUsersByRoles(roles: Array<"ADMIN" | "EDITOR" | "CUSTOMER">) {
     return prisma.user.findMany({
       where: {
@@ -77,6 +93,13 @@ export class IdentityRepository {
         name: true,
         role: true,
         createdAt: true,
+        roleAssignments: {
+          where: { role: { deleted: false } },
+          select: {
+            roleId: true,
+            role: { select: { name: true } },
+          },
+        },
       },
       orderBy: {
         updatedAt: "desc",
@@ -122,6 +145,13 @@ export class IdentityRepository {
         name: true,
         role: true,
         createdAt: true,
+        roleAssignments: {
+          where: { role: { deleted: false } },
+          select: {
+            roleId: true,
+            role: { select: { name: true } },
+          },
+        },
       },
     });
   }
@@ -149,6 +179,13 @@ export class IdentityRepository {
         name: true,
         role: true,
         createdAt: true,
+        roleAssignments: {
+          where: { role: { deleted: false } },
+          select: {
+            roleId: true,
+            role: { select: { name: true } },
+          },
+        },
       },
     });
   }

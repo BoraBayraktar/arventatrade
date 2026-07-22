@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { hepsiburadaProductSyncService } from "@/modules/integration/services/hepsiburada-product-sync.service";
 import { n11ProductSyncService } from "@/modules/integration/services/n11-product-sync.service";
 import { pazaramaProductSyncService } from "@/modules/integration/services/pazarama-product-sync.service";
@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("integrations.read");
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const channel = (searchParams.get("channel") as "TRENDYOL" | "N11" | "PAZARAMA" | "HEPSIBURADA" | null) ?? "TRENDYOL";

@@ -5,6 +5,8 @@ export type AdminUserListItem = {
   email: string;
   name: string;
   role: UserRole;
+  roleIds: string[];
+  roleNames: string[];
   createdAt: string;
 };
 
@@ -26,7 +28,8 @@ export type AdminUserListResult = {
 export type AdminCreateUserInput = {
   email: string;
   name: string;
-  role: UserRole;
+  role?: UserRole;
+  roleIds?: string[];
   password: string;
 };
 
@@ -35,5 +38,6 @@ export type AdminUpdateUserInput = {
   email?: string;
   name?: string;
   role?: UserRole;
+  roleIds?: string[];
   password?: string;
 };

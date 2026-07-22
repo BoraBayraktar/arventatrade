@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET() {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("inventory.read");
     const result = await inventoryService.getUserInventoryPreferences(user.id);
     return NextResponse.json(result);
   } catch (error) {
@@ -21,7 +21,7 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("inventory.manage");
     const payload = await request.json();
     const result = await inventoryService.saveUserInventoryPreferences(user.id, payload);
     await auditLogService.recordFromRequest(request, {

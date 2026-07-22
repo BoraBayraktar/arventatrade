@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { integrationService } from "@/modules/integration/services/integration.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 
 export async function GET() {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("integrations.read");
     const result = await integrationService.listDeadLetters();
     return NextResponse.json(result);
   } catch (error) {

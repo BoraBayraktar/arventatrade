@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { CommerceOrderAdminError, commerceService } from "@/modules/commerce/services/commerce.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("orders.read");
     const { id } = await context.params;
     const order = await commerceService.getOrderById(id);
     return NextResponse.json(order);
@@ -30,7 +30,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("orders.manage");
     const { id } = await context.params;
     const payload = await request.json();
     const updated = await commerceService.updateOrderStatus({ id, changedByUserId: user.id, ...payload });
@@ -61,7 +61,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("orders.manage");
     const { id } = await context.params;
     await commerceService.softDeleteOrder(id, user.id);
     await auditLogService.recordFromRequest(request, {

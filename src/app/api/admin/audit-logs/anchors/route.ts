@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditAnchorService } from "@/modules/system/services/audit-anchor.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("audit.export");
     const payload = await request.json();
     const anchor = await auditAnchorService.createDailyAnchor({
       startDate: payload.startDate,

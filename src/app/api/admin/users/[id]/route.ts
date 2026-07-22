@@ -7,7 +7,7 @@ import {
 } from "@/modules/identity/services/identity-admin.service";
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
@@ -16,13 +16,13 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("users.manage");
     const { id } = await context.params;
     const payload = await request.json();
     const updated = await identityAdminService.updateUser({
       id,
       ...payload,
-    });
+    }, user.id);
 
     await auditLogService.recordFromRequest(request, {
       entityType: "USER",
@@ -31,7 +31,7 @@ export async function PATCH(
       actorUserId: user.id,
       summary: `Kullanıcı güncellendi: ${updated.email}`,
     });
-    if (payload.role !== undefined || payload.password !== undefined) {
+    if (payload.role !== undefined || payload.roleIds !== undefined || payload.password !== undefined) {
       await auditLogService.recordFromRequest(request, {
         entityType: "AUTH",
         entityId: updated.id,
@@ -40,8 +40,10 @@ export async function PATCH(
         summary: `Kullanıcı güvenlik bilgisi güncellendi: ${updated.email}`,
         metadata: {
           roleChanged: payload.role !== undefined,
+          rbacRolesChanged: payload.roleIds !== undefined,
           passwordChanged: payload.password !== undefined,
           targetRole: payload.role ?? updated.role,
+          targetRoleIds: payload.roleIds ?? updated.roleIds,
         },
       });
     }
@@ -65,7 +67,7 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("users.manage");
     const { id } = await context.params;
     await identityAdminService.softDeleteUser(id, user.id);
     await auditLogService.recordFromRequest(request, {

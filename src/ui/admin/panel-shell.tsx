@@ -316,6 +316,40 @@ function getActiveAdminGuide(pathname: string, searchParams: Pick<URLSearchParam
     });
   }
 
+  if (adminPath === "/admin/roles") {
+    return createGuide({
+      eyebrow: "Rol rehberi",
+      title: "Rol yönetimi nasıl kullanılır?",
+      description: "Bu ekran admin panelinde hangi kullanıcının hangi menüleri görebileceğini ve hangi işlemleri yapabileceğini merkezi olarak yönetir.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce hazır sistem rollerinden ihtiyacınızı karşılayan rol var mı kontrol edin.",
+            "Yeni rol gerekiyorsa rol anahtarını kısa ve teknik, rol adını iş diliyle anlaşılır yazın.",
+            "Rolün göreceği menü ve yapacağı işlemler için gerekli yetkileri seçin.",
+            "Rolü kaydettikten sonra Kullanıcı Yönetimi ekranından ilgili kullanıcıya atayın.",
+          ],
+        },
+        {
+          title: "Dikkat edilmesi gerekenler",
+          items: [
+            "Menü görünürlüğü tek başına güvenlik değildir; API işlemleri de aynı yetki anahtarlarıyla korunur.",
+            "Süper Yönetici rolü pasifleştirilemez ve yetkileri daraltılamaz.",
+            "Kullanıcı kendi Süper Yönetici yetkisini kaldıramaz; sistemde son Süper Yönetici korunur.",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Rol atamak için Kullanıcı Yönetimi ekranına geçin.",
+            "Yetki değişikliklerini kontrol etmek için İşlem Kayıtları ekranını açın.",
+          ],
+        },
+      ],
+    });
+  }
+
   if (adminPath === "/admin/brands") {
     return createGuide({
       eyebrow: "Marka rehberi",

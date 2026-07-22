@@ -4,6 +4,7 @@ import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { catalogService } from "@/modules/catalog/services/catalog.service";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { rbacService } from "@/modules/identity/services/rbac.service";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
 import { ProductManager } from "@/ui/admin/product-manager";
 
@@ -69,8 +70,8 @@ export default async function AdminProductsPage({
       suppliers={suppliers}
       attributeDefinitions={attributeDefinitions}
       warehouses={warehouses}
-      canDelete={user.role === "ADMIN"}
-      canManageIntegrations={user.role === "ADMIN"}
+      canDelete={await rbacService.hasPermission(user, "products.manage")}
+      canManageIntegrations={await rbacService.hasPermission(user, "integrations.manage")}
       labels={{
         title: dictionary.admin.productManager,
         createTitle: dictionary.admin.createProduct,

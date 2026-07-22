@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { catalogImportService } from "@/modules/catalog/services/catalog-import.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("products.manage");
     const formData = await request.formData();
     const file = formData.get("file");
 

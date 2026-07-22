@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { rbacService } from "@/modules/identity/services/rbac.service";
 import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
 import { TrendyolIntegrationManager } from "@/ui/admin/trendyol-integration-manager";
 
@@ -50,7 +51,7 @@ export default async function AdminTrendyolIntegrationPage({
   return (
     <TrendyolIntegrationManager
       locale={locale}
-      canManage={user.role === "ADMIN"}
+      canManage={await rbacService.hasPermission(user, "integrations.manage")}
       initialConfigs={dashboard.configs}
       initialPackages={dashboard.packages}
       capabilities={dashboard.capabilities}

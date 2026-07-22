@@ -4,12 +4,12 @@ import { ZodError } from "zod";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 
 export async function GET(request: Request) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("products.read");
     const { searchParams } = new URL(request.url);
 
     const result = await catalogAdminService.listProductQuestions({

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
 
 export async function GET(request: Request) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("inventory.read");
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("query")?.trim() ?? "";
 

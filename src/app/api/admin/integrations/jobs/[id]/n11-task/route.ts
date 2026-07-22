@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { n11StockSyncService } from "@/modules/integration/services/n11-stock-sync.service";
 
 export async function GET(
@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("integrations.read");
     const { id } = await params;
     const result = await n11StockSyncService.getTaskResultForJob(id);
     return NextResponse.json(result);

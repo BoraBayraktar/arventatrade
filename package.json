@@ -16,6 +16,7 @@
     "db:backfill:business-document-master-data": "tsx --tsconfig tsconfig.json scripts/backfill-business-document-master-data.ts",
     "db:repair:duplicate-skus": "node scripts/repair-duplicate-skus.mjs",
     "verify:rbac": "node scripts/verify-rbac.mjs",
+    "verify:rbac:v2": "node scripts/verify-rbac-v2.mjs",
     "verify:crud": "node scripts/verify-product-crud.mjs",
     "verify:storefront": "node scripts/verify-storefront.mjs",
     "verify:categories": "node scripts/verify-categories.mjs",

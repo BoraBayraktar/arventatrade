@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { catalogExportService } from "@/modules/catalog/services/catalog-export.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("products.read");
     const { searchParams } = new URL(request.url);
 
     const exported = await catalogExportService.exportProducts({

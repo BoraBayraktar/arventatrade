@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { integrationService } from "@/modules/integration/services/integration.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(request: Request) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("integrations.read");
     const { searchParams } = new URL(request.url);
 
     const result = await integrationService.listJobs({
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserRoles(["ADMIN"]);
+    const user = await requirePermission("integrations.manage");
     const payload = await request.json();
     const result = await integrationService.dispatchJobs(payload);
     await auditLogService.recordFromRequest(request, {

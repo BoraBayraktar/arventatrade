@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
+import { rbacService } from "@/modules/identity/services/rbac.service";
 import { SupplierDirectoryManager } from "@/ui/admin/supplier-directory-manager";
 
 export default async function AdminSuppliersPage({
@@ -27,7 +28,7 @@ export default async function AdminSuppliersPage({
   return (
     <SupplierDirectoryManager
       items={items}
-      canDelete={user.role === "ADMIN"}
+      canDelete={await rbacService.hasPermission(user, "inventory.manage")}
       labels={{
         title: dictionary.admin.suppliersTitle,
         description: dictionary.admin.suppliersDescription,

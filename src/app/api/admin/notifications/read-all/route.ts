@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 import { notificationService } from "@/modules/system/services/notification.service";
 
 export async function PATCH() {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("admin.access");
     await notificationService.markAllAsRead(user.id);
     return NextResponse.json({ ok: true });
   } catch (error) {

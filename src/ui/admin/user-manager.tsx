@@ -13,7 +13,16 @@ type UserItem = {
   email: string;
   name: string;
   role: "ADMIN" | "EDITOR" | "CUSTOMER";
+  roleIds: string[];
+  roleNames: string[];
   createdAt: string;
+};
+
+type AvailableRole = {
+  id: string;
+  name: string;
+  description: string | null;
+  isSystem: boolean;
 };
 
 type Labels = {
@@ -28,8 +37,10 @@ type Labels = {
   email: string;
   name: string;
   role: string;
+  roles: string;
   password: string;
   passwordOptional: string;
+  changePassword: string;
   page: string;
   prev: string;
   next: string;
@@ -55,6 +66,7 @@ type Props = {
     totalPages: number;
   };
   labels: Labels;
+  availableRoles?: AvailableRole[];
   fixedRole?: "CUSTOMER";
 };
 
@@ -63,25 +75,24 @@ type DrawerMode = "create" | "edit";
 type UserForm = {
   email: string;
   name: string;
-  role: "ADMIN" | "EDITOR" | "CUSTOMER";
+  roleIds: string[];
   password: string;
 };
 
 const emptyForm: UserForm = {
   email: "",
   name: "",
-  role: "EDITOR",
+  roleIds: [],
   password: "",
 };
 
 function mapPayload(form: UserForm, mode: DrawerMode, fixedRole?: "CUSTOMER") {
-  const role = fixedRole ?? form.role;
-
   if (mode === "create") {
     return {
       email: form.email,
       name: form.name,
-      role,
+      ...(fixedRole ? { role: fixedRole } : {}),
+      roleIds: form.roleIds,
       password: form.password,
     };
   }
@@ -89,14 +100,15 @@ function mapPayload(form: UserForm, mode: DrawerMode, fixedRole?: "CUSTOMER") {
   return {
     email: form.email,
     name: form.name,
-    role,
+    ...(fixedRole ? { role: fixedRole } : {}),
+    roleIds: form.roleIds,
     ...(form.password.trim() ? { password: form.password } : {}),
   };
 }
 
 const ALL_ROLES = "__all_roles__";
 
-export function UserManager({ initialResult, labels, fixedRole }: Props) {
+export function UserManager({ initialResult, labels, availableRoles = [], fixedRole }: Props) {
   const [result, setResult] = useState(initialResult);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<typeof ALL_ROLES | "ADMIN" | "EDITOR" | "CUSTOMER">(fixedRole ?? ALL_ROLES);
@@ -104,6 +116,7 @@ export function UserManager({ initialResult, labels, fixedRole }: Props) {
   const [loading, setLoading] = useState(false);
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [passwordChangeOpen, setPasswordChangeOpen] = useState(false);
   const [createForm, setCreateForm] = useState<UserForm>(emptyForm);
   const [editForm, setEditForm] = useState<UserForm>(emptyForm);
 
@@ -122,6 +135,10 @@ export function UserManager({ initialResult, labels, fixedRole }: Props) {
 
   function validateForm(form: UserForm, mode: DrawerMode) {
     if (!form.email.trim() || !form.name.trim()) {
+      return labels.validationRequired;
+    }
+
+    if (!fixedRole && form.roleIds.length === 0) {
       return labels.validationRequired;
     }
 
@@ -165,17 +182,19 @@ export function UserManager({ initialResult, labels, fixedRole }: Props) {
   function openCreateDrawer() {
     setError(null);
     setEditingId(null);
-    setCreateForm({ ...emptyForm, role: fixedRole ?? "EDITOR" });
+    setPasswordChangeOpen(false);
+    setCreateForm(emptyForm);
     setDrawerMode("create");
   }
 
   function openEditDrawer(user: UserItem) {
     setError(null);
     setEditingId(user.id);
+    setPasswordChangeOpen(false);
     setEditForm({
       email: user.email,
       name: user.name,
-      role: fixedRole ?? user.role,
+      roleIds: user.roleIds,
       password: "",
     });
     setDrawerMode("edit");
@@ -188,6 +207,7 @@ export function UserManager({ initialResult, labels, fixedRole }: Props) {
 
     setDrawerMode(null);
     setEditingId(null);
+    setPasswordChangeOpen(false);
     setError(null);
   }
 
@@ -253,6 +273,7 @@ export function UserManager({ initialResult, labels, fixedRole }: Props) {
       setCreateForm(emptyForm);
       setDrawerMode(null);
       setEditingId(null);
+      setPasswordChangeOpen(false);
       await fetchUsers(query, roleFilter, result.page);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : labels.opFailed);
@@ -295,6 +316,22 @@ export function UserManager({ initialResult, labels, fixedRole }: Props) {
     }
 
     return labels.roleCustomer;
+  }
+
+  function toggleRole(roleId: string) {
+    const patchRoleIds = (prev: UserForm) => ({
+      ...prev,
+      roleIds: prev.roleIds.includes(roleId)
+        ? prev.roleIds.filter((id) => id !== roleId)
+        : [...prev.roleIds, roleId],
+    });
+
+    if (drawerMode === "edit") {
+      setEditForm(patchRoleIds);
+      return;
+    }
+
+    setCreateForm(patchRoleIds);
   }
 
   return (
@@ -347,7 +384,7 @@ export function UserManager({ initialResult, labels, fixedRole }: Props) {
                     <h3 className="font-medium text-neutral-950">{user.name}</h3>
                   </div>
                   <p className="text-sm text-neutral-500">{user.email}</p>
-                  <p className="text-sm font-semibold text-neutral-950">{getRoleLabel(user.role)}</p>
+                  <p className="text-sm font-semibold text-neutral-950">{user.roleNames.length > 0 ? user.roleNames.join(", ") : getRoleLabel(user.role)}</p>
                   <div className="flex flex-wrap gap-2 lg:justify-end">
                     <Button type="button" size="sm" variant="secondary" disabled={loading} onClick={() => openEditDrawer(user)}>{labels.edit}</Button>
                     <Button type="button" size="sm" variant="destructive" disabled={loading} onClick={() => deleteUser(user.id)}>{labels.delete}</Button>
@@ -379,36 +416,54 @@ export function UserManager({ initialResult, labels, fixedRole }: Props) {
               </Button>
             </div>
 
-            <form className="grid gap-4 p-5" onSubmit={submitUser}>
-              <div className="grid gap-2">
-                <Label>{labels.name}</Label>
-                <Input value={activeForm.name} onChange={(event) => patchActiveField("name", event.target.value)} required />
-              </div>
-              <div className="grid gap-2">
-                <Label>{labels.email}</Label>
-                <Input type="email" value={activeForm.email} onChange={(event) => patchActiveField("email", event.target.value)} required />
-              </div>
-              {!fixedRole ? (
+            <form className="flex min-h-0 flex-1 flex-col" onSubmit={submitUser}>
+              <div className="grid flex-1 content-start gap-4 overflow-y-auto p-5">
                 <div className="grid gap-2">
-                  <Label>{labels.role}</Label>
-                  <Select value={activeForm.role} onValueChange={(value) => patchActiveField("role", value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ADMIN">{labels.roleAdmin}</SelectItem>
-                      <SelectItem value="EDITOR">{labels.roleEditor}</SelectItem>
-                      <SelectItem value="CUSTOMER">{labels.roleCustomer}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label>{labels.name}</Label>
+                  <Input value={activeForm.name} onChange={(event) => patchActiveField("name", event.target.value)} required />
                 </div>
-              ) : null}
-              <div className="grid gap-2">
-                <Label>{drawerMode === "edit" ? labels.passwordOptional : labels.password}</Label>
-                <Input type="password" value={activeForm.password} onChange={(event) => patchActiveField("password", event.target.value)} required={drawerMode === "create"} />
+                <div className="grid gap-2">
+                  <Label>{labels.email}</Label>
+                  <Input type="email" value={activeForm.email} onChange={(event) => patchActiveField("email", event.target.value)} required />
+                </div>
+                {!fixedRole ? (
+                  <div className="grid gap-2">
+                    <Label>{labels.roles}</Label>
+                    <div className="grid gap-2 rounded-xl border border-neutral-200 p-3">
+                      {availableRoles.map((role) => (
+                        <label key={role.id} className="flex items-start gap-2 text-sm text-neutral-700">
+                          <input type="checkbox" className="mt-1" checked={activeForm.roleIds.includes(role.id)} onChange={() => toggleRole(role.id)} />
+                          <span>
+                            <span className="block font-medium text-neutral-950">{role.name}</span>
+                            {role.description ? <span className="block text-xs text-neutral-500">{role.description}</span> : null}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {drawerMode === "create" ? (
+                  <div className="grid gap-2">
+                    <Label>{labels.password}</Label>
+                    <Input type="password" value={activeForm.password} onChange={(event) => patchActiveField("password", event.target.value)} required />
+                  </div>
+                ) : (
+                  <div className="grid gap-2 rounded-xl border border-neutral-200 p-3">
+                    {passwordChangeOpen ? (
+                      <>
+                        <Label>{labels.passwordOptional}</Label>
+                        <Input type="password" value={activeForm.password} onChange={(event) => patchActiveField("password", event.target.value)} autoFocus />
+                      </>
+                    ) : (
+                      <Button type="button" variant="secondary" onClick={() => setPasswordChangeOpen(true)}>
+                        {labels.changePassword}
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="mt-2 flex justify-end gap-2 border-t border-neutral-200 pt-5">
+              <div className="flex shrink-0 justify-end gap-2 border-t border-neutral-200 bg-neutral-50 p-5">
                 <Button type="button" variant="secondary" onClick={closeDrawer} disabled={loading}>{labels.cancel}</Button>
                 <Button type="submit" disabled={loading}>{loading ? labels.loading : activeSubmit}</Button>
               </div>

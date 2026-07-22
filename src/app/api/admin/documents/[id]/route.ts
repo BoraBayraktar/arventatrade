@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { documentService, DocumentAdminError } from "@/modules/documents/services/document.service";
-import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { AuthContextError, requirePermission } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    await requirePermission("documents.read");
     const { id } = await context.params;
     const item = await documentService.getBusinessDocumentById(id);
     return NextResponse.json({ item });
@@ -30,7 +30,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("documents.manage");
     const { id } = await context.params;
     const payload = await request.json();
     const updated = await documentService.updateBusinessDocument({ id, ...payload });

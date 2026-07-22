@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   AuthContextError,
-  requireUserRoles,
+  requirePermission,
 } from "@/modules/identity/services/auth-context.service";
 import { notificationService } from "@/modules/system/services/notification.service";
 
@@ -11,7 +11,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requirePermission("admin.access");
     const { id } = await context.params;
     await notificationService.markAsRead(id, user.id);
     return NextResponse.json({ ok: true });

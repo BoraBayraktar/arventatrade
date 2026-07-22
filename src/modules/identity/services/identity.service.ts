@@ -9,6 +9,7 @@ import { AUTH_TOKEN_TTL_SECONDS } from "@/lib/auth";
 import { logError, logInfo } from "@/lib/observability";
 import type {
   AuthUser,
+  ChangePasswordInput,
   ForgotPasswordInput,
   IdentitySession,
   LoginInput,
@@ -39,6 +40,12 @@ const forgotPasswordSchema = z.object({
 const resetPasswordSchema = z.object({
   token: z.string().trim().min(24),
   password: z.string().min(6),
+});
+
+const changePasswordSchema = z.object({
+  userId: z.string().trim().min(1),
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
 });
 
 type SessionTokenPayload = {
@@ -303,6 +310,35 @@ export class IdentityService {
     logInfo("Password reset completed", {
       scope: "identity.password-reset",
       userId: payload.userId,
+    });
+
+    return { ok: true };
+  }
+
+  async changePassword(input: ChangePasswordInput) {
+    const parsed = changePasswordSchema.parse(input);
+    const account = await this.repository.findByIdWithPassword(parsed.userId);
+
+    if (!account) {
+      throw new Error("ACCOUNT_NOT_FOUND");
+    }
+
+    const currentPasswordValid = await compare(parsed.currentPassword, account.passwordHash);
+    if (!currentPasswordValid) {
+      throw new Error("CURRENT_PASSWORD_INVALID");
+    }
+
+    const samePassword = await compare(parsed.newPassword, account.passwordHash);
+    if (samePassword) {
+      throw new Error("PASSWORD_REUSE_NOT_ALLOWED");
+    }
+
+    const passwordHash = await hash(parsed.newPassword, 10);
+    await this.repository.updatePasswordById(account.id, passwordHash);
+
+    logInfo("Password changed by authenticated user", {
+      scope: "identity.change-password",
+      userId: account.id,
     });
 
     return { ok: true };
