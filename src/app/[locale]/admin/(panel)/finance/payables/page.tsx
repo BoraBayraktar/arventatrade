@@ -44,13 +44,7 @@ export default async function AdminSupplierPayablesPage({
         draftCount: dictionary.admin.financeSupplierPayablesDraftCount,
         lastIssueDate: dictionary.admin.financeSupplierPayablesLastIssueDate,
         viewDetail: dictionary.admin.financeSupplierPayablesDetailAction,
-        close: dictionary.admin.documentsDrawerClose,
         notSpecified: dictionary.common.notSpecified,
-        documentNumber: dictionary.admin.documentsDocumentNumber,
-        documentType: dictionary.admin.documentsDocumentType,
-        documentStatus: dictionary.admin.documentsDocumentStatus,
-        orderNumber: dictionary.admin.documentsOrderNumber,
-        inventoryTransactionNumber: dictionary.admin.documentsInventoryTransactionNumber,
       }}
     />
   );

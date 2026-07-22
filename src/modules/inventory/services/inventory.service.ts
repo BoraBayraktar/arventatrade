@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
+import tr from "@/i18n/tr.json";
 import { redisCache } from "@/lib/redis";
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { identityAdminService } from "@/modules/identity/services/identity-admin.service";
@@ -46,6 +47,15 @@ import type {
 } from "@/modules/inventory/contracts/inventory.contract";
 import { InventoryRepository } from "@/modules/inventory/repositories/inventory.repository";
 import { notificationService } from "@/modules/system/services/notification.service";
+
+const adminDictionary = tr.admin;
+
+function formatNotificationMessage(template: string, values: Record<string, string>) {
+  return Object.entries(values).reduce(
+    (message, [key, value]) => message.replaceAll(`{${key}}`, value),
+    template,
+  );
+}
 
 const availabilityQuerySchema = z.object({
   items: z.array(z.object({
@@ -1190,7 +1200,9 @@ async function notifyBackofficeUsersForInventoryAlerts(alerts: Array<{
     notificationService.createForRecipients({
       recipients: recipients.map((recipient) => ({ id: recipient.id })),
       type: "INVENTORY_ALERT_CREATED",
-      title: alert.type === "OUT_OF_STOCK" ? "Inventory out of stock alert" : "Inventory low stock alert",
+      title: alert.type === "OUT_OF_STOCK"
+        ? adminDictionary.notificationInventoryOutOfStockTitle
+        : adminDictionary.notificationInventoryLowStockTitle,
       message: alert.message,
       linkUrl: "/admin/inventory",
       channels: ["IN_APP"],
@@ -2826,8 +2838,11 @@ export class InventoryService {
       await notificationService.createForRecipients({
         recipients: recipients.map((recipient) => ({ id: recipient.id })),
         type: "STOCK_COUNT_APPLIED",
-        title: "Stock count applied",
-        message: `${applied.countNumber} was applied with transaction ${applied.transactionNumber}.`,
+        title: adminDictionary.notificationStockCountAppliedTitle,
+        message: formatNotificationMessage(adminDictionary.notificationStockCountAppliedMessage, {
+          countNumber: applied.countNumber,
+          transactionNumber: applied.transactionNumber,
+        }),
         linkUrl: "/admin/inventory",
         channels: ["IN_APP"],
       });

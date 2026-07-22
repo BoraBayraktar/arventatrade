@@ -3,6 +3,7 @@ import { z } from "zod";
 import type {
   AdminCreateCustomerAccountInput,
   AdminCustomerAccountItem,
+  AdminUpdateCustomerAccountInput,
 } from "@/modules/customers/contracts/customer-account.contract";
 import { customerAccountRepository } from "@/modules/customers/repositories/customer-account.repository";
 
@@ -15,6 +16,10 @@ const createCustomerAccountSchema = z.object({
   address: z.string().trim().max(500).optional().nullable().or(z.literal("")).transform((value) => value || null),
   note: z.string().trim().max(500).optional().nullable().or(z.literal("")).transform((value) => value || null),
   isActive: z.boolean().default(true),
+});
+
+const updateCustomerAccountSchema = createCustomerAccountSchema.extend({
+  id: z.string().trim().min(1),
 });
 
 function mapCustomerAccount(item: Awaited<ReturnType<typeof customerAccountRepository.listCustomerAccounts>>[number]): AdminCustomerAccountItem {
@@ -43,6 +48,16 @@ export class CustomerAccountService {
     const parsed = createCustomerAccountSchema.parse(input);
     const created = await customerAccountRepository.createCustomerAccount(parsed);
     return mapCustomerAccount(created);
+  }
+
+  async updateCustomerAccount(input: AdminUpdateCustomerAccountInput): Promise<AdminCustomerAccountItem> {
+    const parsed = updateCustomerAccountSchema.parse(input);
+    const updated = await customerAccountRepository.updateCustomerAccount(parsed);
+    if (!updated) {
+      throw new Error("Müşteri kartı bulunamadı.");
+    }
+
+    return mapCustomerAccount(updated);
   }
 
   async getCustomerAccountById(id: string): Promise<AdminCustomerAccountItem | null> {

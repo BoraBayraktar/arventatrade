@@ -32,10 +32,13 @@ type Labels = {
   note: string;
   status: string;
   create: string;
+  save: string;
+  edit: string;
   saving: string;
   cancel: string;
   empty: string;
   createFailed: string;
+  operationFailed: string;
 };
 
 type Props = {
@@ -51,6 +54,7 @@ type CustomerAccountForm = {
   taxNumber: string;
   address: string;
   note: string;
+  isActive: boolean;
 };
 
 const emptyForm: CustomerAccountForm = {
@@ -61,14 +65,18 @@ const emptyForm: CustomerAccountForm = {
   taxNumber: "",
   address: "",
   note: "",
+  isActive: true,
 };
+
+type DrawerMode = "create" | "edit";
 
 export function CustomerAccountManager({ items, labels }: Props) {
   const [customerItems, setCustomerItems] = useState(items);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "passive">("all");
   const [sort, setSort] = useState<"name_asc" | "name_desc">("name_asc");
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerAccountForm>(emptyForm);
@@ -105,8 +113,25 @@ export function CustomerAccountManager({ items, labels }: Props) {
 
   function openCreateDrawer() {
     setError(null);
+    setEditingId(null);
     setForm(emptyForm);
-    setDrawerOpen(true);
+    setDrawerMode("create");
+  }
+
+  function openEditDrawer(item: AdminCustomerAccountItem) {
+    setError(null);
+    setEditingId(item.id);
+    setForm({
+      slug: item.slug,
+      name: item.name,
+      email: item.email ?? "",
+      phone: item.phone ?? "",
+      taxNumber: item.taxNumber ?? "",
+      address: item.address ?? "",
+      note: item.note ?? "",
+      isActive: item.isActive,
+    });
+    setDrawerMode("edit");
   }
 
   function closeDrawer() {
@@ -114,34 +139,46 @@ export function CustomerAccountManager({ items, labels }: Props) {
       return;
     }
 
-    setDrawerOpen(false);
+    setDrawerMode(null);
+    setEditingId(null);
     setError(null);
   }
 
-  async function createItem(event: React.FormEvent<HTMLFormElement>) {
+  async function refreshItems() {
+    const response = await fetch("/api/admin/customer-accounts", { method: "GET" });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+      throw new Error(payload?.message ?? labels.operationFailed);
+    }
+
+    const payload = (await response.json()) as { items: AdminCustomerAccountItem[] };
+    setCustomerItems(payload.items);
+  }
+
+  async function submitItem(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
     setError(null);
 
     try {
-      const response = await fetch("/api/admin/customer-accounts", {
-        method: "POST",
+      const response = await fetch(drawerMode === "edit" && editingId ? `/api/admin/customer-accounts/${editingId}` : "/api/admin/customer-accounts", {
+        method: drawerMode === "edit" ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(payload?.message ?? labels.createFailed);
+        setError(payload?.message ?? (drawerMode === "edit" ? labels.operationFailed : labels.createFailed));
         return;
       }
 
-      const payload = (await response.json()) as { item: AdminCustomerAccountItem };
-      setCustomerItems((current) => [payload.item, ...current]);
+      await refreshItems();
       setForm(emptyForm);
-      setDrawerOpen(false);
-    } catch {
-      setError(labels.createFailed);
+      setDrawerMode(null);
+      setEditingId(null);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : labels.operationFailed);
     } finally {
       setPending(false);
     }
@@ -187,13 +224,14 @@ export function CustomerAccountManager({ items, labels }: Props) {
         </div>
 
         <div className="overflow-hidden rounded-xl border border-neutral-200">
-          <div className="hidden grid-cols-[1fr_1fr_1fr_1fr_1fr_160px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+          <div className="hidden grid-cols-[1fr_1fr_1fr_1fr_1fr_120px_120px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
             <span>{labels.name}</span>
             <span>{labels.slug}</span>
             <span>{labels.email}</span>
             <span>{labels.phone}</span>
             <span>{labels.taxNumber}</span>
             <span>{labels.status}</span>
+            <span className="text-right">{labels.edit}</span>
           </div>
 
           {filteredItems.length === 0 ? (
@@ -201,7 +239,7 @@ export function CustomerAccountManager({ items, labels }: Props) {
           ) : (
             <div className="divide-y divide-neutral-200">
               {filteredItems.map((item) => (
-                <article key={item.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_160px] lg:items-start">
+                <article key={item.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_120px_120px] lg:items-start">
                   <div>
                     <h3 className="font-medium text-neutral-950">{item.name}</h3>
                     {item.address ? <p className="mt-1 text-sm text-neutral-500">{item.address}</p> : null}
@@ -211,6 +249,11 @@ export function CustomerAccountManager({ items, labels }: Props) {
                   <p className="text-sm text-neutral-500">{item.phone ?? "-"}</p>
                   <p className="text-sm text-neutral-500">{item.taxNumber ?? "-"}</p>
                   <p className="text-sm font-medium text-neutral-950">{item.isActive ? labels.filterActive : labels.filterPassive}</p>
+                  <div className="flex justify-start lg:justify-end">
+                    <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => openEditDrawer(item)}>
+                      {labels.edit}
+                    </Button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -218,21 +261,21 @@ export function CustomerAccountManager({ items, labels }: Props) {
         </div>
       </div>
 
-      {drawerOpen ? (
+      {drawerMode ? (
         <div className="fixed inset-0 z-50">
           <button type="button" aria-label={labels.cancel} className="absolute inset-0 bg-black/30" onClick={closeDrawer} />
           <aside className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-neutral-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-neutral-200 p-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.title}</p>
-                <h3 className="mt-1 text-xl font-semibold tracking-tight">{labels.createTitle}</h3>
+                <h3 className="mt-1 text-xl font-semibold tracking-tight">{drawerMode === "edit" ? labels.edit : labels.createTitle}</h3>
               </div>
               <Button type="button" size="icon" variant="ghost" onClick={closeDrawer} disabled={pending}>
                 <X className="h-5 w-5" />
               </Button>
             </div>
 
-            <form className="grid gap-4 p-5" onSubmit={createItem}>
+            <form className="grid gap-4 p-5" onSubmit={submitItem}>
               <div className="grid gap-2">
                 <Label>{labels.slug}</Label>
                 <Input value={form.slug} onChange={(event) => setForm((prev) => ({ ...prev, slug: event.target.value }))} required />
@@ -261,12 +304,24 @@ export function CustomerAccountManager({ items, labels }: Props) {
                 <Label>{labels.note}</Label>
                 <Textarea value={form.note} onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))} rows={4} />
               </div>
+              <div className="grid gap-2">
+                <Label>{labels.status}</Label>
+                <Select value={form.isActive ? "active" : "passive"} onValueChange={(value) => setForm((prev) => ({ ...prev, isActive: value === "active" }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">{labels.filterActive}</SelectItem>
+                    <SelectItem value="passive">{labels.filterPassive}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="mt-2 flex items-center justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={closeDrawer} disabled={pending}>
                   {labels.cancel}
                 </Button>
                 <Button type="submit" disabled={pending}>
-                  {pending ? labels.saving : labels.create}
+                  {pending ? labels.saving : drawerMode === "edit" ? labels.save : labels.create}
                 </Button>
               </div>
             </form>

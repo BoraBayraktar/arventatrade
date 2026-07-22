@@ -113,12 +113,18 @@ type Props = {
   notificationsLabel: string;
   noNotificationsLabel: string;
   markAllReadLabel: string;
+  notificationProductQuestionCreatedTitle: string;
+  notificationInventoryOutOfStockTitle: string;
+  notificationInventoryLowStockTitle: string;
+  notificationStockCountAppliedTitle: string;
+  notificationStockCountAppliedMessage: string;
   menuItems: MenuItem[];
   children: React.ReactNode;
 };
 
 type NotificationItem = {
   id: string;
+  type: "PRODUCT_QUESTION_CREATED" | "INVENTORY_ALERT_CREATED" | "STOCK_COUNT_APPLIED";
   title: string;
   message: string;
   linkUrl: string | null;
@@ -867,6 +873,11 @@ export function AdminPanelShell({
   notificationsLabel,
   noNotificationsLabel,
   markAllReadLabel,
+  notificationProductQuestionCreatedTitle,
+  notificationInventoryOutOfStockTitle,
+  notificationInventoryLowStockTitle,
+  notificationStockCountAppliedTitle,
+  notificationStockCountAppliedMessage,
   menuItems,
   children,
 }: Props) {
@@ -1022,6 +1033,47 @@ export function AdminPanelShell({
     }
 
     return linkUrl;
+  }
+
+  function resolveNotificationContent(item: NotificationItem) {
+    if (item.type === "STOCK_COUNT_APPLIED") {
+      const match = item.message.match(/^(.+?) was applied with transaction (.+?)\.$/);
+
+      return {
+        title: notificationStockCountAppliedTitle,
+        message: match
+          ? notificationStockCountAppliedMessage
+            .replaceAll("{countNumber}", match[1] ?? "")
+            .replaceAll("{transactionNumber}", match[2] ?? "")
+          : notificationStockCountAppliedTitle,
+      };
+    }
+
+    if (item.type === "INVENTORY_ALERT_CREATED") {
+      const isOutOfStock = item.title === "Inventory out of stock alert";
+      const isLowStock = item.title === "Inventory low stock alert";
+
+      return {
+        title: isOutOfStock
+          ? notificationInventoryOutOfStockTitle
+          : isLowStock
+            ? notificationInventoryLowStockTitle
+            : item.title,
+        message: item.message,
+      };
+    }
+
+    if (item.type === "PRODUCT_QUESTION_CREATED" && item.title.startsWith("New question for ")) {
+      return {
+        title: `${notificationProductQuestionCreatedTitle}: ${item.title.replace("New question for ", "")}`,
+        message: item.message,
+      };
+    }
+
+    return {
+      title: item.title,
+      message: item.message,
+    };
   }
 
   function isMenuItemActive(item: MenuItem): boolean {
@@ -1244,7 +1296,7 @@ export function AdminPanelShell({
         </aside>
 
         <section className="grid min-h-0 min-w-0 content-start gap-4">
-          <header className="flex h-[72px] items-center justify-between gap-3 overflow-hidden rounded-2xl border border-neutral-200 bg-white px-3 py-2">
+          <header className="flex h-[72px] items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white px-3 py-2">
             <div className="min-w-0 flex flex-1 items-center gap-2">
               <div className="flex items-center gap-2 lg:hidden">
                 <Button
@@ -1314,10 +1366,11 @@ export function AdminPanelShell({
                       ) : (
                         notifications.map((item) => {
                           const localizedLink = resolveLocalizedLink(item.linkUrl);
+                          const notificationContent = resolveNotificationContent(item);
                           const content = (
                             <>
-                              <p className="line-clamp-1 text-sm font-semibold text-neutral-900">{item.title}</p>
-                              <p className="line-clamp-2 text-xs text-neutral-600">{item.message}</p>
+                              <p className="line-clamp-1 text-sm font-semibold text-neutral-900">{notificationContent.title}</p>
+                              <p className="line-clamp-2 text-xs text-neutral-600">{notificationContent.message}</p>
                             </>
                           );
 

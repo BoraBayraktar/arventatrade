@@ -1,7 +1,10 @@
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import type { AdminCreateCustomerAccountInput } from "@/modules/customers/contracts/customer-account.contract";
+import type {
+  AdminCreateCustomerAccountInput,
+  AdminUpdateCustomerAccountInput,
+} from "@/modules/customers/contracts/customer-account.contract";
 
 type CustomerAccountRow = {
   id: string;
@@ -27,6 +30,7 @@ export class CustomerAccountRepository {
         findMany: (args: unknown) => Promise<CustomerAccountRow[]>;
         create: (args: unknown) => Promise<CustomerAccountRow>;
         findFirst: (args: unknown) => Promise<CustomerAccountRow | null>;
+        update: (args: unknown) => Promise<CustomerAccountRow>;
       };
     }).customerAccount;
   }
@@ -129,6 +133,58 @@ export class CustomerAccountRepository {
     `);
 
     return rows[0];
+  }
+
+  async updateCustomerAccount(input: AdminUpdateCustomerAccountInput) {
+    if (this.delegate) {
+      return this.delegate.update({
+        where: {
+          id: input.id,
+        },
+        data: {
+          slug: input.slug,
+          name: input.name,
+          email: input.email ?? null,
+          phone: input.phone ?? null,
+          taxNumber: input.taxNumber ?? null,
+          address: input.address ?? null,
+          note: input.note ?? null,
+          isActive: input.isActive ?? true,
+        },
+      });
+    }
+
+    const rows = await prisma.$queryRaw<CustomerAccountRow[]>(Prisma.sql`
+      UPDATE "CustomerAccount"
+      SET
+        "slug" = ${input.slug},
+        "name" = ${input.name},
+        "email" = ${input.email ?? null},
+        "phone" = ${input.phone ?? null},
+        "taxNumber" = ${input.taxNumber ?? null},
+        "address" = ${input.address ?? null},
+        "note" = ${input.note ?? null},
+        "isActive" = ${input.isActive ?? true},
+        "updatedAt" = NOW()
+      WHERE "id" = ${input.id} AND "deleted" = false
+      RETURNING
+        "id",
+        "slug",
+        "name",
+        "email",
+        "phone",
+        "taxNumber",
+        "address",
+        "note",
+        "isActive",
+        "createdAt",
+        "updatedAt",
+        "deleted",
+        "deletedDate",
+        "deletedUserId"
+    `);
+
+    return rows[0] ?? null;
   }
 
   async findCustomerAccountById(id: string) {

@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { MoreHorizontal } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { AdminPaymentsResult } from "@/modules/finance/contracts/payments.contract";
 
 type AccountOption = {
@@ -23,6 +26,7 @@ type Labels = {
   financeStatusPartial: string;
   financeStatusCompleted: string;
   recordedCount: string;
+  supplier: string;
   documentCount: string;
   lastIssueDate: string;
   amount: string;
@@ -36,6 +40,7 @@ type Labels = {
   createRecordFailed: string;
   account: string;
   accountRequired: string;
+  action: string;
   noResults: string;
 };
 
@@ -77,6 +82,7 @@ function getFinanceStatus(item: AdminPaymentsResult["items"][number], labels: La
 export function PaymentReadinessManager({ result, accountOptions, labels }: Props) {
   const router = useRouter();
   const [busySupplierKey, setBusySupplierKey] = useState<string | null>(null);
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [selectedAccountIds, setSelectedAccountIds] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
@@ -163,64 +169,91 @@ export function PaymentReadinessManager({ result, accountOptions, labels }: Prop
         </article>
       </section>
 
-      <section className="grid gap-3">
+      <section className="overflow-visible rounded-xl border border-neutral-200 bg-white">
+        <div className="hidden grid-cols-[150px_1.2fr_170px_170px_140px_150px_88px] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+          <span>{labels.financeStatus}</span>
+          <span>{labels.supplier}</span>
+          <span>{labels.amount}</span>
+          <span>{labels.remainingAmount}</span>
+          <span>{labels.documentCount}</span>
+          <span>{labels.lastIssueDate}</span>
+          <span className="text-right">{labels.action}</span>
+        </div>
+
         {result.items.length === 0 ? (
-          <article className="rounded-3xl border border-dashed border-neutral-300 bg-white p-6 text-sm text-neutral-500 shadow-sm">
+          <p className="p-6 text-sm text-neutral-500">
             {labels.noResults}
-          </article>
+          </p>
         ) : result.items.map((item) => (
-          <article key={item.supplierKey} className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+          <article key={item.supplierKey} className="grid gap-4 border-b border-neutral-200 p-4 last:border-b-0 lg:grid-cols-[150px_1.2fr_170px_170px_140px_150px_88px] lg:items-center">
             {(() => {
               const financeStatus = getFinanceStatus(item, labels);
 
               return (
                 <>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-semibold text-neutral-950">{item.supplierName}</h2>
-                <div className="mt-3 grid gap-2 text-sm text-neutral-700 md:grid-cols-2 xl:grid-cols-4">
-                  <p>{labels.amount}: {formatMoney(item.totalAmount, item.currency)}</p>
-                  <p>{labels.documentCount}: {item.documentCount}</p>
-                  <p>{labels.draftDocumentCount}: {item.draftCount}</p>
-                  <p>
-                    {labels.financeStatus}:{" "}
-                    <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${financeStatus.className}`}>
+                  <div>
+                    <Badge className={financeStatus.className}>
                       {financeStatus.label}
-                    </span>
-                  </p>
-                  <p>{labels.lastIssueDate}: {item.lastIssueDate ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(item.lastIssueDate)) : "-"}</p>
-                  <p>{labels.remainingAmount}: {formatMoney(item.remainingAmount, item.currency)}</p>
-                  <p>{labels.recordedPaymentCount}: {item.recordedPaymentCount}</p>
-                  <p className="md:col-span-2 xl:col-span-4">Varyant özeti: {item.topVariantSummary ?? "-"}</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <select
-                  value={selectedAccountIds[item.supplierKey] ?? accountOptions[0]?.id ?? ""}
-                  onChange={(event) => setSelectedAccountIds((current) => ({ ...current, [item.supplierKey]: event.target.value }))}
-                  className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700"
-                >
-                  {accountOptions.length === 0 ? <option value="">{labels.account}</option> : null}
-                  {accountOptions.map((option) => (
-                    <option key={option.id} value={option.id}>{option.label}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  disabled={!item.supplierId || item.remainingAmount <= 0 || busySupplierKey === item.supplierKey || isPending}
-                  onClick={() => createPaymentRecord(item.supplierId, item.supplierKey, item.remainingAmount)}
-                  className="inline-flex h-10 items-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {busySupplierKey === item.supplierKey ? labels.creatingRecord : labels.createRecord}
-                </button>
-                <Link href={item.detailHref} className="inline-flex h-10 items-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700">
-                  {labels.openDetail}
-                </Link>
-                <Link href={item.sourceHref} className="inline-flex h-10 items-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700">
-                  {labels.openSource}
-                </Link>
-              </div>
-            </div>
+                    </Badge>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-neutral-950">{item.supplierName}</p>
+                    <p className="mt-1 text-sm text-neutral-500">{labels.recordedPaymentCount}: {item.recordedPaymentCount}</p>
+                    <p className="mt-1 line-clamp-1 text-xs text-neutral-500">Varyant özeti: {item.topVariantSummary ?? "-"}</p>
+                  </div>
+                  <p className="text-sm font-medium text-neutral-950">{formatMoney(item.totalAmount, item.currency)}</p>
+                  <p className="text-sm font-medium text-neutral-950">{formatMoney(item.remainingAmount, item.currency)}</p>
+                  <p className="text-sm text-neutral-500">{item.documentCount} / {labels.draftDocumentCount}: {item.draftCount}</p>
+                  <p className="text-sm text-neutral-500">{item.lastIssueDate ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(item.lastIssueDate)) : "-"}</p>
+                  <div className="relative flex justify-start lg:justify-end">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary"
+                      onClick={() => setOpenActionMenuId((current) => current === item.supplierKey ? null : item.supplierKey)}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                    {openActionMenuId === item.supplierKey ? (
+                      <div className="absolute bottom-11 right-0 z-10 grid min-w-64 gap-2 rounded-xl border border-neutral-200 bg-white p-2 shadow-xl">
+                        <select
+                          value={selectedAccountIds[item.supplierKey] ?? accountOptions[0]?.id ?? ""}
+                          onChange={(event) => setSelectedAccountIds((current) => ({ ...current, [item.supplierKey]: event.target.value }))}
+                          className="h-10 rounded-lg border border-neutral-300 px-3 text-sm text-neutral-700"
+                        >
+                          {accountOptions.length === 0 ? <option value="">{labels.account}</option> : null}
+                          {accountOptions.map((option) => (
+                            <option key={option.id} value={option.id}>{option.label}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          disabled={!item.supplierId || item.remainingAmount <= 0 || busySupplierKey === item.supplierKey || isPending}
+                          onClick={() => {
+                            createPaymentRecord(item.supplierId, item.supplierKey, item.remainingAmount);
+                            setOpenActionMenuId(null);
+                          }}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {busySupplierKey === item.supplierKey ? labels.creatingRecord : labels.createRecord}
+                        </button>
+                        <Link
+                          href={item.detailHref}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
+                          onClick={() => setOpenActionMenuId(null)}
+                        >
+                          {labels.openDetail}
+                        </Link>
+                        <Link
+                          href={item.sourceHref}
+                          className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
+                          onClick={() => setOpenActionMenuId(null)}
+                        >
+                          {labels.openSource}
+                        </Link>
+                      </div>
+                    ) : null}
+                  </div>
                 </>
               );
             })()}

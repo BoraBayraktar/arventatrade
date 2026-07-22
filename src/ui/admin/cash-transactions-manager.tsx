@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type {
   AdminCashTransactionCategory,
   AdminCashTransactionDirection,
@@ -45,6 +48,7 @@ type Labels = {
   createSuccess: string;
   createFailed: string;
   empty: string;
+  cancel: string;
 };
 
 type Props = {
@@ -87,6 +91,18 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function getDirectionClassName(direction: AdminCashTransactionDirection) {
+  if (direction === "IN") {
+    return "border-emerald-200 bg-emerald-100 text-emerald-700";
+  }
+
+  if (direction === "OUT") {
+    return "border-rose-200 bg-rose-100 text-rose-700";
+  }
+
+  return "border-blue-200 bg-blue-100 text-blue-700";
+}
+
 export function CashTransactionsManager({
   locale,
   result,
@@ -99,6 +115,7 @@ export function CashTransactionsManager({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState({
     accountId: initialAccountId || accountOptions[0]?.id || "",
     targetAccountId: "",
@@ -111,7 +128,38 @@ export function CashTransactionsManager({
     counterpartyName: "",
   });
 
-  function submitTransaction() {
+  function resetForm() {
+    setForm((current) => ({
+      ...current,
+      accountId: initialAccountId || accountOptions[0]?.id || "",
+      targetAccountId: "",
+      direction: "IN",
+      sourceType: "MANUAL",
+      category: "GENERAL_INCOME",
+      amount: "",
+      title: "",
+      note: "",
+      counterpartyName: "",
+    }));
+  }
+
+  function openCreateDrawer() {
+    setMessage(null);
+    resetForm();
+    setDrawerOpen(true);
+  }
+
+  function closeDrawer() {
+    if (isPending) {
+      return;
+    }
+
+    setDrawerOpen(false);
+  }
+
+  function submitTransaction(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
     startTransition(async () => {
       setMessage(null);
 
@@ -139,18 +187,9 @@ export function CashTransactionsManager({
           throw new Error(payload?.message ?? labels.createFailed);
         }
 
-        setForm((current) => ({
-          ...current,
-          targetAccountId: "",
-          direction: "IN",
-          sourceType: "MANUAL",
-          category: "GENERAL_INCOME",
-          amount: "",
-          title: "",
-          note: "",
-          counterpartyName: "",
-        }));
+        resetForm();
         setMessage(labels.createSuccess);
+        setDrawerOpen(false);
         router.refresh();
       } catch (error) {
         setMessage(error instanceof Error ? error.message : labels.createFailed);
@@ -159,13 +198,20 @@ export function CashTransactionsManager({
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold text-neutral-950">{labels.title}</h1>
-          <p className="text-sm text-neutral-600">{labels.description}</p>
+    <section className="rounded-2xl border border-neutral-200 bg-white">
+      <div className="flex flex-col gap-4 border-b border-neutral-200 p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.title}</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-950">{labels.title}</h2>
+          <p className="mt-1 text-sm text-neutral-500">{labels.description}</p>
         </div>
-        <form action={`/${locale}/admin/finance/transactions`} className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <Button type="button" onClick={openCreateDrawer}>
+          {labels.createTitle}
+        </Button>
+      </div>
+
+      <div className="p-5">
+        <form action={`/${locale}/admin/finance/transactions`} className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px_auto]">
           <Input type="search" name="search" defaultValue={initialSearch} placeholder={labels.search} />
           <select name="accountId" defaultValue={initialAccountId} className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700">
             <option value="">{labels.account}</option>
@@ -173,165 +219,188 @@ export function CashTransactionsManager({
               <option key={option.id} value={option.id}>{option.label}</option>
             ))}
           </select>
+          <Button type="submit" variant="secondary">
+            {labels.search}
+          </Button>
         </form>
+
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link href={buildFilterHref(locale, "all", initialSearch, initialAccountId)} className={`rounded-full px-3 py-2 text-sm ${initialDirection === "all" ? "bg-neutral-950 text-white" : "bg-neutral-100 text-neutral-700"}`}>{labels.allDirections}</Link>
-          <Link href={buildFilterHref(locale, "IN", initialSearch, initialAccountId)} className={`rounded-full px-3 py-2 text-sm ${initialDirection === "IN" ? "bg-neutral-950 text-white" : "bg-neutral-100 text-neutral-700"}`}>{labels.incoming}</Link>
-          <Link href={buildFilterHref(locale, "OUT", initialSearch, initialAccountId)} className={`rounded-full px-3 py-2 text-sm ${initialDirection === "OUT" ? "bg-neutral-950 text-white" : "bg-neutral-100 text-neutral-700"}`}>{labels.outgoing}</Link>
-          <Link href={buildFilterHref(locale, "TRANSFER", initialSearch, initialAccountId)} className={`rounded-full px-3 py-2 text-sm ${initialDirection === "TRANSFER" ? "bg-neutral-950 text-white" : "bg-neutral-100 text-neutral-700"}`}>{labels.transfer}</Link>
+          <Link href={buildFilterHref(locale, "all", initialSearch, initialAccountId)} className={`rounded-full px-3 py-2 text-sm font-medium no-underline transition-colors ${initialDirection === "all" ? "bg-neutral-950 !text-white hover:!text-white" : "bg-neutral-100 text-neutral-700 hover:text-neutral-950"}`}>{labels.allDirections}</Link>
+          <Link href={buildFilterHref(locale, "IN", initialSearch, initialAccountId)} className={`rounded-full px-3 py-2 text-sm font-medium no-underline transition-colors ${initialDirection === "IN" ? "bg-neutral-950 !text-white hover:!text-white" : "bg-neutral-100 text-neutral-700 hover:text-neutral-950"}`}>{labels.incoming}</Link>
+          <Link href={buildFilterHref(locale, "OUT", initialSearch, initialAccountId)} className={`rounded-full px-3 py-2 text-sm font-medium no-underline transition-colors ${initialDirection === "OUT" ? "bg-neutral-950 !text-white hover:!text-white" : "bg-neutral-100 text-neutral-700 hover:text-neutral-950"}`}>{labels.outgoing}</Link>
+          <Link href={buildFilterHref(locale, "TRANSFER", initialSearch, initialAccountId)} className={`rounded-full px-3 py-2 text-sm font-medium no-underline transition-colors ${initialDirection === "TRANSFER" ? "bg-neutral-950 !text-white hover:!text-white" : "bg-neutral-100 text-neutral-700 hover:text-neutral-950"}`}>{labels.transfer}</Link>
         </div>
-      </section>
 
-      {message ? <section className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700 shadow-sm">{message}</section> : null}
+        {message ? <p className="mt-4 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700 shadow-sm">{message}</p> : null}
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">{labels.totalIncoming}</p>
-          <p className="mt-3 text-2xl font-semibold text-emerald-950">{formatMoney(result.summary.totalIncoming, result.summary.currency)}</p>
-        </article>
-        <article className="rounded-3xl border border-rose-200 bg-rose-50 p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-700">{labels.totalOutgoing}</p>
-          <p className="mt-3 text-2xl font-semibold text-rose-950">{formatMoney(result.summary.totalOutgoing, result.summary.currency)}</p>
-        </article>
-        <article className="rounded-3xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">{labels.netAmount}</p>
-          <p className="mt-3 text-2xl font-semibold text-blue-950">{formatMoney(result.summary.netAmount, result.summary.currency)}</p>
-        </article>
-        <article className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.transactionCount}</p>
-          <p className="mt-3 text-2xl font-semibold text-neutral-950">{result.summary.transactionCount}</p>
-        </article>
-      </section>
-
-      <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold text-neutral-950">{labels.createTitle}</h2>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <select
-            value={form.accountId}
-            onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))}
-            className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700"
-          >
-            <option value="">{labels.account}</option>
-            {accountOptions.map((option) => (
-              <option key={option.id} value={option.id}>{option.label}</option>
-            ))}
-          </select>
-          <select
-            value={form.direction}
-            onChange={(event) => {
-              const nextDirection = event.target.value as AdminCashTransactionDirection;
-              setForm((current) => ({
-                ...current,
-                direction: nextDirection,
-                sourceType: nextDirection === "TRANSFER" ? "TRANSFER" : nextDirection === "OUT" ? current.sourceType : "MANUAL",
-                category:
-                  nextDirection === "TRANSFER"
-                    ? "TRANSFER"
-                    : nextDirection === "IN"
-                      ? "GENERAL_INCOME"
-                      : current.sourceType === "REFUND"
-                        ? "REFUND"
-                        : "GENERAL_EXPENSE",
-              }));
-            }}
-            className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700"
-          >
-            <option value="IN">{labels.incoming}</option>
-            <option value="OUT">{labels.outgoing}</option>
-            <option value="TRANSFER">{labels.transfer}</option>
-          </select>
-          <select
-            value={form.sourceType}
-            onChange={(event) => {
-              const nextSourceType = event.target.value as AdminCashTransactionSourceType;
-              setForm((current) => ({
-                ...current,
-                sourceType: nextSourceType,
-                category:
-                  nextSourceType === "REFUND"
-                    ? "REFUND"
-                    : nextSourceType === "TRANSFER"
-                      ? "TRANSFER"
-                      : current.direction === "IN"
-                        ? "GENERAL_INCOME"
-                        : current.category === "REFUND"
-                          ? "GENERAL_EXPENSE"
-                          : current.category,
-              }));
-            }}
-            className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700"
-          >
-            <option value="MANUAL">{labels.sourceType}</option>
-            <option value="REFUND">{labels.refund}</option>
-            <option value="TRANSFER">{labels.transfer}</option>
-          </select>
-          {form.direction === "OUT" ? (
-            <select
-              value={form.category}
-              onChange={(event) => setForm((current) => ({ ...current, category: event.target.value as AdminCashTransactionCategory }))}
-              className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700"
-            >
-              <option value="GENERAL_EXPENSE">{labels.category}</option>
-              <option value="MARKETPLACE_COMMISSION">Pazaryeri komisyonu</option>
-              <option value="SHIPPING_EXPENSE">Kargo gideri</option>
-              <option value="SERVICE_FEE">Hizmet bedeli</option>
-              <option value="REFUND">{labels.refund}</option>
-            </select>
-          ) : null}
-          {form.direction === "TRANSFER" ? (
-            <select
-              value={form.targetAccountId}
-              onChange={(event) => setForm((current) => ({ ...current, targetAccountId: event.target.value }))}
-              className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700"
-            >
-              <option value="">{labels.targetAccount}</option>
-              {accountOptions
-                .filter((option) => option.id !== form.accountId)
-                .map((option) => (
-                  <option key={option.id} value={option.id}>{option.label}</option>
-                ))}
-            </select>
-          ) : null}
-          <Input type="number" step="0.01" value={form.amount} onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))} placeholder={labels.amount} />
-          <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder={labels.titleField} />
-          <Input value={form.counterpartyName} onChange={(event) => setForm((current) => ({ ...current, counterpartyName: event.target.value }))} placeholder={labels.counterparty} />
-          <Input value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} placeholder={labels.note} />
-        </div>
-        <button
-          type="button"
-          onClick={submitTransaction}
-          disabled={isPending}
-          className="mt-4 inline-flex h-10 items-center rounded-xl bg-neutral-950 px-4 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {isPending ? labels.creatingAction : labels.createAction}
-        </button>
-      </section>
-
-      <section className="grid gap-3">
-        {result.items.length === 0 ? (
-          <article className="rounded-3xl border border-dashed border-neutral-300 bg-white p-6 text-sm text-neutral-500 shadow-sm">
-            {labels.empty}
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">{labels.totalIncoming}</p>
+            <p className="mt-3 text-2xl font-semibold text-emerald-950">{formatMoney(result.summary.totalIncoming, result.summary.currency)}</p>
           </article>
-        ) : result.items.map((item) => (
-          <article key={item.id} className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-semibold text-neutral-950">{item.title}</h2>
-                <div className="mt-3 grid gap-2 text-sm text-neutral-700 md:grid-cols-2 xl:grid-cols-6">
-                  <p>{labels.account}: {item.accountName}</p>
-                  <p>{labels.amount}: {formatMoney(item.amount, item.currency)}</p>
-                  <p>{labels.transactionDate}: {formatDate(item.transactionAt)}</p>
-                  <p>{labels.sourceType}: {item.sourceType === "REFUND" ? labels.refund : item.sourceType === "TRANSFER" ? labels.transfer : labels.sourceType}</p>
-                  <p>{labels.counterparty}: {item.counterpartyName ?? "-"}</p>
-                  <p>{labels.note}: {item.note ?? "-"}</p>
-                </div>
+          <article className="rounded-3xl border border-rose-200 bg-rose-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-700">{labels.totalOutgoing}</p>
+            <p className="mt-3 text-2xl font-semibold text-rose-950">{formatMoney(result.summary.totalOutgoing, result.summary.currency)}</p>
+          </article>
+          <article className="rounded-3xl border border-blue-200 bg-blue-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">{labels.netAmount}</p>
+            <p className="mt-3 text-2xl font-semibold text-blue-950">{formatMoney(result.summary.netAmount, result.summary.currency)}</p>
+          </article>
+          <article className="rounded-3xl border border-neutral-200 bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.transactionCount}</p>
+            <p className="mt-3 text-2xl font-semibold text-neutral-950">{result.summary.transactionCount}</p>
+          </article>
+        </div>
+
+        <div className="mt-5 overflow-hidden rounded-xl border border-neutral-200">
+          <div className="hidden grid-cols-[120px_1.2fr_1fr_150px_170px_1fr_1fr] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 lg:grid">
+            <span>{labels.allDirections}</span>
+            <span>{labels.titleField}</span>
+            <span>{labels.account}</span>
+            <span>{labels.amount}</span>
+            <span>{labels.transactionDate}</span>
+            <span>{labels.counterparty}</span>
+            <span>{labels.note}</span>
+          </div>
+          {result.items.length === 0 ? (
+            <p className="p-6 text-sm text-neutral-500">{labels.empty}</p>
+          ) : result.items.map((item) => (
+            <article key={item.id} className="grid gap-4 border-b border-neutral-200 p-4 last:border-b-0 lg:grid-cols-[120px_1.2fr_1fr_150px_170px_1fr_1fr] lg:items-center">
+              <div>
+                <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${getDirectionClassName(item.direction)}`}>
+                  {item.direction === "IN" ? labels.incoming : item.direction === "OUT" ? labels.outgoing : labels.transfer}
+                </span>
               </div>
+              <div>
+                <h3 className="font-medium text-neutral-950">{item.title}</h3>
+                <p className="mt-1 text-xs text-neutral-500">{item.sourceType === "REFUND" ? labels.refund : item.sourceType === "TRANSFER" ? labels.transfer : item.sourceType}</p>
+              </div>
+              <p className="text-sm text-neutral-500">{item.accountName}</p>
+              <p className="text-sm font-medium text-neutral-950">{formatMoney(item.amount, item.currency)}</p>
+              <p className="text-sm text-neutral-500">{formatDate(item.transactionAt)}</p>
+              <p className="text-sm text-neutral-500">{item.counterpartyName ?? "-"}</p>
+              <p className="text-sm text-neutral-500">{item.note ?? "-"}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      {drawerOpen ? (
+        <div className="fixed inset-0 z-50">
+          <button type="button" aria-label={labels.cancel} className="absolute inset-0 bg-black/30" onClick={closeDrawer} />
+          <aside className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-neutral-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-neutral-200 p-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.title}</p>
+                <h3 className="mt-1 text-xl font-semibold tracking-tight">{labels.createTitle}</h3>
+              </div>
+              <Button type="button" size="icon" variant="ghost" onClick={closeDrawer} disabled={isPending}>
+                <X className="h-5 w-5" />
+              </Button>
             </div>
-          </article>
-        ))}
-      </section>
-    </div>
+
+            <form className="grid gap-4 p-5" onSubmit={submitTransaction}>
+              <div className="grid gap-2">
+                <Label>{labels.account}</Label>
+                <select value={form.accountId} onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))} className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700">
+                  <option value="">{labels.account}</option>
+                  {accountOptions.map((option) => (
+                    <option key={option.id} value={option.id}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <Label>{labels.allDirections}</Label>
+                <select
+                  value={form.direction}
+                  onChange={(event) => {
+                    const nextDirection = event.target.value as AdminCashTransactionDirection;
+                    setForm((current) => ({
+                      ...current,
+                      direction: nextDirection,
+                      sourceType: nextDirection === "TRANSFER" ? "TRANSFER" : nextDirection === "OUT" ? current.sourceType : "MANUAL",
+                      category: nextDirection === "TRANSFER" ? "TRANSFER" : nextDirection === "IN" ? "GENERAL_INCOME" : current.sourceType === "REFUND" ? "REFUND" : "GENERAL_EXPENSE",
+                    }));
+                  }}
+                  className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700"
+                >
+                  <option value="IN">{labels.incoming}</option>
+                  <option value="OUT">{labels.outgoing}</option>
+                  <option value="TRANSFER">{labels.transfer}</option>
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <Label>{labels.sourceType}</Label>
+                <select
+                  value={form.sourceType}
+                  onChange={(event) => {
+                    const nextSourceType = event.target.value as AdminCashTransactionSourceType;
+                    setForm((current) => ({
+                      ...current,
+                      sourceType: nextSourceType,
+                      category: nextSourceType === "REFUND" ? "REFUND" : nextSourceType === "TRANSFER" ? "TRANSFER" : current.direction === "IN" ? "GENERAL_INCOME" : current.category === "REFUND" ? "GENERAL_EXPENSE" : current.category,
+                    }));
+                  }}
+                  className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700"
+                >
+                  <option value="MANUAL">{labels.sourceType}</option>
+                  <option value="REFUND">{labels.refund}</option>
+                  <option value="TRANSFER">{labels.transfer}</option>
+                </select>
+              </div>
+              {form.direction === "OUT" ? (
+                <div className="grid gap-2">
+                  <Label>{labels.category}</Label>
+                  <select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value as AdminCashTransactionCategory }))} className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700">
+                    <option value="GENERAL_EXPENSE">{labels.category}</option>
+                    <option value="MARKETPLACE_COMMISSION">Pazaryeri komisyonu</option>
+                    <option value="SHIPPING_EXPENSE">Kargo gideri</option>
+                    <option value="SERVICE_FEE">Hizmet bedeli</option>
+                    <option value="REFUND">{labels.refund}</option>
+                  </select>
+                </div>
+              ) : null}
+              {form.direction === "TRANSFER" ? (
+                <div className="grid gap-2">
+                  <Label>{labels.targetAccount}</Label>
+                  <select value={form.targetAccountId} onChange={(event) => setForm((current) => ({ ...current, targetAccountId: event.target.value }))} className="h-10 rounded-xl border border-neutral-300 px-3 text-sm text-neutral-700">
+                    <option value="">{labels.targetAccount}</option>
+                    {accountOptions
+                      .filter((option) => option.id !== form.accountId)
+                      .map((option) => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                      ))}
+                  </select>
+                </div>
+              ) : null}
+              <div className="grid gap-2">
+                <Label>{labels.amount}</Label>
+                <Input type="number" step="0.01" value={form.amount} onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))} required />
+              </div>
+              <div className="grid gap-2">
+                <Label>{labels.titleField}</Label>
+                <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} required />
+              </div>
+              <div className="grid gap-2">
+                <Label>{labels.counterparty}</Label>
+                <Input value={form.counterpartyName} onChange={(event) => setForm((current) => ({ ...current, counterpartyName: event.target.value }))} />
+              </div>
+              <div className="grid gap-2">
+                <Label>{labels.note}</Label>
+                <Input value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} />
+              </div>
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={closeDrawer} disabled={isPending}>
+                  {labels.cancel}
+                </Button>
+                <Button type="submit" disabled={isPending}>
+                  {isPending ? labels.creatingAction : labels.createAction}
+                </Button>
+              </div>
+            </form>
+          </aside>
+        </div>
+      ) : null}
+    </section>
   );
 }

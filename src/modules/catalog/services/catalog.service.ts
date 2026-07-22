@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import tr from "@/i18n/tr.json";
 import { redisCache } from "@/lib/redis";
 import type {
   CategoryOption,
@@ -23,6 +24,15 @@ import {
 } from "@/modules/catalog/services/product-features.codec";
 import { identityAdminService } from "@/modules/identity/services/identity-admin.service";
 import { notificationService } from "@/modules/system/services/notification.service";
+
+const adminDictionary = tr.admin;
+
+function formatNotificationMessage(template: string, values: Record<string, string>) {
+  return Object.entries(values).reduce(
+    (message, [key, value]) => message.replaceAll(`{${key}}`, value),
+    template,
+  );
+}
 
 const productListQuerySchema = z.object({
   search: z.string().trim().optional(),
@@ -673,8 +683,11 @@ export class CatalogService {
           recipients: recipients.map((item) => ({ id: item.id })),
           channels: ["IN_APP", "EMAIL"],
           type: "PRODUCT_QUESTION_CREATED",
-          title: `New question for ${product.name}`,
-          message: `${parsed.askedBy}: ${parsed.question}`,
+          title: `${adminDictionary.notificationProductQuestionCreatedTitle}: ${product.name}`,
+          message: formatNotificationMessage(adminDictionary.notificationProductQuestionCreatedMessage, {
+            askedBy: parsed.askedBy,
+            question: parsed.question,
+          }),
           linkUrl: `/admin/product-questions?questionId=${question.id}`,
         });
       }

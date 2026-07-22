@@ -161,6 +161,11 @@ export default async function AdminPanelLayout({
       notificationsLabel={dictionary.admin.notifications}
       noNotificationsLabel={dictionary.admin.noNotifications}
       markAllReadLabel={dictionary.admin.markAllRead}
+      notificationProductQuestionCreatedTitle={dictionary.admin.notificationProductQuestionCreatedTitle}
+      notificationInventoryOutOfStockTitle={dictionary.admin.notificationInventoryOutOfStockTitle}
+      notificationInventoryLowStockTitle={dictionary.admin.notificationInventoryLowStockTitle}
+      notificationStockCountAppliedTitle={dictionary.admin.notificationStockCountAppliedTitle}
+      notificationStockCountAppliedMessage={dictionary.admin.notificationStockCountAppliedMessage}
       menuItems={menuItems}
     >
       {children}

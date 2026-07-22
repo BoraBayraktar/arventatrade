@@ -44,6 +44,7 @@ export default async function AdminFinancePaymentsPage({
         financeStatusPartial: dictionary.admin.financeOperationStatusPartial,
         financeStatusCompleted: dictionary.admin.financeOperationStatusCompleted,
         recordedCount: dictionary.admin.financePaymentsRecordedCount,
+        supplier: dictionary.admin.supplier,
         documentCount: dictionary.admin.financePaymentsDocumentCount,
         lastIssueDate: dictionary.admin.financePaymentsLastIssueDate,
         amount: dictionary.admin.financePaymentsAmount,
@@ -57,6 +58,7 @@ export default async function AdminFinancePaymentsPage({
         createRecordFailed: dictionary.admin.financePaymentsCreateRecordFailed,
         account: dictionary.admin.financePaymentsFinancialAccount,
         accountRequired: dictionary.admin.financePaymentsFinancialAccountRequired,
+        action: dictionary.admin.action,
         noResults: dictionary.admin.financePaymentsEmpty,
       }}
     />

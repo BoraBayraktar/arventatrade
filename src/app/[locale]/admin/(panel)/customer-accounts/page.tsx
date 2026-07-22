@@ -49,10 +49,13 @@ export default async function AdminCustomerAccountsPage({
         note: dictionary.admin.documentsNote,
         status: dictionary.admin.status,
         create: dictionary.admin.create,
+        save: dictionary.admin.save,
+        edit: dictionary.admin.edit,
         saving: dictionary.common.loading,
         cancel: dictionary.admin.cancel,
         empty: dictionary.admin.customerAccountsEmpty,
         createFailed: dictionary.admin.customerAccountsCreateFailed,
+        operationFailed: dictionary.admin.operationFailed,
       }}
     />
   );

@@ -1,10 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AdminSupplierPayableSummary } from "@/modules/finance/contracts/payables.contract";
 
@@ -18,13 +15,7 @@ type Labels = {
   draftCount: string;
   lastIssueDate: string;
   viewDetail: string;
-  close: string;
   notSpecified: string;
-  documentNumber: string;
-  documentType: string;
-  documentStatus: string;
-  orderNumber: string;
-  inventoryTransactionNumber: string;
 };
 
 type Props = {
@@ -35,8 +26,6 @@ type Props = {
 };
 
 export function SupplierPayablesManager({ locale, items, initialSearch, labels }: Props) {
-  const [detail, setDetail] = useState<AdminSupplierPayableSummary | null>(null);
-
   return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
@@ -72,13 +61,6 @@ export function SupplierPayablesManager({ locale, items, initialSearch, labels }
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  onClick={() => setDetail(item)}
-                  variant="secondary"
-                >
-                  {labels.viewDetail}
-                </Button>
                 <Link
                   href={`/${locale}/admin/finance/payables/${encodeURIComponent(item.supplierKey)}`}
                   className="inline-flex h-10 items-center rounded-xl border border-neutral-300 px-4 text-sm font-medium text-neutral-700"
@@ -90,57 +72,6 @@ export function SupplierPayablesManager({ locale, items, initialSearch, labels }
           </article>
         ))}
       </section>
-
-      {detail ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-neutral-950/35">
-          <div className="flex h-full w-full max-w-3xl flex-col overflow-y-auto bg-white p-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{labels.totalAmount}</p>
-                <h3 className="mt-1 text-xl font-semibold text-neutral-950">{detail.supplierName}</h3>
-              </div>
-              <Button type="button" onClick={() => setDetail(null)} variant="secondary" size="sm">
-                {labels.close}
-              </Button>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-neutral-200 p-4 text-sm text-neutral-700">
-                <p>{labels.totalAmount}</p>
-                <p className="mt-2 text-lg font-semibold text-neutral-950">
-                  {detail.totalAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {detail.currency}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-neutral-200 p-4 text-sm text-neutral-700">
-                <p>{labels.documentCount}</p>
-                <p className="mt-2 text-lg font-semibold text-neutral-950">{detail.documentCount}</p>
-              </div>
-              <div className="rounded-2xl border border-neutral-200 p-4 text-sm text-neutral-700">
-                <p>{labels.draftCount}</p>
-                <p className="mt-2 text-lg font-semibold text-neutral-950">{detail.draftCount}</p>
-              </div>
-            </div>
-            <div className="mt-6 space-y-3">
-              {detail.documents.map((document) => (
-                <article key={document.id} className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary">{document.documentType}</Badge>
-                    <Badge className="border-emerald-200 bg-emerald-100 text-emerald-700">{document.status}</Badge>
-                  </div>
-                  <h4 className="mt-3 font-semibold text-neutral-950">{document.documentNumber}</h4>
-                  <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    <p>{labels.documentStatus}: {document.status}</p>
-                    <p>{labels.documentType}: {document.documentType}</p>
-                    <p>{labels.orderNumber}: {document.orderNumber ?? labels.notSpecified}</p>
-                    <p>{labels.inventoryTransactionNumber}: {document.inventoryTransactionNumber ?? labels.notSpecified}</p>
-                    <p>{labels.lastIssueDate}: {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(document.issueDate))}</p>
-                    <p>{labels.totalAmount}: {(document.totalAmount ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {document.currency}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

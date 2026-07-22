@@ -22,3 +22,7 @@ export type AdminCreateCustomerAccountInput = {
   note?: string | null;
   isActive?: boolean;
 };
+
+export type AdminUpdateCustomerAccountInput = AdminCreateCustomerAccountInput & {
+  id: string;
+};

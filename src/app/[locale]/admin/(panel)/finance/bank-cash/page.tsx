@@ -65,6 +65,8 @@ export default async function AdminFinancialAccountsPage({
         createFailed: dictionary.admin.financeFinancialAccountsCreateFailed,
         empty: dictionary.admin.financeFinancialAccountsEmpty,
         emptyHint: dictionary.admin.financeFinancialAccountsEmptyHint,
+        cancel: dictionary.admin.cancel,
+        action: dictionary.admin.action,
       }}
     />
   );
