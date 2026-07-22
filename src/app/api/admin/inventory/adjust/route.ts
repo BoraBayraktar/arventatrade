@@ -32,8 +32,8 @@ export async function POST(request: Request) {
       note: payload.note ?? "Inventory manager manual adjustment",
     });
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INVENTORY",
       entityId: payload.productId,
       action: "UPDATE",
       actorUserId: user.id,

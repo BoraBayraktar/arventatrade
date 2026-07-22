@@ -25,6 +25,8 @@
     "verify:orders": "node scripts/verify-orders.mjs",
     "verify:integrations": "node scripts/verify-integrations.mjs",
     "verify:platform": "node scripts/verify-platform.mjs",
+    "verify:audit:coverage": "node scripts/verify-audit-coverage.mjs",
+    "verify:audit:integrity": "node scripts/verify-audit-integrity.mjs",
     "verify:media": "node scripts/verify-media-upload.mjs",
     "verify:inventory:sprint1": "node scripts/verify-inventory-sprint1.mjs",
     "verify:inventory:sprint2": "node scripts/verify-inventory-sprint2.mjs",
@@ -44,7 +46,7 @@
     "verify:inventory:week2": "node scripts/verify-inventory-week2.mjs",
     "verify:inventory:week3": "node scripts/verify-inventory-week3.mjs",
     "verify:questions-phase4": "node scripts/verify-questions-phase4.mjs",
-    "verify:phase5": "npm run verify:platform && npm run verify:integrations && npm run verify:auth && npm run verify:rbac && npm run verify:users && npm run verify:questions-phase4",
+    "verify:phase5": "npm run verify:platform && npm run verify:integrations && npm run verify:auth && npm run verify:rbac && npm run verify:users && npm run verify:questions-phase4 && npm run verify:audit:coverage",
     "worker:notifications": "tsx --tsconfig tsconfig.json scripts/process-notification-emails.ts",
     "test:notification-email-live": "tsx --tsconfig tsconfig.json scripts/test-notification-email-live.ts",
     "worker:notifications:cron": "bash scripts/run-notification-worker-cron.sh"

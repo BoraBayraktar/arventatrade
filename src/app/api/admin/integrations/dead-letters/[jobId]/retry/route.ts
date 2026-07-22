@@ -3,14 +3,22 @@ import { ZodError } from "zod";
 
 import { integrationService } from "@/modules/integration/services/integration.service";
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
-export async function POST(_request: Request, context: { params: Promise<{ jobId: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
   try {
     const user = await requireUserRoles(["ADMIN"]);
     const { jobId } = await context.params;
     const result = await integrationService.retryDeadLetter({
       jobId,
       resolvedByUserId: user.id,
+    });
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INTEGRATION",
+      entityId: jobId,
+      action: "SYNC",
+      actorUserId: user.id,
+      summary: "Dead letter entegrasyon işi tekrar kuyruğa alındı",
     });
 
     return NextResponse.json({ item: result });

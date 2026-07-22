@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       deletedUserId: payload?.action === "delete" ? user.id : undefined,
     });
 
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "PRODUCT",
       action: payload?.action === "answer" ? "UPDATE" : "DELETE",
       actorUserId: user.id,

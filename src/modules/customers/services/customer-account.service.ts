@@ -53,27 +53,24 @@ export class CustomerAccountService {
   async ensureCustomerAccountFromContact(profile: {
     email?: string | null;
     name: string;
-  }): Promise<AdminCustomerAccountItem> {
+  }): Promise<AdminCustomerAccountItem | null> {
     const normalizedName = profile.name.trim();
     const normalizedEmail = profile.email?.trim()
       ? profile.email.trim().toLocaleLowerCase("tr-TR")
       : null;
 
-    if (normalizedEmail) {
-      const existingByEmail = await customerAccountRepository.findCustomerAccountByEmail(normalizedEmail);
-      if (existingByEmail) {
-        return mapCustomerAccount(existingByEmail);
-      }
+    if (!normalizedEmail) {
+      return null;
     }
 
-    const existingByName = await customerAccountRepository.findCustomerAccountByName(normalizedName);
-    if (existingByName) {
-      return mapCustomerAccount(existingByName);
+    const existingByEmail = await customerAccountRepository.findCustomerAccountByEmail(normalizedEmail);
+    if (existingByEmail) {
+      return mapCustomerAccount(existingByEmail);
     }
 
     const slugParts = [
       normalizedName.toLocaleLowerCase("tr-TR").replace(/\s+/g, "-"),
-      normalizedEmail ? normalizedEmail.split("@")[0] : `customer-${Date.now()}`,
+      normalizedEmail.split("@")[0],
     ];
     const slugBase = slugParts.join("-").replace(/[^a-z0-9-]/g, "");
     const created = await customerAccountRepository.createCustomerAccount({
@@ -89,7 +86,7 @@ export class CustomerAccountService {
   async ensureCustomerAccountFromUserProfile(profile: {
     email: string;
     name: string;
-  }): Promise<AdminCustomerAccountItem> {
+  }): Promise<AdminCustomerAccountItem | null> {
     return this.ensureCustomerAccountFromContact(profile);
   }
 }

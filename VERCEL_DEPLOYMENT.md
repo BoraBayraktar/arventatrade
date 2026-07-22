@@ -12,6 +12,15 @@ The root layout also avoids remote Google Font fetching so production builds are
 
 Database migrations are intentionally not executed inside `npm run build`. Run `npm run db:migrate` against the target database before deploying or as a separate release step. This keeps Vercel artifact builds independent from database connectivity and prevents transient Prisma schema-engine failures from blocking the build phase.
 
+## Environment separation
+
+Use different sources for local and production configuration:
+
+- Local development: `.env.local`
+- Production on Vercel: Vercel Project Settings -> Environment Variables
+
+Do not treat `.env.vercel` as the production runtime source of truth. If Vercel CLI creates local env helper files, keep them local-only and do not copy production database credentials into `.env.local`.
+
 ## Required environment variables
 
 - `DATABASE_URL`: required for Prisma and all catalog/admin/server flows.

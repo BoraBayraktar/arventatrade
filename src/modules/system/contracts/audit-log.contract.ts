@@ -1,15 +1,45 @@
-export type AuditLogEntityType =
-  | "USER"
-  | "PRODUCT"
-  | "SUPPLIER"
-  | "CUSTOMER_ACCOUNT"
-  | "CATEGORY"
-  | "ORDER"
-  | "WAREHOUSE"
-  | "STOREFRONT_ITEM"
-  | "AUTH";
+export const AUDIT_LOG_ENTITY_TYPES = [
+  "USER",
+  "PRODUCT",
+  "BRAND",
+  "SUPPLIER",
+  "PRODUCT_ATTRIBUTE",
+  "CUSTOMER_ACCOUNT",
+  "CATEGORY",
+  "ORDER",
+  "BUSINESS_DOCUMENT",
+  "FINANCE_COLLECTION",
+  "FINANCE_PAYMENT",
+  "WAREHOUSE",
+  "INVENTORY",
+  "STOCK_COUNT",
+  "INTEGRATION",
+  "MARKETPLACE_ACCOUNT",
+  "MARKETPLACE_PACKAGE",
+  "STOREFRONT_ITEM",
+  "AUTH",
+] as const;
 
-export type AuditLogAction = "CREATE" | "UPDATE" | "DELETE" | "STATUS_UPDATE" | "LOGIN" | "LOGOUT";
+export const AUDIT_LOG_ACTIONS = [
+  "CREATE",
+  "UPDATE",
+  "DELETE",
+  "STATUS_UPDATE",
+  "IMPORT",
+  "EXPORT",
+  "SYNC",
+  "LOGIN",
+  "LOGIN_FAILED",
+  "LOGOUT",
+  "PASSWORD_RESET_REQUEST",
+  "PASSWORD_RESET_COMPLETE",
+  "PERMISSION_CHANGE",
+  "AUDIT_EXPORT",
+] as const;
+
+export type AuditLogEntityType = (typeof AUDIT_LOG_ENTITY_TYPES)[number];
+
+export type AuditLogAction = (typeof AUDIT_LOG_ACTIONS)[number];
 
 export type AuditLogItem = {
   id: string;
@@ -18,9 +48,24 @@ export type AuditLogItem = {
   entityLabel: string;
   action: AuditLogAction;
   actorUserId: string | null;
+  actorType: string;
   actorLabel: string | null;
+  tenantId: string | null;
+  module: string | null;
+  route: string | null;
+  operation: string | null;
+  requestId: string | null;
+  correlationId: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
   summary: string | null;
   metadata: Record<string, unknown> | null;
+  payloadHash: string | null;
+  previousHash: string | null;
+  chainHash: string | null;
+  hashAlgorithm: string;
+  occurredAt: string;
+  serverReceivedAt: string;
   createdAt: string;
 };
 
@@ -48,6 +93,16 @@ export type CreateAuditLogInput = {
   entityId?: string | null;
   action: AuditLogAction;
   actorUserId?: string | null;
+  actorType?: "USER" | "SYSTEM" | "INTEGRATION";
+  tenantId?: string | null;
+  module?: string | null;
+  route?: string | null;
+  operation?: string | null;
+  requestId?: string | null;
+  correlationId?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
   summary?: string | null;
   metadata?: Record<string, unknown> | null;
+  occurredAt?: Date | string | null;
 };

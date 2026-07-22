@@ -4,15 +4,23 @@ import { ZodError } from "zod";
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
 import { MarketplaceOrderCreationError } from "@/modules/commerce/services/marketplace-order.service";
 import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireUserRoles(["ADMIN"]);
+    const user = await requireUserRoles(["ADMIN"]);
     const { id } = await params;
     const result = await marketplaceIntegrationService.createOrderFromPackage({ packageId: id });
+    await auditLogService.recordFromRequest(request, {
+      entityType: "MARKETPLACE_PACKAGE",
+      entityId: id,
+      action: "CREATE",
+      actorUserId: user.id,
+      summary: "Pazaryeri paketinden sipariş oluşturuldu",
+    });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof AuthContextError) {

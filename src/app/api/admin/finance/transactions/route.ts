@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 
 import { cashTransactionsService } from "@/modules/finance/services/cash-transactions.service";
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(request: Request) {
   try {
@@ -34,6 +35,18 @@ export async function POST(request: Request) {
     const item = await cashTransactionsService.createTransaction({
       ...payload,
       recordedByUserId: user.id,
+    });
+    await auditLogService.recordFromRequest(request, {
+      entityType: "FINANCE_COLLECTION",
+      entityId: item.id,
+      action: "CREATE",
+      actorUserId: user.id,
+      summary: "Kasa/banka hareketi oluşturuldu",
+      metadata: {
+        direction: item.direction,
+        amount: item.amount,
+        currency: item.currency,
+      },
     });
     return NextResponse.json({ item }, { status: 201 });
   } catch (error) {

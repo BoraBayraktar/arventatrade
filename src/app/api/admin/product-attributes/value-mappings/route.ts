@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 
 import { catalogAdminService } from "@/modules/catalog/services/catalog-admin.service";
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(request: Request) {
   try {
@@ -22,9 +23,19 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
     const payload = await request.json();
     const item = await catalogAdminService.upsertAttributeValueMarketplaceMapping(payload);
+    await auditLogService.recordFromRequest(request, {
+      entityType: "PRODUCT_ATTRIBUTE",
+      entityId: item.id,
+      action: "UPDATE",
+      actorUserId: user.id,
+      summary: "Ürün özellik pazaryeri değer eşlemesi kaydedildi",
+      metadata: {
+        channel: item.channel,
+      },
+    });
     return NextResponse.json({ item }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthContextError) {

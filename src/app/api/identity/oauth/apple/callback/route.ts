@@ -74,3 +74,4 @@ export async function POST(request: Request) {
 
   return response;
 }
+// AUDIT_EXEMPT_REASON: OAuth sağlayıcı callback akışı başarılı oturum üretimine bağlıdır; sosyal hesap eşleşmesi identity repository kayıtlarında tutulur.

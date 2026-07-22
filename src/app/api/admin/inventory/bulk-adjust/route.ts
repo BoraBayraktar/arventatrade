@@ -15,8 +15,8 @@ export async function POST(request: Request) {
     const payload = schema.parse(await request.json());
     const result = await inventoryService.bulkAdjustInventory(inventoryService.parseBulkAdjustmentCsv(payload.csv));
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INVENTORY",
       action: "UPDATE",
       actorUserId: user.id,
       summary: `Toplu stok düzeltmesi işlendi: ${result.successCount}/${result.total}`,

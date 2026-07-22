@@ -16,3 +16,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Unexpected error" }, { status: 500 });
   }
 }
+// AUDIT_EXEMPT_REASON: Teklif hesaplama kalıcı finans/e-belge işlemi oluşturmaz; checkout sipariş oluşumunda audit üretilir.

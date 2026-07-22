@@ -5,7 +5,7 @@ import { inventoryService } from "@/modules/inventory/services/inventory.service
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -13,8 +13,8 @@ export async function POST(
     const { id } = await context.params;
     const applied = await inventoryService.applyStockCount(id);
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "STOCK_COUNT",
       entityId: id,
       action: "UPDATE",
       actorUserId: user.id,

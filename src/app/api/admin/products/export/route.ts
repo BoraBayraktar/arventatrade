@@ -17,9 +17,9 @@ export async function GET(request: Request) {
       supplierId: searchParams.get("supplierId") ?? undefined,
     });
 
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "PRODUCT",
-      action: "UPDATE",
+      action: "EXPORT",
       actorUserId: user.id,
       summary: `ÜRÜN_DIŞA_AKTARIM | ${exported.total} satır dışa aktarıldı`,
       metadata: {

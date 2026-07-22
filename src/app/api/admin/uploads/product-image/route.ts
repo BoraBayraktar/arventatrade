@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       productSlug: typeof slug === "string" && slug.trim() ? slug : undefined,
     });
 
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "PRODUCT",
       action: "UPDATE",
       actorUserId: user.id,

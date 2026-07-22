@@ -33,9 +33,9 @@ export async function POST(request: Request) {
       },
     });
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
-      action: "UPDATE",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INVENTORY",
+      action: "EXPORT",
       actorUserId: user.id,
       summary: `ENVANTER_DIŞA_AKTARIM | ${payload.total} satır dışa aktarıldı`,
       metadata: {

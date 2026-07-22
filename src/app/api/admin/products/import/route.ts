@@ -16,9 +16,9 @@ export async function POST(request: Request) {
 
     const result = await catalogImportService.importProductsFromCsv(await file.text());
 
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "PRODUCT",
-      action: "CREATE",
+      action: "IMPORT",
       actorUserId: user.id,
       summary: `ÜRÜN_İÇE_AKTARIM | ${result.createdCount} ürün oluşturuldu`,
       metadata: {

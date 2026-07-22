@@ -112,6 +112,9 @@ jobs:
       - name: Verify questions phase4
         run: npm run verify:questions-phase4
 
+      - name: Verify audit coverage
+        run: npm run verify:audit:coverage
+
       - name: Print app logs on failure
         if: failure()
         run: cat /tmp/arventa-dev.log || true

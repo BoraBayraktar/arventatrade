@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 
 import { requireUserRoles, AuthContextError } from "@/modules/identity/services/auth-context.service";
 import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET() {
   try {
@@ -20,9 +21,21 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await requireUserRoles(["ADMIN"]);
+    const user = await requireUserRoles(["ADMIN"]);
     const payload = await request.json();
     const result = await marketplaceIntegrationService.upsertConfig(payload);
+    await auditLogService.recordFromRequest(request, {
+      entityType: "MARKETPLACE_ACCOUNT",
+      entityId: result.id,
+      action: "UPDATE",
+      actorUserId: user.id,
+      summary: `Pazaryeri entegrasyon ayarı kaydedildi: ${result.displayName}`,
+      metadata: {
+        channel: result.channel,
+        sellerId: result.sellerId,
+        credentialsChanged: Boolean(payload.apiKey || payload.apiSecret || payload.serviceToken),
+      },
+    });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof AuthContextError) {

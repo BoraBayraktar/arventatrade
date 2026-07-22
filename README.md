@@ -45,8 +45,18 @@ prisma/
 1. Ortam degiskenlerini hazirlayin.
 
 ```bash
-cp .env.example .env
+cp .env.local.example .env.local
 ```
+
+Next.js local calismada `.env.local` dosyasini kullanir. Bu repoda onerilen duzen:
+
+- Local development: `.env.local` -> local PostgreSQL / Redis / MinIO
+- Vercel production: Vercel Project Settings -> Environment Variables
+
+Not:
+
+- `.env.local` dosyasini production connection string ile doldurmayin.
+- Vercel uzerindeki production veritabani bilgileri repodaki `.env` veya `.env.local` dosyalarinda tutulmamalidir.
 
 Sosyal girisleri aktif etmek isterseniz su alanlari da doldurun:
 

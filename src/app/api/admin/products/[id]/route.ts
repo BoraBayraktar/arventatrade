@@ -43,7 +43,7 @@ export async function PATCH(
       id,
       ...payload,
     });
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "PRODUCT",
       entityId: updated.id,
       action: "UPDATE",
@@ -65,14 +65,14 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
     const user = await requireUserRoles(["ADMIN"]);
     const { id } = await context.params;
     await catalogAdminService.softDeleteProduct(id, user.id);
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "PRODUCT",
       entityId: id,
       action: "DELETE",

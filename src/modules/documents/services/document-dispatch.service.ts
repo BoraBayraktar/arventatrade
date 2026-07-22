@@ -7,6 +7,7 @@ import type {
 } from "@/modules/documents/contracts/document.contract";
 import { DocumentRepository } from "@/modules/documents/repositories/document.repository";
 import { documentDispatchLifecycleService } from "@/modules/documents/services/document-dispatch-lifecycle.service";
+import { documentLifecycleService } from "@/modules/documents/services/document-lifecycle.service";
 import { DocumentAdminError } from "@/modules/documents/services/document.service";
 import { integrationService } from "@/modules/integration/services/integration.service";
 
@@ -98,6 +99,55 @@ function mapDetail(item: Awaited<ReturnType<DocumentRepository["findBusinessDocu
       queuedAt: dispatch.queuedAt.toISOString(),
       dispatchedAt: dispatch.dispatchedAt ? dispatch.dispatchedAt.toISOString() : null,
       createdAt: dispatch.createdAt.toISOString(),
+    })),
+    lifecycleEvents: (item.lifecycleEvents ?? []).map((event: {
+      id: string;
+      eventType: string;
+      status: string | null;
+      externalStatus: string | null;
+      providerCode: string | null;
+      integrationJobId: string | null;
+      actorType: string;
+      requestId: string | null;
+      correlationId: string | null;
+      summary: string;
+      metadata: unknown;
+      occurredAt: Date;
+      integrationMessages: Array<{
+        id: string;
+        direction: string;
+        channel: string | null;
+        providerCode: string | null;
+        messageType: string;
+        payloadHash: string;
+        statusCode: number | null;
+        errorMessage: string | null;
+        occurredAt: Date;
+      }>;
+    }) => ({
+      id: event.id,
+      eventType: event.eventType,
+      status: event.status,
+      externalStatus: event.externalStatus,
+      providerCode: event.providerCode,
+      integrationJobId: event.integrationJobId,
+      actorType: event.actorType,
+      requestId: event.requestId,
+      correlationId: event.correlationId,
+      summary: event.summary,
+      metadata: (event.metadata as Record<string, unknown> | null) ?? null,
+      occurredAt: event.occurredAt.toISOString(),
+      messages: event.integrationMessages.map((message) => ({
+        id: message.id,
+        direction: message.direction,
+        channel: message.channel,
+        providerCode: message.providerCode,
+        messageType: message.messageType,
+        payloadHash: message.payloadHash,
+        statusCode: message.statusCode,
+        errorMessage: message.errorMessage,
+        occurredAt: message.occurredAt.toISOString(),
+      })),
     })),
   };
 }
@@ -200,6 +250,30 @@ export class DocumentDispatchService {
       requestPayload: payload,
     });
 
+    await documentLifecycleService.recordEvent({
+      businessDocumentId: document.id,
+      eventType: "OUTBOUND_QUEUED",
+      status: document.status,
+      externalStatus: "QUEUED",
+      providerCode: provider.providerCode,
+      integrationJobId: queuedJob.id,
+      actorType: "USER",
+      summary: `Belge gönderim kuyruğuna alındı: ${document.documentNumber}`,
+      metadata: {
+        documentNumber: document.documentNumber,
+        documentType: document.documentType,
+        jobType: "DOCUMENT_OUTBOUND",
+      },
+      message: {
+        direction: "OUTBOUND",
+        channel: parsed.channel,
+        providerCode: provider.providerCode,
+        endpoint: provider.endpointUrl,
+        messageType: "DOCUMENT_OUTBOUND_REQUEST",
+        payload,
+      },
+    });
+
     const updated = await this.repository.findBusinessDocumentById(document.id);
     if (!updated) {
       throw new DocumentAdminError("Belge bulunamadı.", 404);
@@ -235,7 +309,7 @@ export class DocumentDispatchService {
       forceFail: parsed.forceFail ?? false,
     };
 
-    await integrationService.dispatchJobs({
+    const dispatchResult = await integrationService.dispatchJobs({
       channel: provider.channel,
       jobType: "DOCUMENT_STATUS_SYNC",
       entityType: "BUSINESS_DOCUMENT",
@@ -243,6 +317,31 @@ export class DocumentDispatchService {
       maxAttempts: 3,
       idempotencySuffix: `status-${provider.providerCode}-${Date.now()}`,
       payload,
+    });
+
+    const queuedJob = dispatchResult.jobs[0];
+    await documentLifecycleService.recordEvent({
+      businessDocumentId: document.id,
+      eventType: "STATUS_SYNC_QUEUED",
+      status: document.status,
+      externalStatus: document.externalSystemStatus,
+      providerCode: provider.providerCode,
+      integrationJobId: queuedJob?.id ?? null,
+      actorType: "USER",
+      summary: `Belge durum senkronu kuyruğa alındı: ${document.documentNumber}`,
+      metadata: {
+        documentNumber: document.documentNumber,
+        documentType: document.documentType,
+        jobType: "DOCUMENT_STATUS_SYNC",
+      },
+      message: {
+        direction: "OUTBOUND",
+        channel: provider.channel,
+        providerCode: provider.providerCode,
+        endpoint: provider.endpointUrl,
+        messageType: "DOCUMENT_STATUS_SYNC_REQUEST",
+        payload,
+      },
     });
 
     const updated = await this.repository.findBusinessDocumentById(document.id);

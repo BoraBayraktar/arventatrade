@@ -7,7 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
-import { auditLogService } from "@/modules/system/services/audit-log.service";
+import {
+  auditLogActionLabels,
+  auditLogEntityLabels,
+  auditLogService,
+} from "@/modules/system/services/audit-log.service";
+import {
+  AUDIT_LOG_ACTIONS,
+  AUDIT_LOG_ENTITY_TYPES,
+  type AuditLogAction,
+  type AuditLogEntityType,
+} from "@/modules/system/contracts/audit-log.contract";
 
 type AuditLogsPageProps = {
   params: Promise<{ locale: string }>;
@@ -26,6 +36,10 @@ function getEntityBadgeClass(entityType: string) {
   switch (entityType) {
     case "PRODUCT":
       return "bg-emerald-100 text-emerald-700";
+    case "BRAND":
+    case "SUPPLIER":
+    case "PRODUCT_ATTRIBUTE":
+      return "bg-lime-100 text-lime-700";
     case "USER":
       return "bg-sky-100 text-sky-700";
     case "CATEGORY":
@@ -34,8 +48,20 @@ function getEntityBadgeClass(entityType: string) {
       return "bg-teal-100 text-teal-700";
     case "ORDER":
       return "bg-amber-100 text-amber-700";
+    case "BUSINESS_DOCUMENT":
+      return "bg-orange-100 text-orange-700";
+    case "FINANCE_COLLECTION":
+    case "FINANCE_PAYMENT":
+      return "bg-teal-100 text-teal-700";
     case "WAREHOUSE":
       return "bg-cyan-100 text-cyan-700";
+    case "INVENTORY":
+    case "STOCK_COUNT":
+      return "bg-blue-100 text-blue-700";
+    case "INTEGRATION":
+    case "MARKETPLACE_ACCOUNT":
+    case "MARKETPLACE_PACKAGE":
+      return "bg-indigo-100 text-indigo-700";
     case "STOREFRONT_ITEM":
       return "bg-fuchsia-100 text-fuchsia-700";
     default:
@@ -44,26 +70,7 @@ function getEntityBadgeClass(entityType: string) {
 }
 
 function getEntityTypeLabel(entityType: string) {
-  switch (entityType) {
-    case "PRODUCT":
-      return "Ürün";
-    case "USER":
-      return "Kullanıcı";
-    case "CATEGORY":
-      return "Kategori";
-    case "CUSTOMER_ACCOUNT":
-      return "Cari Müşteri Kartı";
-    case "ORDER":
-      return "Sipariş";
-    case "WAREHOUSE":
-      return "Depo";
-    case "STOREFRONT_ITEM":
-      return "Mağaza İçeriği";
-    case "AUTH":
-      return "Oturum";
-    default:
-      return entityType;
-  }
+  return auditLogEntityLabels[entityType as AuditLogEntityType] ?? entityType;
 }
 
 function getActionBadgeClass(action: string) {
@@ -76,28 +83,19 @@ function getActionBadgeClass(action: string) {
       return "bg-rose-100 text-rose-700";
     case "STATUS_UPDATE":
       return "bg-amber-100 text-amber-700";
+    case "IMPORT":
+      return "bg-violet-100 text-violet-700";
+    case "EXPORT":
+      return "bg-fuchsia-100 text-fuchsia-700";
+    case "SYNC":
+      return "bg-indigo-100 text-indigo-700";
     default:
       return "bg-neutral-200 text-neutral-700";
   }
 }
 
 function getActionLabel(action: string) {
-  switch (action) {
-    case "CREATE":
-      return "Oluşturma";
-    case "UPDATE":
-      return "Güncelleme";
-    case "DELETE":
-      return "Silme";
-    case "STATUS_UPDATE":
-      return "Durum Güncelleme";
-    case "LOGIN":
-      return "Giriş";
-    case "LOGOUT":
-      return "Çıkış";
-    default:
-      return action;
-  }
+  return auditLogActionLabels[action as AuditLogAction] ?? action;
 }
 
 function formatAuditSummary(summary: string | null, fallback: string) {
@@ -177,28 +175,17 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
   }
 
   const query = await searchParams;
+  const selectedEntityType = AUDIT_LOG_ENTITY_TYPES.includes(query.entityType as AuditLogEntityType)
+    ? query.entityType as AuditLogEntityType
+    : undefined;
+  const selectedAction = AUDIT_LOG_ACTIONS.includes(query.action as AuditLogAction)
+    ? query.action as AuditLogAction
+    : undefined;
+
   const result = await auditLogService.list({
     search: query.search,
-    entityType:
-      query.entityType === "USER" ||
-      query.entityType === "PRODUCT" ||
-      query.entityType === "CUSTOMER_ACCOUNT" ||
-      query.entityType === "CATEGORY" ||
-      query.entityType === "ORDER" ||
-      query.entityType === "WAREHOUSE" ||
-      query.entityType === "STOREFRONT_ITEM" ||
-      query.entityType === "AUTH"
-        ? query.entityType
-        : undefined,
-    action:
-      query.action === "CREATE" ||
-      query.action === "UPDATE" ||
-      query.action === "DELETE" ||
-      query.action === "STATUS_UPDATE" ||
-      query.action === "LOGIN" ||
-      query.action === "LOGOUT"
-        ? query.action
-        : undefined,
+    entityType: selectedEntityType,
+    action: selectedAction,
     startDate: query.startDate,
     endDate: query.endDate,
     page: query.page ? Number(query.page) : 1,
@@ -241,6 +228,33 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
     return qs ? `/${locale}/admin/audit-logs?${qs}` : `/${locale}/admin/audit-logs`;
   }
 
+  function getExportHref() {
+    const params = new URLSearchParams();
+    if (query.search) {
+      params.set("search", query.search);
+    }
+
+    if (selectedEntityType) {
+      params.set("entityType", selectedEntityType);
+    }
+
+    if (selectedAction) {
+      params.set("action", selectedAction);
+    }
+
+    if (query.startDate) {
+      params.set("startDate", query.startDate);
+    }
+
+    if (query.endDate) {
+      params.set("endDate", query.endDate);
+    }
+
+    params.set("pageSize", "100");
+    params.set("export", "manifest");
+    return `/api/admin/audit-logs?${params.toString()}`;
+  }
+
   return (
     <section className="overflow-hidden rounded-3xl border border-neutral-200 bg-gradient-to-b from-neutral-50 to-white shadow-sm">
       <div className="border-b border-neutral-200 bg-[radial-gradient(circle_at_top_right,_rgba(14,116,144,0.12),_transparent_55%),radial-gradient(circle_at_left,_rgba(245,158,11,0.12),_transparent_45%),linear-gradient(135deg,white,rgba(250,250,250,0.96))] p-6">
@@ -248,6 +262,11 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{dictionary.admin.auditLogMenu}</p>
           <h2 className="mt-2 text-3xl font-semibold tracking-tight text-neutral-950">{dictionary.admin.auditLogTitle}</h2>
           <p className="mt-2 text-sm text-neutral-600">{result.total} {dictionary.admin.auditLogCount}</p>
+          <div className="mt-4">
+            <Link href={getExportHref()} className="inline-flex rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100">
+              Denetçi manifesti indir
+            </Link>
+          </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <article className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
@@ -284,14 +303,9 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tüm varlıklar</SelectItem>
-              <SelectItem value="PRODUCT">Ürün</SelectItem>
-              <SelectItem value="USER">Kullanıcı</SelectItem>
-              <SelectItem value="CUSTOMER_ACCOUNT">Cari Müşteri Kartı</SelectItem>
-              <SelectItem value="CATEGORY">Kategori</SelectItem>
-              <SelectItem value="ORDER">Sipariş</SelectItem>
-              <SelectItem value="WAREHOUSE">Depo</SelectItem>
-              <SelectItem value="STOREFRONT_ITEM">Mağaza İçeriği</SelectItem>
-              <SelectItem value="AUTH">Oturum</SelectItem>
+              {AUDIT_LOG_ENTITY_TYPES.map((entityType) => (
+                <SelectItem key={entityType} value={entityType}>{auditLogEntityLabels[entityType]}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select name="action" defaultValue={query.action ?? "all"}>
@@ -300,12 +314,9 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tüm aksiyonlar</SelectItem>
-              <SelectItem value="CREATE">Oluşturma</SelectItem>
-              <SelectItem value="UPDATE">Güncelleme</SelectItem>
-              <SelectItem value="DELETE">Silme</SelectItem>
-              <SelectItem value="STATUS_UPDATE">Durum Güncelleme</SelectItem>
-              <SelectItem value="LOGIN">Giriş</SelectItem>
-              <SelectItem value="LOGOUT">Çıkış</SelectItem>
+              {AUDIT_LOG_ACTIONS.map((action) => (
+                <SelectItem key={action} value={action}>{auditLogActionLabels[action]}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Input
@@ -384,6 +395,12 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">İşlemi yapan</p>
                         <p className="mt-1 text-sm font-medium text-neutral-900">{item.actorLabel ?? dictionary.common.notSpecified}</p>
                       </div>
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Modül / İşlem</p>
+                        <p className="mt-1 text-sm font-medium text-neutral-900">
+                          {[item.module, item.operation].filter(Boolean).join(" / ") || dictionary.common.notSpecified}
+                        </p>
+                      </div>
                     </div>
 
                     <div className="rounded-2xl border border-neutral-200 bg-white p-4">
@@ -421,6 +438,58 @@ export default async function AdminAuditLogsPage({ params, searchParams }: Audit
                       <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Kullanıcı kimliği</p>
                         <p className="mt-1 break-all text-xs text-neutral-700">{item.actorUserId ?? dictionary.common.notSpecified}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Aktör tipi</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{item.actorType}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Tenant</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{item.tenantId ?? dictionary.common.notSpecified}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Request ID</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{item.requestId ?? dictionary.common.notSpecified}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Correlation ID</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{item.correlationId ?? dictionary.common.notSpecified}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Route</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{item.route ?? dictionary.common.notSpecified}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">IP Adresi</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{item.ipAddress ?? dictionary.common.notSpecified}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3 lg:col-span-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">User Agent</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{item.userAgent ?? dictionary.common.notSpecified}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Olay zamanı</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{formatDate(item.occurredAt, locale as Locale)}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Sunucu alma zamanı</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{formatDate(item.serverReceivedAt, locale as Locale)}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Hash algoritması</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{item.hashAlgorithm}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3 lg:col-span-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Payload hash</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{item.payloadHash ?? dictionary.common.notSpecified}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3 lg:col-span-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Önceki zincir hash</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{item.previousHash ?? "İlk kayıt veya eski kayıt"}</p>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3 lg:col-span-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Zincir hash</p>
+                        <p className="mt-1 break-all text-xs text-neutral-700">{item.chainHash ?? dictionary.common.notSpecified}</p>
                       </div>
                     </div>
                   </details>

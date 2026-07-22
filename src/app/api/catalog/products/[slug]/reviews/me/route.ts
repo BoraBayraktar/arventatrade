@@ -82,3 +82,4 @@ export async function DELETE(
     return NextResponse.json({ message: "Unexpected error" }, { status: 500 });
   }
 }
+// AUDIT_EXEMPT_REASON: Müşteri ürün yorumu içerik akışı katalog review tablosunda ve kullanıcı bağlamında tutulur; admin/finans/e-belge audit kapsamı değildir.

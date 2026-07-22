@@ -5,20 +5,21 @@ import { documentService, DocumentAdminError } from "@/modules/documents/service
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
 import { auditLogService } from "@/modules/system/services/audit-log.service";
 
-export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireUserRoles(["ADMIN", "EDITOR"]);
     const { id } = await context.params;
     const created = await documentService.createInvoiceFromDeliveryNote(id);
 
-    await auditLogService.record({
-      entityType: "ORDER",
-      entityId: created.orderId ?? created.id,
+    await auditLogService.recordFromRequest(request, {
+      entityType: "BUSINESS_DOCUMENT",
+      entityId: created.id,
       action: "CREATE",
       actorUserId: user.id,
       summary: `İrsaliyeden e-fatura oluşturuldu: ${created.documentNumber}`,
       metadata: {
         documentId: created.id,
+        orderId: created.orderId,
         documentType: created.documentType,
         sourceDocumentId: id,
         inventoryTransactionId: created.inventoryTransactionId,

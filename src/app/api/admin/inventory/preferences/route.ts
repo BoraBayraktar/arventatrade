@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
 import { inventoryService } from "@/modules/inventory/services/inventory.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET() {
   try {
@@ -23,6 +24,13 @@ export async function PUT(request: Request) {
     const user = await requireUserRoles(["ADMIN", "EDITOR"]);
     const payload = await request.json();
     const result = await inventoryService.saveUserInventoryPreferences(user.id, payload);
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INVENTORY",
+      entityId: user.id,
+      action: "UPDATE",
+      actorUserId: user.id,
+      summary: "Stok görünüm tercihleri güncellendi",
+    });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof AuthContextError) {

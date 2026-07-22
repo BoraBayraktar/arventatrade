@@ -25,8 +25,8 @@ export async function POST(request: Request) {
     const payload = await request.json();
     const result = await inventoryService.receiveExternalStockEvent(payload);
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INVENTORY",
       entityId: result.productId,
       action: "UPDATE",
       actorUserId: user.id,

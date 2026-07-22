@@ -460,7 +460,7 @@ export function OrderDetailManager({ locale, order, labels, canManage, accountOp
       <div className="grid gap-4 border-b border-neutral-200 p-5 md:grid-cols-4">
         <article className="rounded-xl border border-neutral-200 p-4 md:col-span-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{labels.customerAccount}</p>
-          <p className="mt-2 text-sm font-semibold text-neutral-950">{order.customerAccountName ?? labels.notSpecified}</p>
+          <p className="mt-2 text-sm font-semibold text-neutral-950">{order.customerAccountName ?? "Cari kart bağlanmadı"}</p>
           {order.customerAccountEmail ? (
             <p className="mt-1 text-sm text-neutral-500">{order.customerAccountEmail}</p>
           ) : null}

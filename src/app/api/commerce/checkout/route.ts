@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 
 import { getCurrentUserFromContext } from "@/modules/identity/services/auth-context.service";
 import { CommerceCheckoutError, commerceService } from "@/modules/commerce/services/commerce.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function POST(request: Request) {
   try {
@@ -17,6 +18,18 @@ export async function POST(request: Request) {
           }
         : null,
     );
+    await auditLogService.recordFromRequest(request, {
+      entityType: "ORDER",
+      entityId: result.orderNumber,
+      action: "CREATE",
+      actorUserId: user?.id ?? null,
+      actorType: user ? "USER" : "SYSTEM",
+      summary: `Checkout siparişi oluşturuldu: ${result.orderNumber}`,
+      metadata: {
+        total: result.total,
+        currency: result.currency,
+      },
+    });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof ZodError) {

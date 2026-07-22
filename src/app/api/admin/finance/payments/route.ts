@@ -28,9 +28,9 @@ export async function POST(request: Request) {
       recordedByUserId: user.id,
     });
 
-    await auditLogService.record({
-      entityType: "ORDER",
-      entityId: created.supplierId,
+    await auditLogService.recordFromRequest(request, {
+      entityType: "FINANCE_PAYMENT",
+      entityId: created.id,
       action: "CREATE",
       actorUserId: user.id,
       summary: "Ödeme kaydı oluşturuldu",

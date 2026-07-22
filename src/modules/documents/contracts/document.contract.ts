@@ -30,6 +30,34 @@ export type AdminBusinessDocumentDispatchItem = {
   createdAt: string;
 };
 
+export type AdminBusinessDocumentLifecycleMessageItem = {
+  id: string;
+  direction: string;
+  channel: string | null;
+  providerCode: string | null;
+  messageType: string;
+  payloadHash: string;
+  statusCode: number | null;
+  errorMessage: string | null;
+  occurredAt: string;
+};
+
+export type AdminBusinessDocumentLifecycleEventItem = {
+  id: string;
+  eventType: string;
+  status: string | null;
+  externalStatus: string | null;
+  providerCode: string | null;
+  integrationJobId: string | null;
+  actorType: string;
+  requestId: string | null;
+  correlationId: string | null;
+  summary: string;
+  metadata: Record<string, unknown> | null;
+  occurredAt: string;
+  messages: AdminBusinessDocumentLifecycleMessageItem[];
+};
+
 export type AdminDocumentProviderConfigItem = {
   id: string;
   providerCode: string;
@@ -84,6 +112,7 @@ export type AdminBusinessDocumentDetail = AdminBusinessDocumentListItem & {
   providerDisplayName: string | null;
   lines: AdminBusinessDocumentLineItem[];
   dispatches: AdminBusinessDocumentDispatchItem[];
+  lifecycleEvents: AdminBusinessDocumentLifecycleEventItem[];
 };
 
 export type AdminBusinessDocumentListQuery = {

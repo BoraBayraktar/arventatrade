@@ -66,6 +66,10 @@ export class DocumentRepository {
         providerConfig: { select: { id: true, displayName: true } },
         lines: { orderBy: { createdAt: "asc" } },
         dispatches: { orderBy: { createdAt: "desc" } },
+        lifecycleEvents: {
+          orderBy: { occurredAt: "desc" },
+          include: { integrationMessages: { orderBy: { occurredAt: "desc" } } },
+        },
       },
     });
   }
@@ -283,6 +287,10 @@ export class DocumentRepository {
         providerConfig: { select: { id: true, displayName: true } },
         lines: { orderBy: { createdAt: "asc" } },
         dispatches: { orderBy: { createdAt: "desc" } },
+        lifecycleEvents: {
+          orderBy: { occurredAt: "desc" },
+          include: { integrationMessages: { orderBy: { occurredAt: "desc" } } },
+        },
       },
     });
   }
@@ -311,6 +319,10 @@ export class DocumentRepository {
         providerConfig: { select: { id: true, displayName: true } },
         lines: { orderBy: { createdAt: "asc" } },
         dispatches: { orderBy: { createdAt: "desc" } },
+        lifecycleEvents: {
+          orderBy: { occurredAt: "desc" },
+          include: { integrationMessages: { orderBy: { occurredAt: "desc" } } },
+        },
       },
     });
   }
@@ -510,6 +522,10 @@ export class DocumentRepository {
         providerConfig: { select: { id: true, displayName: true } },
         lines: { orderBy: { createdAt: "asc" } },
         dispatches: { orderBy: { createdAt: "desc" } },
+        lifecycleEvents: {
+          orderBy: { occurredAt: "desc" },
+          include: { integrationMessages: { orderBy: { occurredAt: "desc" } } },
+        },
       },
     });
   }
@@ -583,6 +599,10 @@ export class DocumentRepository {
         providerConfig: { select: { id: true, displayName: true } },
         lines: { orderBy: { createdAt: "asc" } },
         dispatches: { orderBy: { createdAt: "desc" } },
+        lifecycleEvents: {
+          orderBy: { occurredAt: "desc" },
+          include: { integrationMessages: { orderBy: { occurredAt: "desc" } } },
+        },
       },
     });
   }
@@ -612,6 +632,10 @@ export class DocumentRepository {
         providerConfig: { select: { id: true, displayName: true } },
         lines: { orderBy: { createdAt: "asc" } },
         dispatches: { orderBy: { createdAt: "desc" } },
+        lifecycleEvents: {
+          orderBy: { occurredAt: "desc" },
+          include: { integrationMessages: { orderBy: { occurredAt: "desc" } } },
+        },
       },
     });
   }
@@ -643,6 +667,10 @@ export class DocumentRepository {
         providerConfig: { select: { id: true, displayName: true } },
         lines: { orderBy: { createdAt: "asc" } },
         dispatches: { orderBy: { createdAt: "desc" } },
+        lifecycleEvents: {
+          orderBy: { occurredAt: "desc" },
+          include: { integrationMessages: { orderBy: { occurredAt: "desc" } } },
+        },
       },
     });
   }

@@ -45,8 +45,8 @@ export async function POST(request: Request) {
       unitCost: payload.unitCost ?? null,
     });
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INVENTORY",
       entityId: payload.productId,
       action: "UPDATE",
       actorUserId: user.id,

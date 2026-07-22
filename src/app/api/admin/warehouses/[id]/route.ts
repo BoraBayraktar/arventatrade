@@ -17,7 +17,7 @@ export async function PATCH(
       id,
       ...payload,
     });
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "WAREHOUSE",
       entityId: updated.id,
       action: "UPDATE",

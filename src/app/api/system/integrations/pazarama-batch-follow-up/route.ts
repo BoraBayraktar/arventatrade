@@ -30,3 +30,4 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   return handle(request);
 }
+// AUDIT_EXEMPT_REASON: Sistem callback endpointi; entegrasyon job/dead-letter geçmişi teknik iz olarak tutulur.

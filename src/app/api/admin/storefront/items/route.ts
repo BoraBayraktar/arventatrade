@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const user = await requireUserRoles(["ADMIN", "EDITOR"]);
     const payload = await request.json();
     const item = await storefrontService.upsertItem(payload);
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "STOREFRONT_ITEM",
       entityId: item.id,
       action: "CREATE",

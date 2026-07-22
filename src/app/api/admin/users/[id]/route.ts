@@ -24,13 +24,27 @@ export async function PATCH(
       ...payload,
     });
 
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "USER",
       entityId: updated.id,
       action: "UPDATE",
       actorUserId: user.id,
       summary: `Kullanıcı güncellendi: ${updated.email}`,
     });
+    if (payload.role !== undefined || payload.password !== undefined) {
+      await auditLogService.recordFromRequest(request, {
+        entityType: "AUTH",
+        entityId: updated.id,
+        action: "PERMISSION_CHANGE",
+        actorUserId: user.id,
+        summary: `Kullanıcı güvenlik bilgisi güncellendi: ${updated.email}`,
+        metadata: {
+          roleChanged: payload.role !== undefined,
+          passwordChanged: payload.password !== undefined,
+          targetRole: payload.role ?? updated.role,
+        },
+      });
+    }
 
     return NextResponse.json({ item: updated });
   } catch (error) {
@@ -47,14 +61,14 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
     const user = await requireUserRoles(["ADMIN"]);
     const { id } = await context.params;
     await identityAdminService.softDeleteUser(id, user.id);
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "USER",
       entityId: id,
       action: "DELETE",

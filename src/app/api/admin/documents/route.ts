@@ -41,14 +41,15 @@ export async function POST(request: Request) {
     const payload = await request.json();
     const created = await documentService.createBusinessDocument(payload);
 
-    await auditLogService.record({
-      entityType: "ORDER",
-      entityId: created.orderId ?? created.id,
+    await auditLogService.recordFromRequest(request, {
+      entityType: "BUSINESS_DOCUMENT",
+      entityId: created.id,
       action: "CREATE",
       actorUserId: user.id,
       summary: `Belge oluşturuldu: ${created.documentNumber}`,
       metadata: {
         documentId: created.id,
+        orderId: created.orderId,
         documentNumber: created.documentNumber,
         documentType: created.documentType,
         inventoryTransactionId: created.inventoryTransactionId,

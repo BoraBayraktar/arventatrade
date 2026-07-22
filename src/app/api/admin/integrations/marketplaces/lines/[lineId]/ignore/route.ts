@@ -3,15 +3,23 @@ import { ZodError } from "zod";
 
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
 import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function PATCH(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ lineId: string }> },
 ) {
   try {
-    await requireUserRoles(["ADMIN"]);
+    const user = await requireUserRoles(["ADMIN"]);
     const { lineId } = await params;
     const result = await marketplaceIntegrationService.ignorePackageLine({ lineId });
+    await auditLogService.recordFromRequest(request, {
+      entityType: "MARKETPLACE_PACKAGE",
+      entityId: lineId,
+      action: "UPDATE",
+      actorUserId: user.id,
+      summary: "Pazaryeri paket satırı yok sayıldı",
+    });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof AuthContextError) {

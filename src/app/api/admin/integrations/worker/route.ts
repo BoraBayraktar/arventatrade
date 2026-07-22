@@ -3,12 +3,25 @@ import { ZodError } from "zod";
 
 import { integrationService } from "@/modules/integration/services/integration.service";
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function POST(request: Request) {
   try {
-    await requireUserRoles(["ADMIN"]);
+    const user = await requireUserRoles(["ADMIN"]);
     const payload = await request.json().catch(() => ({}));
     const result = await integrationService.processQueue(payload);
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INTEGRATION",
+      action: "SYNC",
+      actorUserId: user.id,
+      summary: "Entegrasyon kuyruğu işlendi",
+      metadata: {
+        processed: result.processed,
+        success: result.success,
+        failed: result.failed,
+        deadLetter: result.deadLetter,
+      },
+    });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof AuthContextError) {

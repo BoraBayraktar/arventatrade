@@ -17,14 +17,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       forceFail: payload.forceFail === true,
     });
 
-    await auditLogService.record({
-      entityType: "ORDER",
-      entityId: item.orderId ?? item.id,
+    await auditLogService.recordFromRequest(request, {
+      entityType: "BUSINESS_DOCUMENT",
+      entityId: item.id,
       action: "UPDATE",
       actorUserId: user.id,
       summary: `Belge outbound kuyruğuna alındı: ${item.documentNumber}`,
       metadata: {
         documentId: item.id,
+        orderId: item.orderId,
         documentNumber: item.documentNumber,
         externalSystemStatus: item.externalSystemStatus,
         dispatchCount: item.dispatches.length,

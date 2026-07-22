@@ -48,6 +48,7 @@
 
 .loginVisualPane {
   min-height: 240px;
+  display: none;
 }
 
 .loginVisualFrame {
@@ -509,6 +510,7 @@
   }
 
   .loginVisualPane {
+    display: block;
     min-height: 100%;
   }
 

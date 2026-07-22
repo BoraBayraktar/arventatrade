@@ -22,8 +22,8 @@ export async function POST(
       inventoryService.parseBulkStockCountCsv(payload.csv),
     );
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "STOCK_COUNT",
       entityId: id,
       action: "UPDATE",
       actorUserId: user.id,

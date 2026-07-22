@@ -15,6 +15,10 @@
   min-height: 320px;
 }
 
+.visualPane {
+  display: none;
+}
+
 .visualFrame {
   position: relative;
   min-height: 320px;
@@ -432,6 +436,10 @@
     grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
     gap: 1.25rem;
     padding: 1.25rem;
+  }
+
+  .visualPane {
+    display: block;
   }
 
   .visualFrame,

@@ -5,6 +5,7 @@ import type {
   AuditLogEntityType,
   AuditLogAction,
 } from "@/modules/system/contracts/audit-log.contract";
+import { sha256 } from "@/modules/system/services/audit-integrity.service";
 
 export class AuditLogRepository {
   async create(input: {
@@ -12,18 +13,70 @@ export class AuditLogRepository {
     entityId?: string | null;
     action: AuditLogAction;
     actorUserId?: string | null;
+    actorType?: string;
+    tenantId?: string | null;
+    module?: string | null;
+    route?: string | null;
+    operation?: string | null;
+    requestId?: string | null;
+    correlationId?: string | null;
+    ipAddress?: string | null;
+    userAgent?: string | null;
     summary?: string | null;
     metadata?: Record<string, unknown> | null;
+    occurredAt?: Date | string | null;
   }) {
-    return prisma.auditLog.create({
-      data: {
+    return prisma.$transaction(async (tx) => {
+      const previous = await tx.auditLog.findFirst({
+        orderBy: [
+          { createdAt: "desc" },
+          { id: "desc" },
+        ],
+        select: {
+          chainHash: true,
+        },
+      });
+      const now = new Date();
+      const occurredAt = input.occurredAt ? new Date(input.occurredAt) : now;
+      const payload = {
         entityType: input.entityType,
         entityId: input.entityId ?? null,
         action: input.action,
         actorUserId: input.actorUserId ?? null,
+        actorType: input.actorType ?? "USER",
+        tenantId: input.tenantId ?? null,
+        module: input.module ?? null,
+        route: input.route ?? null,
+        operation: input.operation ?? null,
+        requestId: input.requestId ?? null,
+        correlationId: input.correlationId ?? input.requestId ?? null,
+        ipAddress: input.ipAddress ?? null,
+        userAgent: input.userAgent ?? null,
         summary: input.summary ?? null,
-        metadata: (input.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
-      },
+        metadata: input.metadata ?? null,
+        occurredAt: occurredAt.toISOString(),
+        serverReceivedAt: now.toISOString(),
+      };
+      const payloadHash = sha256(payload);
+      const previousHash = previous?.chainHash ?? null;
+      const chainHash = sha256({
+        payloadHash,
+        previousHash,
+      });
+
+      return tx.auditLog.create({
+        data: {
+          ...payload,
+          metadata: (input.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
+          payloadHash,
+          previousHash,
+          chainHash,
+          hashAlgorithm: "SHA-256",
+          occurredAt,
+          serverReceivedAt: now,
+          timezone: "Europe/Istanbul",
+        },
+      });
     });
   }
 
@@ -100,6 +153,53 @@ export class AuditLogRepository {
     });
   }
 
+  async listForIntegrity(args: {
+    startDate?: string;
+    endDate?: string;
+    take?: number;
+  }) {
+    const createdAtFilter = args.startDate || args.endDate
+      ? {
+          ...(args.startDate ? { gte: new Date(`${args.startDate}T00:00:00.000Z`) } : {}),
+          ...(args.endDate ? { lte: new Date(`${args.endDate}T23:59:59.999Z`) } : {}),
+        }
+      : undefined;
+
+    return prisma.auditLog.findMany({
+      where: {
+        ...(createdAtFilter ? { createdAt: createdAtFilter } : {}),
+      },
+      orderBy: [
+        { createdAt: "asc" },
+        { id: "asc" },
+      ],
+      take: args.take ?? 5000,
+    });
+  }
+
+  async createAnchor(input: {
+    anchorType: string;
+    periodStart: Date;
+    periodEnd: Date;
+    recordCount: number;
+    firstAuditLogId?: string | null;
+    lastAuditLogId?: string | null;
+    firstChainHash?: string | null;
+    lastChainHash?: string | null;
+    manifestHash: string;
+    storageBucket?: string | null;
+    storageObjectKey?: string | null;
+    storageUrl?: string | null;
+    storageMode?: string;
+    status?: string;
+    errorMessage?: string | null;
+    createdByUserId?: string | null;
+  }) {
+    return prisma.auditAnchor.create({
+      data: input,
+    });
+  }
+
   async findUsersByIds(ids: string[]) {
     if (ids.length === 0) {
       return [];
@@ -139,6 +239,63 @@ export class AuditLogRepository {
     });
   }
 
+  async findBrandsByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.brand.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+    });
+  }
+
+  async findSuppliersByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.supplier.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        taxNumber: true,
+      },
+    });
+  }
+
+  async findProductAttributesByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.productAttributeDefinition.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+    });
+  }
+
   async findCategoriesByIds(ids: string[]) {
     if (ids.length === 0) {
       return [];
@@ -173,6 +330,65 @@ export class AuditLogRepository {
         id: true,
         orderNumber: true,
         status: true,
+      },
+    });
+  }
+
+  async findBusinessDocumentsByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.businessDocument.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: {
+        id: true,
+        documentNumber: true,
+        documentType: true,
+      },
+    });
+  }
+
+  async findCollectionRecordsByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.collectionRecord.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: {
+        id: true,
+        amount: true,
+        currency: true,
+        orderId: true,
+      },
+    });
+  }
+
+  async findPaymentRecordsByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.paymentRecord.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: {
+        id: true,
+        amount: true,
+        currency: true,
+        supplierId: true,
       },
     });
   }
@@ -221,7 +437,7 @@ export class AuditLogRepository {
       return [];
     }
 
-    return (prisma.customerAccount as any).findMany({
+    return prisma.customerAccount.findMany({
       where: {
         id: {
           in: ids,

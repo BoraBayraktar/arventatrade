@@ -568,6 +568,8 @@ model BusinessDocument {
   deletedDate            DateTime?
   deletedUserId          String?
   dispatches             BusinessDocumentDispatch[]
+  lifecycleEvents        BusinessDocumentLifecycleEvent[]
+  integrationMessages    BusinessDocumentIntegrationMessage[]
   lines                  BusinessDocumentLine[]
   supplier               Supplier?                  @relation(fields: [supplierId], references: [id])
   customerAccount        CustomerAccount?           @relation(fields: [customerAccountId], references: [id])
@@ -630,6 +632,60 @@ model BusinessDocumentDispatch {
   @@index([businessDocumentId, createdAt])
   @@index([integrationJobId])
   @@index([channel, status])
+}
+
+model BusinessDocumentLifecycleEvent {
+  id                 String   @id @default(cuid())
+  businessDocumentId String
+  eventType          String
+  status             String?
+  externalStatus     String?
+  providerCode       String?
+  integrationJobId   String?
+  dispatchId         String?
+  auditLogId         String?
+  actorUserId        String?
+  actorType          String   @default("SYSTEM")
+  requestId          String?
+  correlationId      String?
+  summary            String
+  metadata           Json?
+  occurredAt         DateTime @default(now())
+  createdAt          DateTime @default(now())
+  businessDocument   BusinessDocument @relation(fields: [businessDocumentId], references: [id])
+  integrationMessages BusinessDocumentIntegrationMessage[]
+
+  @@index([businessDocumentId, occurredAt])
+  @@index([eventType, occurredAt])
+  @@index([integrationJobId])
+  @@index([requestId])
+}
+
+model BusinessDocumentIntegrationMessage {
+  id                 String   @id @default(cuid())
+  businessDocumentId String
+  lifecycleEventId   String?
+  integrationJobId   String?
+  direction          String
+  channel            String?
+  providerCode       String?
+  endpoint           String?
+  messageType        String
+  payloadHash        String
+  hashAlgorithm      String   @default("SHA-256")
+  payload            Json?
+  headers            Json?
+  statusCode         Int?
+  errorMessage       String?
+  occurredAt         DateTime @default(now())
+  createdAt          DateTime @default(now())
+  businessDocument   BusinessDocument @relation(fields: [businessDocumentId], references: [id])
+  lifecycleEvent     BusinessDocumentLifecycleEvent? @relation(fields: [lifecycleEventId], references: [id])
+
+  @@index([businessDocumentId, occurredAt])
+  @@index([lifecycleEventId])
+  @@index([integrationJobId])
+  @@index([payloadHash])
 }
 
 model DocumentProviderConfig {
@@ -1240,18 +1296,61 @@ model UserNotification {
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  entityType  String
-  entityId    String?
-  action      String
-  actorUserId String?
-  summary     String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id               String   @id @default(cuid())
+  entityType       String
+  entityId         String?
+  action           String
+  actorUserId      String?
+  actorType        String   @default("USER")
+  tenantId         String?
+  module           String?
+  route            String?
+  operation        String?
+  requestId        String?
+  correlationId    String?
+  ipAddress        String?
+  userAgent        String?
+  summary          String?
+  metadata         Json?
+  payloadHash      String?
+  previousHash     String?
+  chainHash        String?
+  hashAlgorithm    String   @default("SHA-256")
+  occurredAt       DateTime @default(now())
+  serverReceivedAt DateTime @default(now())
+  timezone         String   @default("Europe/Istanbul")
+  createdAt        DateTime @default(now())
 
   @@index([createdAt])
   @@index([entityType, createdAt])
   @@index([actorUserId, createdAt])
+  @@index([requestId])
+  @@index([chainHash])
+}
+
+model AuditAnchor {
+  id              String   @id @default(cuid())
+  anchorType      String
+  periodStart     DateTime
+  periodEnd       DateTime
+  recordCount     Int
+  firstAuditLogId String?
+  lastAuditLogId  String?
+  firstChainHash  String?
+  lastChainHash   String?
+  manifestHash    String
+  storageBucket   String?
+  storageObjectKey String?
+  storageUrl      String?
+  storageMode     String   @default("LOCAL")
+  status          String   @default("CREATED")
+  errorMessage    String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@index([periodStart, periodEnd])
+  @@index([manifestHash])
+  @@index([createdAt])
 }
 
 model InventoryHistoryEvent {

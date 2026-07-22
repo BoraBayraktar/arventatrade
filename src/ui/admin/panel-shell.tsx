@@ -8,6 +8,7 @@ import {
   BadgeDollarSign,
   Bell,
   Barcode,
+  CircleHelp,
   ChevronRight,
   Boxes,
   ClipboardCheck,
@@ -125,6 +126,701 @@ type NotificationItem = {
   createdAt: string;
 };
 
+type HelpGuideSection = {
+  title: string;
+  items: string[];
+};
+
+type HelpGuide = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  sections: HelpGuideSection[];
+};
+
+function createGuide(guide: HelpGuide): HelpGuide {
+  return guide;
+}
+
+function normalizeAdminPath(pathname: string) {
+  const segments = pathname.split("/").filter(Boolean);
+  const adminIndex = segments.indexOf("admin");
+
+  if (adminIndex === -1) {
+    return pathname;
+  }
+
+  return `/${segments.slice(adminIndex).join("/")}`;
+}
+
+function getActiveAdminGuide(pathname: string, searchParams: Pick<URLSearchParams, "get">): HelpGuide {
+  const adminPath = normalizeAdminPath(pathname);
+  const section = searchParams.get("section");
+
+  if (/^\/admin\/orders\/[^/]+$/.test(adminPath)) {
+    return createGuide({
+      eyebrow: "Sipariş detayı rehberi",
+      title: "Sipariş detay ekranı nasıl kullanılır?",
+      description: "Bu ekran siparişin operasyonel merkezi olarak çalışır. Durum, ödeme, belge, stok ve finans etkisini aynı yerden izler ve yönetirsiniz.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce müşteri, sipariş durumu ve ödeme durumunu kontrol edin.",
+            "Ürün satırlarını ve toplam tutarı doğrulayın.",
+            "Belge alanında e-fatura veya e-irsaliye ihtiyacını kontrol edin.",
+            "Tahsilat özeti eksikse tahsilat kaydı oluşturun.",
+            "İptal veya iade gerekiyorsa durumu güncellemeden önce finans hesabını netleştirin.",
+          ],
+        },
+        {
+          title: "Bu ekranda yapılan kritik işlemler",
+          items: [
+            "Sipariş durumunu güncelleme",
+            "Ödeme durumunu güncelleme",
+            "Tahsilat kaydı başlatma",
+            "İade sürecinde finans hesabı seçerek para çıkışı oluşturma",
+            "Stok ve belge etkisini geçmiş hareketler üzerinden doğrulama",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Belge eksikse Belgeler ekranına geçin.",
+            "Tahsilat eksikse Tahsilatlar ekranına geçin.",
+            "Stok iadesi veya hareket sorunu varsa Envanter hareketlerini açın.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/orders") {
+    return createGuide({
+      eyebrow: "Sipariş rehberi",
+      title: "Siparişler ekranı nasıl kullanılır?",
+      description: "Bu ekran sipariş havuzunu izlemek ve hangi kaydın aksiyon beklediğini bulmak için kullanılır. Asıl operasyon sipariş detayında tamamlanır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce ödeme durumu ve iade durumu kritik olan siparişleri filtreleyin.",
+            "Müşteri veya sipariş numarasına göre ilgili kaydı bulun.",
+            "İşlem yapacağınız siparişi açıp detay ekranına geçin.",
+          ],
+        },
+        {
+          title: "Burada neye bakmalısınız?",
+          items: [
+            "Sipariş durumu",
+            "Ödeme durumu",
+            "Restok durumu",
+            "Sipariş toplamı ve adet bilgisi",
+          ],
+        },
+        {
+          title: "Sipariş nereden oluşur?",
+          items: [
+            "Mağaza sepet/checkout akışı: Müşteri storefront tarafında sepete ürün ekleyip checkout yaptığında sipariş otomatik oluşuyor.",
+            "Pazaryeri entegrasyonları: Trendyol, N11, Pazarama, Hepsiburada gibi entegrasyonlardan gelen paket/sipariş kayıtları eşleştirildikten sonra sistem içinde siparişe dönüştürülüyor.",
+          ],
+        },
+        {
+          title: "Sonraki adım",
+          items: [
+            "Belge veya tahsilat işlemi için sipariş detayına girin.",
+            "İade veya iptal gerekiyorsa yine sipariş detayından ilerleyin.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/products") {
+    return createGuide({
+      eyebrow: "Ürün rehberi",
+      title: "Ürünler ekranı nasıl kullanılır?",
+      description: "Bu ekran satışa açılacak ürünleri hazırlamak için kullanılır. Ürün kartı burada hazırlanır, stok ve kanal hazırlığı sonraki ekranlarda tamamlanır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce ürün temel bilgilerini, fiyatını ve durumunu girin.",
+            "Kategori, marka, tedarikçi ve özellik eşleşmelerini tamamlayın.",
+            "Varyantlı ürünlerde eksenleri ve varyant satırlarını oluşturun.",
+            "Ürünü kaydettikten sonra stok hazırlığı için Envanter ekranına geçin.",
+          ],
+        },
+        {
+          title: "Bu ekranda yapılan işlemler",
+          items: [
+            "Yeni ürün oluşturma",
+            "Varyant üretme ve düzenleme",
+            "Ürün import veya export işlemleri",
+            "Marketplace preflight ve ürün senkron hazırlığı",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "İlk stok için Envanter hızlı aksiyonlarına geçin.",
+            "Kanal gönderimi için Entegrasyonlar veya ürün senkron alanını kullanın.",
+            "Mağaza görünümü için Storefront ekranını kontrol edin.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/categories") {
+    return createGuide({
+      eyebrow: "Kategori rehberi",
+      title: "Kategori yönetimi nasıl kullanılır?",
+      description: "Bu ekran ürünlerin katalogda, vitrinde ve filtrelerde doğru gruplarda görünmesini sağlayan kategori ağacını yönetmek için kullanılır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce ana kategori yapısını oluşturun.",
+            "Alt kategorileri ürün ailesine göre sade ve anlaşılır şekilde bağlayın.",
+            "Kategori adını, slug bilgisini ve sıralamasını kontrol edin.",
+            "Ürün kartlarında doğru kategori seçildiğini Ürünler ekranından doğrulayın.",
+          ],
+        },
+        {
+          title: "Bu ekranda yapılan işlemler",
+          items: [
+            "Yeni kategori oluşturma",
+            "Kategori adını ve sıralamasını düzenleme",
+            "Aktif katalog yapısını sadeleştirme",
+            "Ürünlerin mağaza tarafında hangi başlık altında görüneceğini hazırlama",
+          ],
+        },
+        {
+          title: "Dikkat edilmesi gerekenler",
+          items: [
+            "Aynı anlama gelen kategorileri çoğaltmayın.",
+            "Kategori değişikliği ürün listeleme ve filtre deneyimini etkiler.",
+            "Kategori silmeden veya pasifleştirmeden önce bağlı ürünleri kontrol edin.",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Kategoriye ürün bağlamak için Ürünler ekranına geçin.",
+            "Mağaza görünümünü kontrol etmek için Storefront ekranını açın.",
+            "Marketplace kategori eşleşmesi gerekiyorsa Entegrasyonlar ekranına gidin.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/brands") {
+    return createGuide({
+      eyebrow: "Marka rehberi",
+      title: "Marka yönetimi nasıl kullanılır?",
+      description: "Bu ekran ürün kartlarında kullanılan marka bilgisini merkezi olarak yönetir. Marka bilgisi katalog filtrelerinde, ürün detayında ve pazaryeri hazırlığında kullanılır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce marka adını standart yazımla oluşturun.",
+            "Aynı markanın farklı yazımlarını tek kayıtta toplayın.",
+            "Ürünler ekranında ilgili ürünlere markayı bağlayın.",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Ürüne marka bağlamak için Ürünler ekranını açın.",
+            "Pazaryeri marka eşleşmesini kontrol etmek için Entegrasyonlar ekranına geçin.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/suppliers") {
+    return createGuide({
+      eyebrow: "Tedarikçi rehberi",
+      title: "Tedarikçi yönetimi nasıl kullanılır?",
+      description: "Bu ekran ürünlerin satın alma, stok girişi, belge ve borç akışında kullanılan tedarikçi kayıtlarını yönetir.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce tedarikçi adını ve iletişim bilgilerini oluşturun.",
+            "Vergi ve e-posta gibi belge için gerekli alanları tamamlayın.",
+            "Satın alma veya stok girişinde bu tedarikçiyi kaynak olarak kullanın.",
+          ],
+        },
+        {
+          title: "Bağlı modüller",
+          items: [
+            "Ürünler ekranında ana tedarikçi seçilir.",
+            "Envanter stok girişlerinde tedarikçi bilgisi kullanılabilir.",
+            "Belgeler ve Finans ekranları tedarikçiye bağlı borç ve belge akışını gösterir.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/product-attributes") {
+    return createGuide({
+      eyebrow: "Ürün özellikleri rehberi",
+      title: "Ürün özellikleri nasıl kullanılır?",
+      description: "Bu ekran ürün kartlarında, filtrelerde ve varyant üretiminde kullanılan özellik tanımlarını yönetir.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce renk, beden, hacim gibi tekrar kullanılacak özellikleri tanımlayın.",
+            "Varyant oluşturacak özellikleri ürün ekranında varyant ekseni olarak seçin.",
+            "Filtre deneyimini sade tutmak için gereksiz özellik çoğaltmayın.",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Özelliği ürüne bağlamak için Ürünler ekranına geçin.",
+            "Marketplace attribute eşleşmesi için Entegrasyonlar ekranını kontrol edin.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/storefront") {
+    return createGuide({
+      eyebrow: "Storefront rehberi",
+      title: "Storefront ekranı nasıl kullanılır?",
+      description: "Bu ekran mağaza vitrininde hangi ürün ve içeriklerin öne çıkacağını yönetmek için kullanılır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce satışa açık ve stok durumu uygun ürünleri belirleyin.",
+            "Vitrin sıralamasını ve öne çıkarılan alanları düzenleyin.",
+            "Mağaza tarafında ürünlerin doğru göründüğünü kontrol edin.",
+          ],
+        },
+        {
+          title: "Bağlı modüller",
+          items: [
+            "Ürün bilgileri Ürünler ekranından gelir.",
+            "Stok uygunluğu Envanter ekranındaki değerlerden etkilenir.",
+            "Kategori düzeni Kategori yönetimiyle birlikte çalışır.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/customer-accounts" || adminPath === "/admin/customers") {
+    return createGuide({
+      eyebrow: "Müşteri hesabı rehberi",
+      title: "Müşteri hesapları nasıl kullanılır?",
+      description: "Bu ekran sipariş, belge ve tahsilat akışında kullanılan merkezi müşteri kayıtlarını yönetir.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce müşteri adını ve iletişim bilgisini kontrol edin.",
+            "E-posta, telefon, vergi ve adres alanlarını belge ihtiyacına göre tamamlayın.",
+            "Sipariş detayında müşteri bağlantısını doğrulayın.",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Müşterinin siparişlerini görmek için Siparişler ekranına geçin.",
+            "Açık tahsilatları görmek için Finans alacak ekranlarını kullanın.",
+            "Belge bağlantıları için Belgeler ekranını açın.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/users") {
+    return createGuide({
+      eyebrow: "Kullanıcı rehberi",
+      title: "Kullanıcı yönetimi nasıl kullanılır?",
+      description: "Bu ekran yönetim paneline erişen kullanıcıları ve yönetici yetkilerini kontrol etmek için kullanılır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce kullanıcının e-posta ve aktiflik durumunu kontrol edin.",
+            "Admin yetkisi verilecek kullanıcıları dikkatli seçin.",
+            "İşlem sonrası erişimi audit log ve kullanıcı listesi üzerinden doğrulayın.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/audit-logs") {
+    return createGuide({
+      eyebrow: "Audit log rehberi",
+      title: "Audit log ekranı nasıl kullanılır?",
+      description: "Bu ekran sistemde yapılan yönetim işlemlerini incelemek ve sorun araştırmalarında işlem geçmişini takip etmek için kullanılır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce tarih, kullanıcı veya aksiyon tipine göre filtreleyin.",
+            "Şüpheli kayıtta hedef modül ve işlem detayını inceleyin.",
+            "Gerekirse ilgili modül ekranına dönüp kaydın güncel durumunu kontrol edin.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/inventory/quick-actions" || section === "quick-actions") {
+    return createGuide({
+      eyebrow: "Envanter hızlı aksiyon rehberi",
+      title: "Hızlı aksiyonlar ekranı nasıl kullanılır?",
+      description: "Bu ekran barkod, SKU veya ürün aramasıyla en hızlı stok operasyonunu başlatmak için tasarlanır. Günlük fiziksel operasyon burada hız kazanır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Barkod, SKU veya ürün adı ile kaydı bulun.",
+            "Doğru depoyu ve işlem tipini seçin.",
+            "Miktarı girin ve sonucu hemen uygulayın.",
+            "Ardından hareket geçmişi veya senkron özetini kontrol edin.",
+          ],
+        },
+        {
+          title: "En sık kullanım senaryoları",
+          items: [
+            "Hızlı stok girişi",
+            "Hızlı stok çıkışı",
+            "Ürün bazlı anlık kontrol",
+            "Sayım sonrası fark kapatma",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Ayrıntılı hareket kontrolü için Envanter hareketleri ekranına geçin.",
+            "Senkron sorunu varsa Entegrasyonlar ekranını açın.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath.startsWith("/admin/inventory")) {
+    return createGuide({
+      eyebrow: "Envanter rehberi",
+      title: "Envanter ekranları nasıl kullanılır?",
+      description: "Bu alan stok durumunu izlemek, stok hareketi başlatmak, depo ve sayım süreçlerini yönetmek için kullanılır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce özet ve kritik stok alanlarından aksiyon bekleyen ürünleri bulun.",
+            "Stok girişi, çıkışı veya transfer gerekiyorsa Hızlı Aksiyonlar ekranına geçin.",
+            "Sayım farkı varsa Sayımlar ekranında kapsamı doğrulayıp uygulayın.",
+            "Sonucu Hareketler ekranında kontrol edin.",
+          ],
+        },
+        {
+          title: "Kontrol noktaları",
+          items: [
+            "Eldeki stok",
+            "Rezerve stok",
+            "Depo bazlı dağılım",
+            "Son hareket ve dış kanal senkron durumu",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Dış kanal farkı varsa Entegrasyonlar ekranına gidin.",
+            "Ürün kartı eksikse Ürünler ekranını açın.",
+            "Satış etkisini görmek için Siparişler ekranına geçin.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/documents/pending-invoices") {
+    return createGuide({
+      eyebrow: "Bekleyen fatura rehberi",
+      title: "Bekleyen faturalar ekranı nasıl kullanılır?",
+      description: "Bu ekran irsaliyeden faturaya geçiş bekleyen operasyonları toplar. Fatura oluşturma öncesi eksik kayıtları yakalamak için kullanılır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce hangi siparişlerin faturaya dönmesi gerektiğini kontrol edin.",
+            "Kaynağı açıp sipariş ve müşteri bilgisini doğrulayın.",
+            "Uygun belgeyi oluşturun ve ardından belge durumunu izleyin.",
+          ],
+        },
+        {
+          title: "Kontrol noktaları",
+          items: [
+            "Sipariş bağlantısı",
+            "Müşteri hesabı",
+            "İrsaliye kaydı",
+            "Dış sistem gönderim durumu",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Belge detayları için Belgeler ekranına geçin.",
+            "Sipariş doğrulaması gerekiyorsa Sipariş detayını açın.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/documents/providers") {
+    return createGuide({
+      eyebrow: "Belge provider rehberi",
+      title: "Belge sağlayıcıları nasıl kullanılır?",
+      description: "Bu ekran e-fatura ve e-irsaliye gönderiminde kullanılacak dış belge sağlayıcı ayarlarını yönetir.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce aktif ve varsayılan provider kaydını kontrol edin.",
+            "Gönderim bilgileri, kullanıcı adı ve gizli anahtar alanlarını doğrulayın.",
+            "Belge gönderimi sorunlarında provider kaydını ve dış sistem durumunu birlikte inceleyin.",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Gönderilecek belge için Belgeler ekranına geçin.",
+            "Dış sistem dönüşlerini görmek için Webhook ekranını açın.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/documents/webhooks") {
+    return createGuide({
+      eyebrow: "Belge webhook rehberi",
+      title: "Webhook kayıtları nasıl kullanılır?",
+      description: "Bu ekran dış belge sisteminden gelen durum bildirimlerini izlemek ve belge gönderim problemlerini takip etmek için kullanılır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce başarısız veya bekleyen webhook kayıtlarını bulun.",
+            "İlgili belge numarası ve provider bilgisini doğrulayın.",
+            "Belge durumunu Belgeler ekranında tekrar kontrol edin.",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Belge kaydı için Belgeler ekranına dönün.",
+            "Provider ayarı şüpheli ise Belge sağlayıcıları ekranını açın.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath.startsWith("/admin/documents")) {
+    return createGuide({
+      eyebrow: "Belge rehberi",
+      title: "Belgeler ekranı nasıl kullanılır?",
+      description: "Bu ekran siparişe veya stok işlemine bağlı ticari belgeleri oluşturmak, bağlamak ve dış sisteme göndermek için kullanılır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Belge tipine göre sipariş veya stok işlemi kaynağını seçin.",
+            "Tedarikçi ya da müşteri hesabını doğrulayın.",
+            "Belgeyi oluşturun veya düzenleyin.",
+            "Gönderim kuyruğuna alın ve dış sistem durumunu izleyin.",
+          ],
+        },
+        {
+          title: "Bu ekranda yapılan işlemler",
+          items: [
+            "Belge oluşturma",
+            "Belge düzenleme",
+            "Provider seçimi",
+            "Gönderim ve durum senkronu",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Sipariş doğrulaması için Sipariş detayına dönün.",
+            "Gönderim sorunu varsa Provider veya Webhook ekranlarını açın.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/finance/collections" || /^\/admin\/finance\/collections\/[^/]+$/.test(adminPath)) {
+    return createGuide({
+      eyebrow: "Tahsilat rehberi",
+      title: "Tahsilatlar ekranı nasıl kullanılır?",
+      description: "Bu ekran açık alacakları görmek ve sipariş bazında tahsilat kaydı oluşturmak için kullanılır. Tahsilat burada başlar, sipariş ödeme etkisi sipariş tarafında görünür.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce kalan tutarı olan siparişleri bulun.",
+            "Doğru finans hesabını seçin.",
+            "Tahsilat kaydını oluşturun.",
+            "Ardından sipariş kaynağına dönüp ödeme durumunu kontrol edin.",
+          ],
+        },
+        {
+          title: "Kontrol etmeniz gerekenler",
+          items: [
+            "Kalan tutar",
+            "Kayıtlı tahsilat sayısı",
+            "Ödeme başarısız veya yetkilendirilmiş durumları",
+            "Doğru banka veya kasa hesabı",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Sipariş detayına dönerek finans özetini doğrulayın.",
+            "Tüm hareketleri görmek için Banka/Nakit veya İşlem hareketleri ekranını açın.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath === "/admin/finance/receivables" || /^\/admin\/finance\/receivables\/[^/]+$/.test(adminPath)) {
+    return createGuide({
+      eyebrow: "Alacak rehberi",
+      title: "Alacaklar ekranı nasıl kullanılır?",
+      description: "Bu ekran siparişlerden doğan açık alacakları ve ödeme bekleyen kayıtları finans bakışıyla izlemek için kullanılır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce ödeme durumu açık veya başarısız olan siparişleri bulun.",
+            "Kalan tutarı ve müşteri bilgisini doğrulayın.",
+            "Tahsilat gerekiyorsa Tahsilatlar ekranından kayıt oluşturun.",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Tahsilat için Tahsilatlar ekranına geçin.",
+            "Sipariş kaynağını görmek için Sipariş detayını açın.",
+            "Finans hareketi kontrolü için İşlem hareketleri ekranını kullanın.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath.startsWith("/admin/finance")) {
+    return createGuide({
+      eyebrow: "Finans rehberi",
+      title: "Finans ekranları nasıl kullanılır?",
+      description: "Bu alan alacak, borç, tahsilat, ödeme, banka/kasa ve rapor işlemlerini birlikte yönetir.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce alacak veya borç listesinde açık kaydı bulun.",
+            "Tahsilat veya ödeme işlemini ilgili ekrandan oluşturun.",
+            "Banka/Kasa ve İşlem hareketlerinde kaydın finans etkisini kontrol edin.",
+            "Dönemsel kontrol için rapor ekranlarına geçin.",
+          ],
+        },
+        {
+          title: "Bağlı modüller",
+          items: [
+            "Siparişler alacak ve tahsilat kaynağıdır.",
+            "Belgeler ticari evrak bağlantısını taşır.",
+            "Tedarikçiler borç ve ödeme akışında kullanılır.",
+          ],
+        },
+      ],
+    });
+  }
+
+  if (adminPath.startsWith("/admin/integrations")) {
+    return createGuide({
+      eyebrow: "Entegrasyon rehberi",
+      title: "Entegrasyonlar ekranı nasıl kullanılır?",
+      description: "Bu ekran dış kanallarla veri akışını izlemek, kuyruk işlemlerini yönetmek ve hatalı job kayıtlarını çözmek için kullanılır.",
+      sections: [
+        {
+          title: "Önerilen sıra",
+          items: [
+            "Önce özet kartlardan sıkışan durumları seçin.",
+            "Failed ve dead letter kayıtlarını öncelikli inceleyin.",
+            "Job detayında payload ve hata mesajını okuyun.",
+            "Gerekli düzeltmeyi ilgili modülde yapıp retry başlatın.",
+          ],
+        },
+        {
+          title: "Bu ekranda çözülen başlıklar",
+          items: [
+            "Ürün, fiyat ve stok senkronu",
+            "Sipariş içeri alma",
+            "Belge gönderimi",
+            "Kuyruk ve tekrar deneme yönetimi",
+          ],
+        },
+        {
+          title: "Sonraki gidilecek ekranlar",
+          items: [
+            "Ürün hatalarında Ürünler ekranına gidin.",
+            "Sipariş kaynaklı sorunlarda Siparişler ekranına geçin.",
+            "Belge hatalarında Belgeler ekranını açın.",
+          ],
+        },
+      ],
+    });
+  }
+
+  return createGuide({
+    eyebrow: "Admin rehberi",
+    title: "Bu sayfa nasıl kullanılmalı?",
+    description: "Bulunduğunuz ekran 2BEM içindeki bir operasyon adımını yönetir. En doğru kullanım için önce hedef kaydı bulun, ardından bağlı modüllere geçerek süreci tamamlayın.",
+    sections: [
+      {
+        title: "Genel sıra",
+        items: [
+          "Önce ilgili kaydı veya problemi bulun.",
+          "Durum ve bağlı verileri doğrulayın.",
+          "Aksiyonu doğru modülde tamamlayın.",
+          "Sonucu ilgili kaynak ekranda tekrar kontrol edin.",
+        ],
+      },
+      {
+        title: "Bağlı modüller",
+        items: [
+          "Siparişler operasyon merkezi olarak çalışır.",
+          "Belgeler ticari evrak akışını yönetir.",
+          "Finans tahsilat ve iade hareketlerini yönetir.",
+          "Entegrasyonlar dış sistem akışını izler.",
+        ],
+      },
+    ],
+  });
+}
+
 export function AdminPanelShell({
   locale,
   title,
@@ -144,6 +840,7 @@ export function AdminPanelShell({
   const searchParams = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [openMenuGroups, setOpenMenuGroups] = useState<Record<string, boolean>>({});
   const [menuSearch, setMenuSearch] = useState("");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -242,6 +939,7 @@ export function AdminPanelShell({
     const timer = window.setTimeout(() => {
       setNotificationsOpen(false);
       setMobileMenuOpen(false);
+      setHelpOpen(false);
     }, 0);
 
     return () => {
@@ -410,6 +1108,7 @@ export function AdminPanelShell({
   const visibleMenuItems = menuItems
     .map((item) => filterMenuTree(item, menuSearch))
     .filter((item): item is MenuItem => item !== null);
+  const activeGuide = getActiveAdminGuide(pathname, searchParams);
 
   return (
     <main className="min-h-screen bg-[#f5f7fb]">
@@ -510,7 +1209,7 @@ export function AdminPanelShell({
           </Card>
         </aside>
 
-        <section className="grid min-h-0 content-start gap-4">
+        <section className="grid min-h-0 min-w-0 content-start gap-4">
           <header className="flex h-[72px] items-center justify-between gap-3 overflow-hidden rounded-2xl border border-neutral-200 bg-white px-3 py-2">
             <div className="min-w-0 flex flex-1 items-center gap-2">
               <div className="flex items-center gap-2 lg:hidden">
@@ -537,6 +1236,16 @@ export function AdminPanelShell({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Sayfa yardımı"
+                title="Sayfa yardımı"
+                onClick={() => setHelpOpen(true)}
+              >
+                <CircleHelp className="h-4 w-4" />
+              </Button>
               <div className="relative" ref={notificationRef}>
                 <Button
                   type="button"
@@ -620,9 +1329,52 @@ export function AdminPanelShell({
             </div>
           </header>
 
-          <div className="grid gap-4">{children}</div>
+          <div className="grid min-w-0 gap-4">{children}</div>
         </section>
       </div>
+
+      {helpOpen ? (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            aria-label="Yardım panelini kapat"
+            className="absolute inset-0 bg-black/35 backdrop-blur-[1px]"
+            onClick={() => setHelpOpen(false)}
+          />
+          <aside className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col overflow-hidden border-l border-neutral-200 bg-white shadow-2xl">
+            <div className="border-b border-neutral-200 bg-[radial-gradient(circle_at_top_right,_rgba(14,116,144,0.12),_transparent_52%),radial-gradient(circle_at_left,_rgba(245,158,11,0.10),_transparent_40%)] px-5 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">{activeGuide.eyebrow}</p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">{activeGuide.title}</h2>
+                  <p className="mt-2 text-sm leading-6 text-neutral-600">{activeGuide.description}</p>
+                </div>
+                <Button type="button" variant="ghost" size="icon" onClick={() => setHelpOpen(false)} aria-label="Kapat">
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-5">
+              <div className="space-y-4">
+                {activeGuide.sections.map((sectionItem) => (
+                  <section key={sectionItem.title} className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4">
+                    <h3 className="text-sm font-semibold text-neutral-950">{sectionItem.title}</h3>
+                    <ul className="mt-3 space-y-2 text-sm leading-6 text-neutral-700">
+                      {sectionItem.items.map((item) => (
+                        <li key={item} className="flex gap-2">
+                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-400" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+      ) : null}
     </main>
   );
 }

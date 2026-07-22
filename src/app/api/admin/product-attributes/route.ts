@@ -24,8 +24,8 @@ export async function POST(request: Request) {
     const user = await requireUserRoles(["ADMIN", "EDITOR"]);
     const payload = await request.json();
     const created = await catalogAdminService.createAttributeDefinition(payload);
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "PRODUCT_ATTRIBUTE",
       entityId: created.id,
       action: "CREATE",
       actorUserId: user.id,

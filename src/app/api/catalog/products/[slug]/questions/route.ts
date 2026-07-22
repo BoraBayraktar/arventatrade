@@ -39,3 +39,4 @@ export async function POST(
     return NextResponse.json({ message: "Unexpected error" }, { status: 500 });
   }
 }
+// AUDIT_EXEMPT_REASON: Müşteri ürün soru akışı katalog question tablosunda ve moderasyon auditinde takip edilir; finans/e-belge audit kapsamı değildir.

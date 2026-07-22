@@ -19,8 +19,8 @@ export async function POST(request: Request) {
 
     const created = await inventoryService.createStockCount(payload);
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "STOCK_COUNT",
       entityId: created.id,
       action: "CREATE",
       actorUserId: user.id,

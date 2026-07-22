@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 
 import { AUTH_COOKIE_NAME, AUTH_TOKEN_REMEMBER_ME_TTL_SECONDS, AUTH_TOKEN_TTL_SECONDS } from "@/lib/auth";
 import { identityService } from "@/modules/identity/services/identity.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
+
+function maskEmail(value: unknown) {
+  if (typeof value !== "string" || !value.includes("@")) {
+    return null;
+  }
+
+  const [name, domain] = value.toLowerCase().split("@");
+  return `${name.slice(0, 2)}***@${domain}`;
+}
 
 export async function POST(request: Request) {
   const payload = await request.json();
@@ -9,8 +19,29 @@ export async function POST(request: Request) {
 
   const result = await identityService.login(payload);
   if (!result) {
+    await auditLogService.recordFromRequest(request, {
+      entityType: "AUTH",
+      action: "LOGIN_FAILED",
+      actorType: "SYSTEM",
+      summary: "Başarısız giriş denemesi",
+      metadata: {
+        emailMasked: maskEmail(payload?.email),
+      },
+    });
     return NextResponse.json({ message: "Invalid credentials" }, { status: 401 });
   }
+
+  await auditLogService.recordFromRequest(request, {
+    entityType: "AUTH",
+    entityId: result.user.id,
+    action: "LOGIN",
+    actorUserId: result.user.id,
+    summary: `Kullanıcı giriş yaptı: ${result.user.email}`,
+    metadata: {
+      role: result.user.role,
+      rememberMe: Boolean(payload?.rememberMe),
+    },
+  });
 
   const response = NextResponse.json({ user: result.user });
   response.cookies.set({

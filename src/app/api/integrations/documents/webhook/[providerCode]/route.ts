@@ -26,13 +26,14 @@ export async function POST(request: Request, context: { params: Promise<{ provid
       payload: parsedBody,
     });
 
-    await auditLogService.record({
-      entityType: "ORDER",
-      entityId: item.orderId ?? item.id,
+    await auditLogService.recordFromRequest(request, {
+      entityType: "BUSINESS_DOCUMENT",
+      entityId: item.id,
       action: "STATUS_UPDATE",
       summary: `Belge webhook durumu işlendi: ${item.documentNumber}`,
       metadata: {
         documentId: item.id,
+        orderId: item.orderId,
         providerCode,
         externalSystemStatus: item.externalSystemStatus,
       },

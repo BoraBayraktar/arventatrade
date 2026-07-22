@@ -39,12 +39,22 @@ export async function POST(request: Request) {
     const user = await requireUserRoles(["ADMIN"]);
     const payload = await request.json();
     const created = await identityAdminService.createUser(payload);
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "USER",
       entityId: created.id,
       action: "CREATE",
       actorUserId: user.id,
       summary: `Kullanıcı oluşturuldu: ${created.email}`,
+    });
+    await auditLogService.recordFromRequest(request, {
+      entityType: "AUTH",
+      entityId: created.id,
+      action: "PERMISSION_CHANGE",
+      actorUserId: user.id,
+      summary: `Kullanıcı yetkisi tanımlandı: ${created.email}`,
+      metadata: {
+        targetRole: created.role,
+      },
     });
     return NextResponse.json({ item: created }, { status: 201 });
   } catch (error) {

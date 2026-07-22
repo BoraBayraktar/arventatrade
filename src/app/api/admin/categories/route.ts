@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const user = await requireUserRoles(["ADMIN", "EDITOR"]);
     const payload = await request.json();
     const created = await catalogAdminService.createCategory(payload);
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "CATEGORY",
       entityId: created.id,
       action: "CREATE",

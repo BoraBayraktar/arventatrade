@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import type { AdminBusinessDocumentDetail, DocumentWebhookPayload } from "@/modules/documents/contracts/document.contract";
 import { DocumentRepository } from "@/modules/documents/repositories/document.repository";
 import { DocumentAdminError } from "@/modules/documents/services/document.service";
+import { documentLifecycleService } from "@/modules/documents/services/document-lifecycle.service";
 import { documentProviderCryptoService } from "@/modules/documents/services/document-provider-crypto.service";
 import { documentService } from "@/modules/documents/services/document.service";
 
@@ -82,6 +83,55 @@ function mapDocument(item: Awaited<ReturnType<DocumentRepository["findBusinessDo
       dispatchedAt: dispatch.dispatchedAt ? dispatch.dispatchedAt.toISOString() : null,
       createdAt: dispatch.createdAt.toISOString(),
     })),
+    lifecycleEvents: (item.lifecycleEvents ?? []).map((event: {
+      id: string;
+      eventType: string;
+      status: string | null;
+      externalStatus: string | null;
+      providerCode: string | null;
+      integrationJobId: string | null;
+      actorType: string;
+      requestId: string | null;
+      correlationId: string | null;
+      summary: string;
+      metadata: unknown;
+      occurredAt: Date;
+      integrationMessages: Array<{
+        id: string;
+        direction: string;
+        channel: string | null;
+        providerCode: string | null;
+        messageType: string;
+        payloadHash: string;
+        statusCode: number | null;
+        errorMessage: string | null;
+        occurredAt: Date;
+      }>;
+    }) => ({
+      id: event.id,
+      eventType: event.eventType,
+      status: event.status,
+      externalStatus: event.externalStatus,
+      providerCode: event.providerCode,
+      integrationJobId: event.integrationJobId,
+      actorType: event.actorType,
+      requestId: event.requestId,
+      correlationId: event.correlationId,
+      summary: event.summary,
+      metadata: (event.metadata as Record<string, unknown> | null) ?? null,
+      occurredAt: event.occurredAt.toISOString(),
+      messages: event.integrationMessages.map((message) => ({
+        id: message.id,
+        direction: message.direction,
+        channel: message.channel,
+        providerCode: message.providerCode,
+        messageType: message.messageType,
+        payloadHash: message.payloadHash,
+        statusCode: message.statusCode,
+        errorMessage: message.errorMessage,
+        occurredAt: message.occurredAt.toISOString(),
+      })),
+    })),
   };
 }
 
@@ -134,6 +184,33 @@ export class DocumentWebhookService {
       id: document.id,
       externalSystemStatus: args.payload.status ?? "SENT",
       externalReference: args.payload.externalReference ?? document.externalReference,
+    });
+
+    await documentLifecycleService.recordEvent({
+      businessDocumentId: document.id,
+      eventType: "WEBHOOK_RECEIVED",
+      status: updated.status,
+      externalStatus: updated.externalSystemStatus,
+      providerCode: args.providerCode,
+      actorType: "INTEGRATION",
+      summary: `Belge webhook durumu işlendi: ${updated.documentNumber}`,
+      metadata: {
+        documentNumber: updated.documentNumber,
+        externalReference: updated.externalReference,
+      },
+      message: {
+        direction: "INBOUND",
+        channel: provider.channel,
+        providerCode: args.providerCode,
+        messageType: "DOCUMENT_STATUS_WEBHOOK",
+        payload: {
+          rawBody: args.rawBody,
+          parsed: args.payload,
+        },
+        headers: {
+          "x-arventa-signature": args.signature,
+        },
+      },
     });
 
     return mapDocument(updated);

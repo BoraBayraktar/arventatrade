@@ -15,8 +15,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       ...payload,
     });
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "PRODUCT_ATTRIBUTE",
       entityId: updated.id,
       action: "UPDATE",
       actorUserId: user.id,
@@ -40,14 +40,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 }
 
-export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireUserRoles(["ADMIN", "EDITOR"]);
     const { id } = await context.params;
     const deleted = await catalogAdminService.deleteAttributeDefinition(id);
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "PRODUCT_ATTRIBUTE",
       entityId: deleted.id,
       action: "DELETE",
       actorUserId: user.id,

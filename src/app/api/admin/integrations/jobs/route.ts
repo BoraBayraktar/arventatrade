@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 
 import { integrationService } from "@/modules/integration/services/integration.service";
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(request: Request) {
   try {
@@ -33,9 +34,20 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await requireUserRoles(["ADMIN"]);
+    const user = await requireUserRoles(["ADMIN"]);
     const payload = await request.json();
     const result = await integrationService.dispatchJobs(payload);
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INTEGRATION",
+      action: "SYNC",
+      actorUserId: user.id,
+      summary: "Entegrasyon işi oluşturuldu",
+      metadata: {
+        channel: payload.channel,
+        jobType: payload.jobType,
+        entityType: payload.entityType,
+      },
+    });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof AuthContextError) {

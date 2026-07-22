@@ -17,7 +17,7 @@ export async function PATCH(
     const { id } = await context.params;
     const payload = await request.json();
     const item = await storefrontService.upsertItem({ id, ...payload });
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "STOREFRONT_ITEM",
       entityId: item.id,
       action: "UPDATE",
@@ -39,14 +39,14 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
     const user = await requireUserRoles(["ADMIN"]);
     const { id } = await context.params;
     await storefrontService.softDeleteItem(id, user.id);
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "STOREFRONT_ITEM",
       entityId: id,
       action: "DELETE",

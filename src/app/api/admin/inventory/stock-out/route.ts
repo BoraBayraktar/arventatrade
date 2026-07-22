@@ -37,8 +37,8 @@ export async function POST(request: Request) {
       externalSystemStatus: payload.externalSystemStatus,
     });
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INVENTORY",
       entityId: payload.productId,
       action: "UPDATE",
       actorUserId: user.id,

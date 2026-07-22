@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const user = await requireUserRoles(["ADMIN", "EDITOR"]);
     const payload = await request.json();
     const created = await customerAccountService.createCustomerAccount(payload);
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "CUSTOMER_ACCOUNT",
       entityId: created.id,
       action: "CREATE",

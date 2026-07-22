@@ -70,6 +70,12 @@ type Labels = {
   dispatchError: string;
   dispatchQueuedAt: string;
   noDispatchHistory: string;
+  lifecycleHistory: string;
+  noLifecycleHistory: string;
+  lifecycleMessageEvidence: string;
+  lifecyclePayloadHash: string;
+  lifecycleRequestId: string;
+  lifecycleIntegrationJobId: string;
   providerSelection: string;
   providerNone: string;
   selectSupplier: string;
@@ -261,7 +267,6 @@ function exportItemsAsCsv(items: AdminBusinessDocumentListItem[]) {
 }
 
 export function DocumentManager({
-  locale: _locale,
   result,
   providerOptions,
   supplierOptions,
@@ -1192,6 +1197,49 @@ export function DocumentManager({
                           <p className="mt-1">{labels.externalReference}: {dispatch.externalReference ?? labels.notSpecified}</p>
                           <p className="mt-1">{labels.dispatchQueuedAt}: {formatDate(dispatch.queuedAt)}</p>
                           <p className="mt-1">{labels.dispatchError}: {dispatch.errorMessage ?? labels.notSpecified}</p>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-950">{labels.lifecycleHistory}</h3>
+                  {detail.lifecycleEvents.length === 0 ? (
+                    <p className="mt-3 text-sm text-slate-500">{labels.noLifecycleHistory}</p>
+                  ) : (
+                    <div className="mt-3 space-y-3">
+                      {detail.lifecycleEvents.map((event) => (
+                        <article key={event.id} className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">
+                          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                            <div>
+                              <p className="font-semibold text-slate-950">{event.summary}</p>
+                              <p className="mt-1 text-xs text-slate-500">{event.eventType} • {formatDate(event.occurredAt)}</p>
+                            </div>
+                            <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                              {event.externalStatus ?? event.status ?? labels.notSpecified}
+                            </span>
+                          </div>
+                          <div className="mt-3 grid gap-2 md:grid-cols-2">
+                            <p className="break-all text-xs text-slate-600">{labels.lifecycleRequestId}: {event.requestId ?? labels.notSpecified}</p>
+                            <p className="break-all text-xs text-slate-600">{labels.lifecycleIntegrationJobId}: {event.integrationJobId ?? labels.notSpecified}</p>
+                          </div>
+                          {event.messages.length > 0 ? (
+                            <details className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2">
+                              <summary className="cursor-pointer list-none text-xs font-semibold text-slate-600 marker:hidden">
+                                {labels.lifecycleMessageEvidence}
+                              </summary>
+                              <div className="mt-3 space-y-2">
+                                {event.messages.map((message) => (
+                                  <div key={message.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                    <p className="text-xs font-semibold text-slate-900">{message.direction} • {message.messageType}</p>
+                                    <p className="mt-1 break-all text-xs text-slate-600">{labels.lifecyclePayloadHash}: {message.payloadHash}</p>
+                                    <p className="mt-1 text-xs text-slate-500">{formatDate(message.occurredAt)}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          ) : null}
                         </article>
                       ))}
                     </div>

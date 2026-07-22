@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 
 import { financialAccountsService } from "@/modules/finance/services/financial-accounts.service";
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function GET(request: Request) {
   try {
@@ -28,9 +29,16 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await requireUserRoles(["ADMIN", "EDITOR"]);
+    const user = await requireUserRoles(["ADMIN", "EDITOR"]);
     const payload = await request.json();
     const item = await financialAccountsService.createAccount(payload);
+    await auditLogService.recordFromRequest(request, {
+      entityType: "FINANCE_PAYMENT",
+      entityId: item.id,
+      action: "CREATE",
+      actorUserId: user.id,
+      summary: `Finans hesabı oluşturuldu: ${item.name}`,
+    });
     return NextResponse.json({ item }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthContextError) {

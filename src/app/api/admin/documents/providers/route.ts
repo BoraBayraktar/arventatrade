@@ -25,8 +25,8 @@ export async function POST(request: Request) {
     const payload = await request.json();
     const item = await documentService.upsertProviderConfig(payload);
 
-    await auditLogService.record({
-      entityType: "ORDER",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INTEGRATION",
       entityId: item.id,
       action: "UPDATE",
       actorUserId: user.id,

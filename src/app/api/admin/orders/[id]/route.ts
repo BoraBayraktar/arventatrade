@@ -34,7 +34,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const { id } = await context.params;
     const payload = await request.json();
     const updated = await commerceService.updateOrderStatus({ id, changedByUserId: user.id, ...payload });
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "ORDER",
       entityId: id,
       action: "STATUS_UPDATE",
@@ -59,12 +59,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 }
 
-export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireUserRoles(["ADMIN"]);
     const { id } = await context.params;
     await commerceService.softDeleteOrder(id, user.id);
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "ORDER",
       entityId: id,
       action: "DELETE",

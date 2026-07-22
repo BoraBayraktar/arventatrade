@@ -17,6 +17,7 @@ import type {
   DocumentProviderResolvedConfig,
 } from "@/modules/documents/contracts/document.contract";
 import { DocumentRepository } from "@/modules/documents/repositories/document.repository";
+import { documentLifecycleService } from "@/modules/documents/services/document-lifecycle.service";
 import { documentProviderCryptoService } from "@/modules/documents/services/document-provider-crypto.service";
 
 const listQuerySchema = z.object({
@@ -203,6 +204,55 @@ function mapDocument(item: Awaited<ReturnType<DocumentRepository["findBusinessDo
       queuedAt: dispatch.queuedAt.toISOString(),
       dispatchedAt: dispatch.dispatchedAt ? dispatch.dispatchedAt.toISOString() : null,
       createdAt: dispatch.createdAt.toISOString(),
+    })),
+    lifecycleEvents: (item.lifecycleEvents ?? []).map((event: {
+      id: string;
+      eventType: string;
+      status: string | null;
+      externalStatus: string | null;
+      providerCode: string | null;
+      integrationJobId: string | null;
+      actorType: string;
+      requestId: string | null;
+      correlationId: string | null;
+      summary: string;
+      metadata: unknown;
+      occurredAt: Date;
+      integrationMessages: Array<{
+        id: string;
+        direction: string;
+        channel: string | null;
+        providerCode: string | null;
+        messageType: string;
+        payloadHash: string;
+        statusCode: number | null;
+        errorMessage: string | null;
+        occurredAt: Date;
+      }>;
+    }) => ({
+      id: event.id,
+      eventType: event.eventType,
+      status: event.status,
+      externalStatus: event.externalStatus,
+      providerCode: event.providerCode,
+      integrationJobId: event.integrationJobId,
+      actorType: event.actorType,
+      requestId: event.requestId,
+      correlationId: event.correlationId,
+      summary: event.summary,
+      metadata: (event.metadata as Record<string, unknown> | null) ?? null,
+      occurredAt: event.occurredAt.toISOString(),
+      messages: event.integrationMessages.map((message) => ({
+        id: message.id,
+        direction: message.direction,
+        channel: message.channel,
+        providerCode: message.providerCode,
+        messageType: message.messageType,
+        payloadHash: message.payloadHash,
+        statusCode: message.statusCode,
+        errorMessage: message.errorMessage,
+        occurredAt: message.occurredAt.toISOString(),
+      })),
     })),
   };
 }
@@ -425,6 +475,22 @@ export class DocumentService {
       throw new DocumentAdminError("Kaynak irsaliye bulunamadı.", 404);
     }
 
+    await documentLifecycleService.recordEvent({
+      businessDocumentId: created.id,
+      eventType: "INVOICE_CREATED_FROM_DELIVERY_NOTE",
+      status: created.status,
+      externalStatus: created.externalSystemStatus,
+      providerCode: created.providerConfig?.displayName ?? null,
+      actorType: "SYSTEM",
+      summary: `İrsaliyeden e-fatura oluşturuldu: ${created.documentNumber}`,
+      metadata: {
+        sourceDocumentId: sourceDocument.id,
+        sourceDocumentNumber: sourceDocument.documentNumber,
+        orderId: created.order?.id ?? null,
+        inventoryTransactionId: created.inventoryTransaction?.id ?? null,
+      },
+    });
+
     return mapDocument(created);
   }
 
@@ -524,6 +590,22 @@ export class DocumentService {
       resolvedLines,
     });
 
+    await documentLifecycleService.recordEvent({
+      businessDocumentId: created.id,
+      eventType: "DOCUMENT_CREATED",
+      status: created.status,
+      externalStatus: created.externalSystemStatus,
+      providerCode: created.providerConfig?.displayName ?? null,
+      actorType: "USER",
+      summary: `Belge oluşturuldu: ${created.documentNumber}`,
+      metadata: {
+        documentType: created.documentType,
+        orderId: created.order?.id ?? null,
+        inventoryTransactionId: created.inventoryTransaction?.id ?? null,
+        lineCount: created.lines.length,
+      },
+    });
+
     return mapDocument(created);
   }
 
@@ -542,6 +624,20 @@ export class DocumentService {
     }
 
     const updated = await this.repository.updateBusinessDocument(parsed);
+    await documentLifecycleService.recordEvent({
+      businessDocumentId: updated.id,
+      eventType: "DOCUMENT_UPDATED",
+      status: updated.status,
+      externalStatus: updated.externalSystemStatus,
+      providerCode: updated.providerConfig?.displayName ?? null,
+      actorType: "USER",
+      summary: `Belge güncellendi: ${updated.documentNumber}`,
+      metadata: {
+        changedFields: Object.keys(parsed).filter((key) => key !== "id"),
+        previousStatus: existing.status,
+        previousExternalSystemStatus: existing.externalSystemStatus,
+      },
+    });
     return mapDocument(updated);
   }
 

@@ -3,9 +3,10 @@ import { ZodError } from "zod";
 
 import { AuthContextError, requireUserRoles } from "@/modules/identity/services/auth-context.service";
 import { marketplaceIntegrationService } from "@/modules/integration/services/marketplace-integration.service";
+import { auditLogService } from "@/modules/system/services/audit-log.service";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string; jobId: string }> },
 ) {
   try {
@@ -15,6 +16,16 @@ export async function POST(
       packageId: id,
       jobId,
       resolvedByUserId: user.id,
+    });
+    await auditLogService.recordFromRequest(request, {
+      entityType: "MARKETPLACE_PACKAGE",
+      entityId: id,
+      action: "SYNC",
+      actorUserId: user.id,
+      summary: "Pazaryeri paket durum işi tekrar kuyruğa alındı",
+      metadata: {
+        jobId,
+      },
     });
     return NextResponse.json(result);
   } catch (error) {

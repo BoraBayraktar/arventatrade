@@ -23,7 +23,7 @@ export async function PATCH(
       variants: payload.variants ?? [],
     });
 
-    await auditLogService.record({
+    await auditLogService.recordFromRequest(request, {
       entityType: "PRODUCT",
       entityId: updated.id,
       action: "UPDATE",

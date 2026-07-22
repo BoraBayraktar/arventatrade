@@ -17,8 +17,8 @@ export async function POST(request: Request) {
       inventoryService.parseBulkPreferredWarehouseCsv(payload.csv),
     );
 
-    await auditLogService.record({
-      entityType: "PRODUCT",
+    await auditLogService.recordFromRequest(request, {
+      entityType: "INVENTORY",
       action: "UPDATE",
       actorUserId: user.id,
       summary: `Toplu tercih edilen depo ataması işlendi: ${result.successCount}/${result.total}`,
